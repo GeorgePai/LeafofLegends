@@ -1,0 +1,335 @@
+'use strict';
+/* =========================================================
+   繪製：低解析像素緩衝 → 整數放大 + 次像素平移（鏡頭平滑）
+   ========================================================= */
+G.Render = (() => {
+  const R = {
+    cam: { x: 0, y: 0, zoom: 1, follow: true, vx: 0, vy: 0 },
+    scale: 4, uiS: 3, sw: 0, sh: 0, dpr: 1, ox: 0, oy: 0, fx: 0, fy: 0
+  };
+  let cv, ctx, buf, bctx, ui, uctx, vign;
+
+  R.init = function (canvas) {
+    cv = canvas; ctx = cv.getContext('2d', { alpha: false });
+    buf = G.canvas(8, 8); bctx = buf.getContext('2d');
+    ui = G.canvas(8, 8); uctx = ui.getContext('2d');
+    R.uctx = uctx;
+    R.resize();
+  };
+  // 固定畫面比例：橫屏固定 320×180（16:9）、直屏寬固定 180（高 320~400）；
+  // 視窗多出來的部分留黑邊，不論視窗多大，畫面內所有物件的比例都一樣
+  R.resize = function () {
+    R.dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const W0 = innerWidth, H0 = innerHeight, port = H0 > W0;
+    const LW = port ? 180 : 320, LH = port ? G.clamp(Math.round(180 * H0 / W0), 320, 400) : 180;
+    // 電腦：每個像素放大成「整數倍」的螢幕實體像素 → 所有像素一樣大，字與輪廓不會粗細不均（看起來糊）
+    // 手機：像素很密，看不出差異，維持填滿畫面
+    const touch0 = matchMedia('(pointer: coarse)').matches;
+    let cs = Math.min(W0 / LW, H0 / LH), kInt = 0;
+    if (!touch0) { const k = Math.floor(cs * R.dpr); if (k >= 2) { kInt = k; cs = k / R.dpr; } }
+    const cw = kInt ? LW * cs : Math.floor(LW * cs), ch = kInt ? LH * cs : Math.floor(LH * cs);
+    R.cssX = Math.floor((W0 - cw) / 2); R.cssY = Math.floor((H0 - ch) / 2);
+    cv.style.position = 'fixed'; cv.style.left = R.cssX + 'px'; cv.style.top = R.cssY + 'px'; cv.style.width = cw + 'px'; cv.style.height = ch + 'px';
+    R.sw = kInt ? LW * kInt : Math.round(cw * R.dpr); R.sh = kInt ? LH * kInt : Math.round(ch * R.dpr);
+    cv.width = R.sw; cv.height = R.sh;
+    R.uw = LW; R.uh = LH; R.uiS = R.sw / LW;
+    R.base = port ? R.uiS * 0.9 : R.uiS;
+    // 安全邊距（UI px，固定值）：直屏避開圓角/底部手勢列，橫屏避開瀏海；系統安全區超出黑邊時再加大
+    const touch = matchMedia('(pointer: coarse)').matches, cssPerUi = cs;
+    let si = { l: 0, r: 0, t: 0, b: 0 };
+    const pr = document.getElementById('safe'); if (pr) { const b = pr.getBoundingClientRect(); si = { l: b.left, t: b.top, r: W0 - b.right, b: H0 - b.bottom }; }
+    const ex = (v, gap) => Math.ceil(Math.max(0, v - gap) / cssPerUi), gx = R.cssX, gy = R.cssY;
+    const base = port ? { l: 5, r: 5, t: 5, b: touch ? 15 : 5 } : { l: touch ? 13 : 2, r: touch ? 13 : 2, t: touch ? 3 : 2, b: touch ? 6 : 2 };
+    R.ins = { l: Math.max(base.l, ex(si.l, gx)), r: Math.max(base.r, ex(si.r, gx)), t: Math.max(base.t, ex(si.t, gy)), b: Math.max(base.b, ex(si.b, gy)) };
+    ui.width = R.uw; ui.height = R.uh;
+    // 暗角
+    vign = G.canvas(R.sw, R.sh); const v = vign.getContext('2d');
+    const g = v.createRadialGradient(R.sw / 2, R.sh / 2, Math.min(R.sw, R.sh) * 0.35, R.sw / 2, R.sh / 2, Math.hypot(R.sw, R.sh) * 0.6);
+    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.55)');
+    v.fillStyle = g; v.fillRect(0, 0, R.sw, R.sh);
+  };
+  // 最小縮放：可以縮到整張地圖都在畫面內
+  R.zoomMin = () => { const W = G.W; if (!W || !W.M) return 0.6; const fit = Math.min(R.sw / (W.M.ww * G.AX), R.sh / (W.M.wh * G.AY)) / R.base; return Math.min(0.6, fit * 0.98); };
+  R.setZoom = z => { R.cam.zoom = G.clamp(z, R.zoomMin(), 2.0); };
+
+  // 鏡頭
+  R.updateCam = function (W, dt) {
+    const c = R.cam, h = W.hero;
+    let tx = c.x, ty = c.y;
+    if (W.attract) { const t = W.time * 0.05; tx = W.M.ww * (0.5 + Math.sin(t) * 0.28); ty = W.M.wh * (0.5 - Math.sin(t) * 0.22); }
+    else if (c.follow) {
+      if (h && h.alive) { tx = h.x + h.vx * 0.35; ty = h.y + h.vy * 0.35; }
+      else if (W.over) { const t = W.holy[W.over.win ? 1 : 0]; tx = t.x; ty = t.y; }
+      else { tx = W.spawnPt[0][0]; ty = W.spawnPt[0][1]; }
+    }
+    if (c.follow) { const k = G.damp(7, dt); c.x += (tx - c.x) * k; c.y += (ty - c.y) * k; c.vx = c.vy = 0; }
+    else if (c.vx || c.vy) { c.x += c.vx * dt * 0.5; c.y += c.vy * dt * 0.5; const d = Math.exp(-dt * 9); c.vx *= d; c.vy *= d; if (Math.abs(c.vx) + Math.abs(c.vy) < 2) c.vx = c.vy = 0; }
+    const sc = R.base * c.zoom, hw = R.sw / sc / 2 / G.AX, hh = R.sh / sc / 2 / G.AY;
+    const px = W.ground.pad / G.AX - 20, py = W.ground.pad / G.AY - 20;   // 地圖外圍森林邊界
+    c.x = G.clamp(c.x, Math.min(hw - px, W.M.ww / 2), Math.max(W.M.ww - hw + px, W.M.ww / 2));
+    c.y = G.clamp(c.y, Math.min(hh - py, W.M.wh / 2), Math.max(W.M.wh - hh + py, W.M.wh / 2));
+    W.cam = c;
+  };
+  R.screenToWorld = (sx, sy) => {
+    const ax = R.ox + R.fx + sx / R.scale, ay = R.oy + R.fy + sy / R.scale;
+    return [ax / G.AX, ay / G.AY];
+  };
+  R.worldToScreen = (x, y, z = 0) => [((x * G.AX - R.ox - R.fx) * R.scale), ((y * G.AY - z * G.AZ - R.oy - R.fy) * R.scale)];
+
+  // 單位在美術座標的外框（點選用）
+  R.unitBox = (u) => {
+    const s = u.spr[0], ax = u.x * G.AX - R.ox, ay = u.y * G.AY - u.z * G.AZ - R.oy;
+    return [ax - s.w / 2, ay - s.h, s.w, s.h];
+  };
+
+  const sprOf = (k) => { const s = G.SPR[k]; return Array.isArray(s) ? s[0] : s; };
+
+  R.draw = function (W, alpha, rt) {
+    R.dtF = Math.min(0.1, Math.max(0, rt - (R._lrt || rt))); R._lrt = rt;
+    const sc = R.scale = R.base * R.cam.zoom;
+    const bw = Math.ceil(R.sw / sc) + 2, bh = Math.ceil(R.sh / sc) + 2;
+    if (buf.width !== bw || buf.height !== bh) { buf.width = bw; buf.height = bh; }
+    const b = bctx; b.imageSmoothingEnabled = false;
+    // 鏡頭 + 震動
+    const tr = W.trauma * W.trauma, sh = tr * 7;
+    const shx = (G.vnoise(rt * 25, 3.1) - 0.5) * 2 * sh, shy = (G.vnoise(5.7, rt * 25) - 0.5) * 2 * sh;
+    const left = R.cam.x * G.AX - R.sw / sc / 2 + shx, top = R.cam.y * G.AY - R.sh / sc / 2 + shy;
+    const ox = Math.floor(left), oy = Math.floor(top);
+    R.ox = ox; R.oy = oy; R.fx = left - ox; R.fy = top - oy;
+    const o = { x: ox, y: oy };
+    G.setPatOffset(ox, oy);
+    // 背景 + 地面
+    b.fillStyle = G.PAL[1]; b.fillRect(0, 0, bw, bh);
+    const gd = W.ground;
+    let sx = ox + gd.pad, sy = oy + gd.pad, dx = 0, dy = 0, w = bw, h = bh;
+    if (sx < 0) { dx = -sx; w += sx; sx = 0; } if (sy < 0) { dy = -sy; h += sy; sy = 0; }
+    if (sx + w > gd.w) w = gd.w - sx; if (sy + h > gd.h) h = gd.h - sy;
+    if (w > 0 && h > 0) b.drawImage(gd.c, sx, sy, w, h, dx, dy, w, h);
+    b.fillStyle = 'rgba(70,70,70,0.17)'; b.fillRect(0, 0, bw, bh);    // 地面對比稍微壓低（v2.3），讓角色更突出
+    // 焦痕
+    for (const d of W.decals) { const a = (1 - d.t / d.dur) * 0.75; G.pxDisc(b, d.x * G.AX - ox, d.y * G.AY - oy, d.r * G.AX, d.r * G.AY, d.col ?? 2, a); }
+    // 地面特效
+    for (const e of W.effects) if (e.layer === 0 && e.draw) e.draw(b, o);
+    W.parts.draw(b, ox, oy, W.frame, true);
+    // 野怪巢穴：空巢時顯示重生倒數
+    const campTxt = [];
+    for (const cp of W.camps || []) {
+      if (cp.u) continue;
+      const gx = cp.x * G.AX - ox, gy = cp.y * G.AY - oy; if (gx < -40 || gy < -40 || gx > bw + 40 || gy > bh + 40) continue;
+      const big = cp.def.kind === 'wboss', r = big ? 16 : 10;
+      G.pxEllipse(b, gx, gy, r, r * 0.5, 3, 4, rt * 2);
+      campTxt.push([Math.round(gx), Math.round(gy - 3), Math.ceil(cp.t)]);
+    }
+    // 移動落點：地面脈衝圈 + 落下彈跳的箭頭
+    const mk = W.mark;
+    if (mk && !W.attract) {
+      const gx = mk.x * G.AX - ox, gy = mk.y * G.AY - oy, t = mk.t, fade = 1 - (mk.out || 0) / 0.2;
+      const pr = (t * 2.2) % 1;
+      G.pxEllipse(b, gx, gy, 9 * G.AX * 2 * (1 - pr) + 2, 9 * G.AY * 2 * (1 - pr) + 1, pr > 0.6 ? 15 : 13);
+      G.pxDisc(b, gx, gy, 6, 2.5, 13, 0.3 * fade);
+      G.pxEllipse(b, gx, gy, 7, 3, 13);
+      b.fillStyle = G.PAL[13]; b.fillRect(Math.round(gx), Math.round(gy), 1, 1);
+      const drop = t < 0.18 ? (1 - t / 0.18) * 26 : 0, bounce = t < 0.18 ? 0 : Math.abs(Math.sin((t - 0.18) * 7)) * 3;
+      mk.ax = Math.round(gx); mk.ay = Math.round(gy - 8 - drop - bounce); mk.fade = fade;
+    }
+    // 英雄攻擊射程（接近敵人時自動淡入）
+    const h0 = W.hero;
+    if (h0 && h0.alive && h0.rangeA > 0.02 && !W.attract) {
+      const x = G.lerp(h0.px, h0.x, alpha), y = G.lerp(h0.py, h0.y, alpha), rr = h0.st.range + h0.r * 0.4 + 8, a = h0.rangeA;
+      const hot = h0.nearD <= h0.st.range;                 // 有敵人在射程內
+      const gx = x * G.AX - ox, gy = y * G.AY - oy;
+      if (a > 0.5) G.pxEllipse(b, gx, gy, rr * G.AX, rr * G.AY, hot ? 9 : 6, hot ? 0 : 6, rt * 6);
+      else G.pxEllipse(b, gx, gy, rr * G.AX, rr * G.AY, 6, 4, rt * 6);
+    }
+    // 大招前搖：場景稍微壓暗，凸顯施法者（v2.3）
+    { const hc = W.hero && W.hero.chg; if (hc && hc.big) { b.fillStyle = 'rgba(0,0,0,' + (0.3 * Math.min(1, hc.T / hc.dur)).toFixed(3) + ')'; b.fillRect(0, 0, bw, bh); } }
+    // 收集要排序的物件
+    const list = [], vx0 = ox - 30, vx1 = ox + bw + 30, vy0 = oy - 10, vy1 = oy + bh + 60;
+    const inView = (x, y) => { const ax = x * G.AX, ay = y * G.AY; return ax > vx0 && ax < vx1 && ay > vy0 && ay < vy1; };
+    for (const p of W.M.props) if (inView(p.x, p.y)) list.push({ y: p.y, p });
+    for (const u of W.units) if (u.alive && inView(u.x, u.y) && W.seen(0, u)) list.push({ y: G.lerp(u.py, u.y, alpha), u });   // 迷霧中的敵人不畫
+    for (const p of W.projs) if (p.side === 0 || W.seenXY(0, p.x, p.y)) list.push({ y: p.y, j: p });
+    list.sort((a, c) => a.y - c.y);
+    const bars = [], arrows = [], reticles = [], flags = [];
+    for (const it of list) {
+      if (it.p) {
+        const p = it.p, s = p.s, ax = Math.round(p.x * G.AX - ox - s.w / 2), ay = Math.round(p.y * G.AY - oy - s.h + 2);
+        b.drawImage(s.n, ax, ay);
+      } else if (it.u) {
+        const u = it.u, x = G.lerp(u.px, u.x, alpha), y = G.lerp(u.py, u.y, alpha);
+        const moving = Math.hypot(u.vx, u.vy) > 10;
+        const fr = u.spr, fi = u.vis.fly ? ((u.anim * 1.4) | 0) % fr.length : moving ? ((u.anim * 0.7) | 0) % fr.length : 0;
+        const s = fr[fi];
+        const gx = x * G.AX - ox, gy = y * G.AY - oy;
+        // 影子
+        const shR = u.vis.shadow * G.AX * (u.vis.fly ? 0.7 : 1);
+        G.pxDisc(b, gx, gy, shR, Math.max(1.5, shR * 0.42), 0, u.static ? 0.7 : 0.55);
+        if (u === h0) G.pxEllipse(b, gx, gy + 1, shR + 3, shR * 0.42 + 2, 9, 5, rt * 12);
+        if (u.chg) {                                            // 施法前搖：腳下法陣由小變大、旋轉
+          const cp = Math.min(1, u.chg.T / u.chg.dur), E = G.ELEM[u.chg.el] || G.ELEM.arcane, R0 = (shR + (u.chg.big ? 12 : 7)) * (0.35 + 0.65 * Math.sqrt(cp));
+          G.pxEllipse(b, gx, gy + 1, R0, R0 * 0.42, E.c, 3, rt * 10); G.pxEllipse(b, gx, gy + 1, R0 * 0.62, R0 * 0.26, E.c2, 2, -rt * 14);
+          if (u.chg.big) { b.globalAlpha = 0.35 * cp; b.fillStyle = G.PAL[E.c]; b.fillRect(Math.round(gx - 3 - cp * 3), 0, Math.round(6 + cp * 6), Math.round(gy)); b.globalAlpha = 1; }   // 大招：光柱
+        }
+        const tgt = h0 && h0.target === u && h0.alive;
+        const lockedU = h0 && h0.alive && h0.cmd && h0.cmd.lock && h0.cmd.t === u;
+        if (tgt && !lockedU) { G.pxEllipse(b, gx, gy + 1, shR + 3, shR * 0.42 + 2, 9); G.pxEllipse(b, gx, gy + 1, shR + 2, shR * 0.42 + 1.5, 0); }
+        // 鎖定：改成畫在地面（腳下）的紅色圈＋四個轉動小刻度，不擋本體與血條
+        if (lockedU) {
+          u.lockT = (u.lockT || 0) + 1 / 60;
+          const k = Math.min(1, u.lockT / 0.22), rx = shR + 5 + (1 - k) * 12, ry = shR * 0.42 + 3 + (1 - k) * 5;
+          G.pxEllipse(b, gx, gy + 2, rx, ry, 0); G.pxEllipse(b, gx, gy + 1, rx, ry, 10, 4, rt * 8);   // 黑色底線＋紅色虛線，在亮/暗地面都看得到
+          for (let i = 0; i < 4; i++) { const a = rt * 1.6 + i * Math.PI / 2, px = Math.round(gx + Math.cos(a) * (rx + 2)), py = Math.round(gy + 1 + Math.sin(a) * (ry + 1)); b.fillStyle = G.PAL[0]; b.fillRect(px - 1, py - 1, 3, 3); b.fillStyle = G.PAL[10]; b.fillRect(px, py, 1, 1); }
+        } else u.lockT = 0;
+        // 動作偏移
+        let ddx = 0, ddy = 0;
+        // 攻擊姿勢（v2.3）：蓄勢（往後仰＋蹲）→ 出手（前衝＋前傾＋拉長）→ 收招；遠程：後座力；施法：蹲低發抖
+        let psx = 1, psy = 1, psk = 0;
+        if (u.windup > 0) { const wp = 1 - u.windup / (u.melee ? 0.13 : 0.09); ddx = -u.face * Math.round(1 + wp); psk = u.face * 0.22 * wp; psy = 1 - 0.1 * wp; psx = 1 + 0.08 * wp; }
+        if (u.lunge > 0) { const f = u.lunge; ddx = Math.round(Math.sin(f * Math.PI) * 4) * u.face; psk = -u.face * 0.32 * f; psx = 1 + 0.14 * f; psy = 1 - 0.07 * f; }
+        if (u.recoil > 0) { ddx = -u.face * Math.round(u.recoil * 2); psy = 1 + 0.06 * u.recoil; psx = 1 - 0.04 * u.recoil; }
+        if (u.chg) { const cp = Math.min(1, u.chg.T / u.chg.dur); psy = 1 - 0.09 * cp; psx = 1 + 0.07 * cp; ddx = Math.round(Math.sin(u.chg.T * 70) * cp * (u.chg.big ? 1.4 : 0.8)); }
+        if (u.cast > 0.12) { psy = 1.08; psx = 0.95; }
+        if (moving && fi === 1) ddy = -1;
+        if (!moving && !u.static && Math.sin(u.anim * 3 + u.id) > 0.7) ddy = -1;
+        if (u.cast > 0.12) ddy -= 2;
+        const zz = u.z + u.spawnT * 70 + (u.vis.fly ? Math.sin(u.anim * 2.5) * 3 : 0);
+        const red = u.side === 1 && !u.static;                 // 敵方單位：赤紅配色
+        const img = u.flash > 0 ? (u.face < 0 ? s.fm : s.f) : red ? G.redOf(u.face < 0 ? s.m : s.n) : (u.face < 0 ? s.m : s.n);
+        const ax = Math.round(gx - s.w / 2 + ddx), ay = Math.round(gy - zz * G.AZ - s.h + 1 + ddy);
+        const base = red ? G.redOf(u.face < 0 ? s.m : s.n) : (u.face < 0 ? s.m : s.n);
+        // 層次感（v2.3）：光從左上來 → 斜向投影（落在右下方地面）＋左上亮邊＋右下暗邊
+        if (!u.vis.fly && u.spawnT <= 0.01) {
+          const sil = G.glowOf(base, 0, 1, 0).tint, fx = Math.round(gx + ddx), fy = Math.round(gy) + 1;
+          b.save(); b.globalAlpha = u.static ? 0.32 : 0.26; b.setTransform(1, 0, -0.55, -0.32, fx - s.w / 2 * 1 + (s.h) * 0, fy); b.drawImage(sil, 0, -s.h); b.restore();
+        }
+        const shielded = u.protectors && W.isProtected(u);
+        // 稀有度外框（我方英雄與小兵）
+        if (u.side === 0 && (u.kind === 'hero' || u.kind === 'creep') && u.rar != null) {
+          const gl = G.glowOf(base, G.RARITY[u.rar].c, 1, u.rar >= 2 ? 3 : 2);
+          b.globalAlpha = u.rar === 0 ? 0.55 : 0.75 + Math.sin(rt * 4 + u.id) * 0.2; b.drawImage(gl.c, ax - gl.p, ay - gl.p); b.globalAlpha = 1;
+        }
+        // 中立野怪：黃色淡外框
+        if (u.side === 2) { const gl = G.glowOf(base, 13, 1, 2); b.globalAlpha = 0.45 + Math.sin(rt * 3 + u.id) * 0.15; b.drawImage(gl.c, ax - gl.p, ay - gl.p); b.globalAlpha = 1; }
+        // 我方首領（被收服的野生首領）：黃色外框
+        if (u.allyBoss) { const gl = G.glowOf(base, 13, 1, 3); b.globalAlpha = 0.8; b.drawImage(gl.c, ax - gl.p, ay - gl.p); b.globalAlpha = 1; }
+        // 護盾：沿建築剪影外擴的藍色光殼 + 呼吸光暈
+        if (shielded) { const gl = G.glowOf(base, 12, 1, 5); b.globalAlpha = 0.6 + Math.sin(rt * 3 + u.id) * 0.25; b.drawImage(gl.c, ax - gl.p, ay - gl.p); b.globalAlpha = 1; }
+        G.VFX.auraBack(b, u, ax, ay, base, gx, gy, rt, W);
+        { const gk = G.glowOf(base, 0, 1, 0), gw = G.glowOf(base, 9, 1, 0); b.globalAlpha = 0.55; b.drawImage(gk.tint, ax + 1, ay + 1); b.globalAlpha = u.side === 1 ? 0.35 : 0.22; b.drawImage(gw.tint, ax - 1, ay - 1); b.globalAlpha = 1; }   // 右下暗邊、左上亮邊
+        if (u.chg) {                                            // 施法前搖：身體發光（越來越亮）
+          const cp = Math.min(1, u.chg.T / u.chg.dur), E = G.ELEM[u.chg.el] || G.ELEM.arcane, gl = G.glowOf(base, E.c, 1, 2);
+          b.globalAlpha = 0.25 + 0.6 * cp * (0.75 + 0.25 * Math.sin(rt * 30)); b.drawImage(gl.c, ax - gl.p, ay - gl.p); b.globalAlpha = 1;
+        }
+        if (psx !== 1 || psy !== 1 || psk !== 0) {              // 以腳底為支點做擠壓／傾斜
+          const fx = ax + s.w / 2, fy = ay + s.h;
+          b.save(); b.setTransform(psx, 0, psk, psy, fx, fy); b.drawImage(img, -s.w / 2, -s.h); b.restore();
+        } else b.drawImage(img, ax, ay);
+        if (u.chg && u.chg.T > u.chg.dur - 0.06) { b.globalAlpha = 0.8; b.drawImage(G.glowOf(base, 9, 1, 0).tint, ax, ay); b.globalAlpha = 1; }   // 放招瞬間白閃
+        if (u.lunge > 0.25 && !u.static) G.FX.swingArc(b, u, ax, ay, s, 1 - u.lunge);
+        if (u.recoil > 0.55) { const mx = Math.round(ax + (u.face > 0 ? s.w + 1 : -2)), my = Math.round(ay + s.h * 0.45); b.fillStyle = G.PAL[u.side === 1 ? 14 : 9]; b.fillRect(mx - 1, my, 3, 1); b.fillRect(mx, my - 1, 1, 3); }
+        G.VFX.auraFront(b, u, ax, ay, s, gx, gy, rt, W);
+        if (shielded) {
+          const gl = G.glowOf(base, 12, 1, 5); b.globalAlpha = 0.14 + Math.sin(rt * 3 + u.id) * 0.06; b.drawImage(gl.tint, ax, ay); b.globalAlpha = 1;
+          // 掃光：一道亮帶由下往上掃過剪影
+          const sy = ((rt * 0.6 + u.id * 0.37) % 1.6) / 1.6 * (s.h + 16) - 8;
+          if (sy > 0 && sy < s.h) { b.save(); b.beginPath(); b.rect(ax - 2, ay + s.h - sy - 2, s.w + 4, 3); b.clip(); b.globalAlpha = 0.5; b.drawImage(gl.tint, ax, ay); b.globalAlpha = 1; b.restore(); }
+          if ((W.frame % 10) === 0) W.parts.add(u.x + G.rr(-s.w, s.w) / G.AX * 0.5, u.y + G.rr(-4, 4), G.rr(4, s.h / G.AZ), 0, 0, G.rr(8, 18), 0.9, 12, 9, 1, 0, 0.4);
+        }
+        // 聖所/塔的待機特效
+        if (u.kind === 'holy' && u.side === 0 && (W.frame % 6) === 0) W.parts.add(u.x + G.rr(-24, 24), u.y + G.rr(-6, 6), G.rr(20, 60), 0, 0, G.rr(10, 25), 1.2, 9, 7, 1, 0, 0.5);
+        if (u.kind === 'holy' && u.side === 1 && (W.frame % 8) === 0) W.parts.add(u.x + G.rr(-12, 12), u.y, G.rr(50, 70), G.rr(-5, 5), 0, G.rr(10, 20), 1.4, 2, 1, 2, -5, 0.5);
+        // 血條
+        const full = u.hp >= u.st.hp - 0.5;
+        if (!full || u.kind !== 'creep') bars.push([u, Math.round(gx), ay - 3]);
+        if (u.follow) flags.push([Math.round(gx), ay - (full && u.kind === 'creep' ? 2 : 6)]);
+        const locked = h0 && h0.alive && h0.cmd && h0.cmd.lock && h0.cmd.t === u;
+        if (!locked && tgt) arrows.push([Math.round(gx), ay - 9 - Math.round(Math.abs(Math.sin(rt * 6)) * 2)]);
+      } else if (it.j) {
+        const p = it.j, s = sprOf(p.o.vis);
+        const gx = p.x * G.AX - ox, gy = p.y * G.AY - oy;
+        if (p.z > 3) G.pxDisc(b, gx, gy, p.o.big ? 3 : 1.5, 1, 0, 0.5);
+        const custom = p.o.fx && G.VFX.drawProj(b, p, o, s, rt);
+        if (s && !custom) b.drawImage(p.tx < p.x0 ? s.m : s.n, Math.round(gx - s.w / 2), Math.round(gy - p.z * G.AZ - s.h / 2));
+        if (p.o.vis === 'mistic' && !custom) G.pxEllipse(b, gx, gy - p.z * G.AZ, 6 + Math.sin(rt * 40), 6 + Math.sin(rt * 40), 9, 3, rt * 40);
+      }
+    }
+    W.parts.draw(b, ox, oy, W.frame, false);
+    for (const e of W.effects) if (e.layer === 1 && e.draw) e.draw(b, o);
+    // 迷霧：看不到的區域蓋上一層暗色（逐格淡入淡出，邊緣柔和）
+    if (W.vis && !W.attract) {
+      // 迷霧：地圖外圍的森林邊界也要蓋（向外延伸 PD 格，數值沿用最靠近的邊緣格），縮小時才不會出現一圈明顯的框線
+      const V = W.vis, n = V.gw * V.gh, v = V.v[0], f = V.fog, k = Math.min(1, (R.dtF || 0.016) * 6);
+      const PD = Math.ceil((W.ground.pad / G.AX + 80) / V.cs) + 2, GW = V.gw + PD * 2, GH = V.gh + PD * 2;
+      if (!R.fogC || R.fogC.width !== GW || R.fogC.height !== GH) { R.fogC = G.canvas(GW, GH); R.fogX = R.fogC.getContext('2d'); R.fogD = R.fogX.createImageData(GW, GH); }
+      for (let i = 0; i < n; i++) f[i] += ((v[i] ? 0 : 1) - f[i]) * k;
+      const d = R.fogD.data;
+      for (let yy = 0; yy < GH; yy++) { const sy = G.clamp(yy - PD, 0, V.gh - 1) * V.gw; for (let xx = 0; xx < GW; xx++) { const o = (yy * GW + xx) * 4, a = f[sy + G.clamp(xx - PD, 0, V.gw - 1)]; d[o] = 8; d[o + 1] = 10; d[o + 2] = 18; d[o + 3] = Math.round(a * 210); } }
+      R.fogX.putImageData(R.fogD, 0, 0);
+      b.imageSmoothingEnabled = true;
+      b.drawImage(R.fogC, 0, 0, GW, GH, -ox - PD * V.cs * G.AX, -oy - PD * V.cs * G.AY, GW * V.cs * G.AX, GH * V.cs * G.AY);
+      b.imageSmoothingEnabled = false;
+    }
+    // 血條
+    for (const [u, cx, y] of bars) {
+      const bw2 = u.kind === 'holy' ? 34 : u.static ? 28 : u.kind === 'boss' ? 24 : u.kind === 'hero' ? 16 : 10;
+      const x = cx - (bw2 >> 1), f = Math.max(0, Math.round(bw2 * u.hp / u.st.hp));
+      if (u.static) {                                       // 建築：粗血條（3px），雙方都用白色，敵方加刻痕
+        b.fillStyle = G.PAL[0]; b.fillRect(x - 1, y - 3, bw2 + 2, 5);
+        b.fillStyle = G.PAL[2]; b.fillRect(x, y - 2, bw2, 3);
+        b.fillStyle = G.PAL[9]; b.fillRect(x, y - 2, f, 3);
+        b.fillStyle = G.PAL[u.side === 0 ? 7 : 6]; b.fillRect(x, y, f, 1);
+        if (u.side !== 0) { b.fillStyle = G.PAL[0]; for (let i = 7; i < bw2; i += 7) b.fillRect(x + i, y - 2, 1, 3); }
+        continue;
+      }
+      b.fillStyle = G.PAL[0]; b.fillRect(x - 1, y - 1, bw2 + 2, 3);
+      if (u.kind === 'hero') { b.fillStyle = G.PAL[10]; b.fillRect(x, y, f, 1); }
+      else if (u.side === 0) { b.fillStyle = G.PAL[9]; b.fillRect(x, y, f, 1); }
+      else if (u.side === 2) { b.fillStyle = G.PAL[13]; b.fillRect(x, y, f, 1); }
+      else { for (let i = 0; i < f; i++) { b.fillStyle = G.PAL[(i % 3) === 2 ? 7 : 9]; b.fillRect(x + i, y, 1, 1); } }   // 敵方：亮白帶刻痕
+      if (u.kind === 'hero') { b.fillStyle = G.PAL[3]; b.fillRect(x, y + 2, bw2, 1); b.fillStyle = G.PAL[11]; b.fillRect(x, y + 2, Math.round(bw2 * u.mp / u.st.mp), 1); b.fillStyle = G.PAL[0]; b.fillRect(x - 1, y + 3, bw2 + 2, 1); }
+      if (u.kind === 'boss') G.text(b, 'BOSS', cx, y - 7, u.side === 1 ? 12 : 13, 1, 0, 0.5);
+      if (u.kind === 'jungler') G.text(b, 'HUNTER', cx, y - 7, 14, 1, 0, 0.5);
+    }
+    for (const [x, y, t] of campTxt) G.text(b, t, x, y, 5, 1, 0, 0.5);
+    // 召集中的小兵：頭上黃色小旗
+    for (const [x, y0] of flags) {
+      const y = y0 - (((rt * 3) | 0) % 2);
+      b.fillStyle = G.PAL[0]; b.fillRect(x - 2, y - 8, 7, 5); b.fillRect(x - 2, y - 8, 3, 10);
+      b.fillStyle = G.PAL[9]; b.fillRect(x - 1, y - 7, 1, 8);
+      b.fillStyle = G.PAL[13]; b.fillRect(x, y - 7, 4, 3); b.fillStyle = G.PAL[14]; b.fillRect(x, y - 5, 4, 1);
+    }
+    // 落點箭頭（畫在最上層）
+    if (mk && mk.ax != null && mk.fade > 0.3 && !W.attract) {
+      const x = mk.ax, y = mk.ay;
+      b.fillStyle = G.PAL[0];
+      b.fillRect(x - 2, y - 9, 5, 6); b.fillRect(x - 5, y - 4, 11, 2); b.fillRect(x - 4, y - 2, 9, 1); b.fillRect(x - 3, y - 1, 7, 1); b.fillRect(x - 2, y, 5, 1); b.fillRect(x - 1, y + 1, 3, 1);
+      b.fillStyle = G.PAL[13];
+      b.fillRect(x - 1, y - 8, 3, 5); b.fillRect(x - 4, y - 3, 9, 1); b.fillRect(x - 3, y - 2, 7, 1); b.fillRect(x - 2, y - 1, 5, 1); b.fillRect(x - 1, y, 3, 1);
+      b.fillStyle = G.PAL[14]; b.fillRect(x + 1, y - 8, 1, 5); b.fillRect(x + 1, y - 2, 1, 1);
+    }
+    // 目標箭頭
+    for (const [x, y] of arrows) {
+      b.fillStyle = G.PAL[0]; b.fillRect(x - 4, y - 1, 9, 1); b.fillRect(x - 4, y, 9, 2); b.fillRect(x - 3, y + 2, 7, 1); b.fillRect(x - 2, y + 3, 5, 1); b.fillRect(x - 1, y + 4, 3, 1);
+      b.fillStyle = G.PAL[9]; b.fillRect(x - 3, y, 7, 1); b.fillRect(x - 2, y + 1, 5, 1); b.fillRect(x - 1, y + 2, 3, 1); b.fillRect(x, y + 3, 1, 1);
+    }
+    for (const e of W.effects) if (e.layer === 2 && e.draw) e.draw(b, o);
+    // 輸出到螢幕
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(buf, 0, 0, bw, bh, -R.fx * sc, -R.fy * sc, bw * sc, bh * sc);
+    ctx.drawImage(vign, 0, 0);
+    if (W.flashScreen > 0) { ctx.fillStyle = `rgba(255,255,255,${W.flashScreen * 2.5})`; ctx.fillRect(0, 0, R.sw, R.sh); }
+    if (h0 && !W.attract) {
+      if (!h0.alive) { ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(0, 0, R.sw, R.sh); }
+      else if (h0.hp / h0.st.hp < 0.3) { const a = (0.3 - h0.hp / h0.st.hp) * (0.8 + Math.sin(rt * 8) * 0.4); ctx.globalAlpha = G.clamp(a * 2.5, 0, 0.8); ctx.drawImage(vign, 0, 0); ctx.drawImage(vign, 0, 0); ctx.globalAlpha = 1; }
+    }
+  };
+  // 需要原生解析度的 UI（小地圖、大地圖）：在 UI 畫完後直接畫到螢幕；之後若有遮罩蓋上就不畫（保留 UI 畫布上的低解析版本）
+  R.hi = [];
+  R.hiQ = fn => R.hi.push({ fn, cov: false });
+  R.blitUI = function () {
+    G.setPatOffset(0, 0); ctx.imageSmoothingEnabled = false; ctx.drawImage(ui, 0, 0, R.uw, R.uh, 0, 0, R.uw * R.uiS, R.uh * R.uiS);
+    for (const q of R.hi) if (!q.cov) { ctx.save(); q.fn(ctx); ctx.restore(); }
+    ctx.imageSmoothingEnabled = false;
+  };
+  return R;
+})();
