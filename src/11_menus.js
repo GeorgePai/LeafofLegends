@@ -50,14 +50,14 @@ G.Menus = (() => {
     c.fillStyle = P[13]; c.fillRect(x - 6 + dx, y, 5, 1); c.fillRect(x - 2 + dx, y - 2, 1, 5); c.fillRect(x - 1 + dx, y - 1, 1, 3); c.fillRect(x + dx, y, 1, 1);
   }
   // 分段頁籤
-  function tabs(c, x, y, w, items, cur, fn) {
+  function tabs(c, x, y, w, items, cur, fn, pre = 'tab') {
     const n = items.length, tw = Math.floor(w / n);
     H().box(c, x, y, tw * n, 15, 0, 3, false);
     items.forEach((t, i) => {
       const on = cur === i, xx = x + i * tw;
       if (on) H().box(c, xx + 1, y + 1, tw - 2, 13, 3, 9, false);
       G.cn(c, t, xx + tw / 2, y + 1, on ? 9 : 5, 0.5);
-      tap('tab' + i, xx, y, tw, 15, () => fn(i));
+      tap(pre + i, xx, y, tw, 15, () => fn(i));
     });
     return y + 19;
   }
@@ -153,10 +153,12 @@ G.Menus = (() => {
   const STATS = [['hp', '生命', 10], ['mp', '魔力', 11], ['power', '攻擊', 14], ['armor', '防禦', 12], ['crit', '爆擊', 19], ['aspd', '攻速', 18], ['range', '射程', 17], ['speed', '跑速', 20]];
   // cur：目前值（含增益），base：基礎值；回傳結束 y
   G.statBars = (c, x, y, w, base, mx, cur, opt = {}) => {
-    const keys = STATS.filter(([k]) => (k !== 'mp' || base.mp > 0) && !(opt.skip || []).includes(k));
+    const ex = opt.extra || [];                         // v2.5 額外的列（例：經驗），和數值條同欄寬、同長度、同粗細
+    const keys = ex.map(e => [e, e.lab, e.col]).concat(STATS.filter(([k]) => (k !== 'mp' || base.mp > 0) && !(opt.skip || []).includes(k)));
     const cols = w >= 250 ? 2 : 1, cw = Math.floor((w - (cols - 1) * 10) / cols), lw = Math.max(...keys.map(q => G.cnW(q[1]))) + 4;   // 標籤欄依最寬標籤
     keys.forEach(([k, lab, col], i) => {
       const xx = x + (i % cols) * (cw + 10), yy = y + ((i / cols) | 0) * 12, bx = xx + lw, bw = cw - lw - 30;
+      if (typeof k === 'object') { G.cn(c, lab, xx, yy - 1, 5); G.bar3d(c, bx, yy + 3, bw, 4, G.clamp(k.f, 0, 1), col); G.text(c, k.txt, xx + cw, yy + 3, 9, 1, null, 1); return; }
       const b0 = base[k], v = cur ? cur[k] : b0, f0 = G.clamp(b0 / (mx[k] || 1), 0.04, 1), f1 = G.clamp(v / (mx[k] || 1), 0.04, 1);
       G.cn(c, lab, xx, yy - 1, 5);
       G.bar3d(c, bx, yy + 3, bw, 4, Math.min(f0, f1), col);
@@ -514,7 +516,7 @@ G.Menus = (() => {
       arrow('mwU', top - 6, -1, mw.tgt > 0); arrow('mwD', bot + 2, 1, mw.tgt < ITEMS.length - 1);
       c.globalAlpha = 1;
     }
-    G.text(c, 'V2.4', uw - I.r - 2, uh - I.b - 6, 3, 1, null, 1);
+    G.text(c, 'V2.5', uw - I.r - 2, uh - I.b - 6, 3, 1, null, 1);
     // 右上：鑰匙數；左下：開發者模式開關
     const kt = G.Team.dev ? '∞' : String(G.Team.keys()), kw = 22 + G.cnW(kt);
     H().box(c, uw - I.r - kw, I.t, kw, 14, 0, 13); H().icon(c, 'i_key', uw - I.r - kw + 9, I.t + 7); G.cn(c, kt, uw - I.r - 4, I.t + 1, 13, 1);
@@ -813,14 +815,37 @@ G.Menus = (() => {
 
   // ---------- 圖鑑：同樣的舞台轉盤 ----------
   let btab = 0;
+  let bpot = 0;                                          // v2.5 圖鑑上方切換：0 敵人／1 藥水
+  M._btab = i => { if (i === 5) bpot = 1; else { bpot = 0; btab = i; } };   // 測試用
   M.book = c => {
     tick(); bg(c); car = cars.book;
     const y0 = header(c, '圖鑑'), I = R.ins, L = I.l, Rr = R.uw - I.r, B = R.uh - I.b, LD = land();
     const WK = Object.keys(G.WILD);
     const lists = [G.ROSTER.bosses, G.ROSTER.smalls, G.ROSTER.towers, WK.map(k => G.WILD[k].unit), G.ROSTER.hunters], list = lists[btab];
-    if (!list.includes(sel.enemy)) sel.enemy = list[0];
     const colW = LD ? Math.min(200, Math.round((Rr - L) * 0.52)) : Rr - L;
-    let y = tabs(c, L, y0, LD ? colW : Math.min(colW, 220), ['BOSS', '小怪', '塔', '野怪', '獵手'], btab, i => { if (i === btab) return; btab = i; sel.enemy = lists[i][0]; car.pos = car.tgt = 0; car.settled = true; sbKey = ''; skillSel = -1; G.Audio.play('tick'); });
+    tabs(c, L + 64, R.ins.t, Math.min(120, Rr - L - 70), ['敵人', '藥水'], bpot, i => { if (i === bpot) return; bpot = i; G.Audio.play('tick'); }, 'bk');   // 標題列：敵人／藥水
+    let y = bpot ? y0 : tabs(c, L, y0, LD ? colW : Math.min(colW, 220), ['BOSS', '小怪', '塔', '野怪', '獵手'], btab, i => { if (i === btab) return; btab = i; sel.enemy = lists[i][0]; car.pos = car.tgt = 0; car.settled = true; sbKey = ''; skillSel = -1; G.Audio.play('tick'); });
+    if (bpot) {                                         // v2.5 藥水一覽：圖示、名稱、價格、效果（可捲動）
+      const w = Math.min(Rr - L, LD ? 420 : 300), x = Math.round(L + (Rr - L) / 2 - w / 2), cols = LD && w >= 360 ? 2 : 1, cw = Math.floor((w - (cols - 1) * 6) / cols);
+      scrollDetail(c, x, y + 2, w, B - y - 4, 'potions', top => {
+        const rows = G.SHOP.map(it => ({ it, ls: G.cnWrap(it.d, cw - 30) })), hs = rows.map(r => 18 + r.ls.length * 13 + 3);
+        let yy = top;
+        for (let i = 0; i < rows.length; i += cols) {
+          const rh = Math.max(...hs.slice(i, i + cols)), vis = yy + rh > y + 2 && yy < B - 2;   // 只畫看得到的列
+          for (let j = 0; j < cols && i + j < rows.length && vis; j++) {
+            const { it, ls } = rows[i + j], bx = x + j * (cw + 6);
+            H().box(c, bx, yy, cw, rh, 0, 4, false); H().icon(c, it.ic, bx + 12, yy + 12);
+            const inV = ty => ty >= y + 1 && ty + 12 <= B - 2;   // 捲到一半被裁掉的字不畫
+            if (inV(yy + 3)) { G.cn(c, it.n, bx + 24, yy + 3, 9); H().icon(c, 'i_gold', bx + cw - 30, yy + 9); G.text(c, it.cost, bx + cw - 25, yy + 7, 13, 1); }
+            ls.forEach((l, k) => { if (inV(yy + 17 + k * 13)) G.cn(c, l, bx + 24, yy + 17 + k * 13, 6); });
+          }
+          yy += rh + 4;
+        }
+        return yy;
+      });
+      return;
+    }
+    if (!list.includes(sel.enemy)) sel.enemy = list[0];
     if (car.inited !== true) { car.inited = true; car.pos = car.tgt = Math.max(0, list.indexOf(sel.enemy)); }
     const ch = LD ? G.clamp(B - y - 3 - nameplateH(colW, list[G.clamp(Math.round(car.pos), 0, list.length - 1)], 'book') - 18, 60, 118) : G.clamp(Math.round(R.uh * 0.27), 88, 124);
     carousel(c, L, y, colW, ch, list, 'book');
@@ -1101,7 +1126,7 @@ G.Menus = (() => {
           }
         },
         {
-          z: 1, t: '召集小兵', m: '點我方小兵，牠會跟著英雄、打同一個目標（頭上有黃旗）；再點一次解除', d: '左鍵點我方小兵，牠會跟著英雄打同一個目標；再點一次解除',
+          z: 1, t: '召集小兵', m: '點我方小兵，牠會跟在英雄後方、打同一個目標；再點一次解除，右下黃旗鈕可一次全部解散', d: '左鍵點我方小兵，牠會跟著英雄打同一個目標；再點一次解除',
           draw(c, x, y, w, h, t, dk) {
             const T = t % 5, gy = y + Math.round(h * 0.68), on = T > 0.9 && T < 4.3, k = ss(seg(T, 1.4, 2.6));
             const hx = lerp(x + w * 0.22, x + w * 0.5, k), mx = lerp(x + w * 0.34, x + w * 0.62, ss(seg(T, 1.55, 2.8))) - (T < 0.9 ? 0 : 0), ex = x + w * 0.86;
@@ -1365,7 +1390,7 @@ G.Menus = (() => {
           }
         },
         {
-          t: '防禦塔', m: '每條路有外塔、中塔、內塔三層，基地前還有一座主塔',
+          t: '防禦塔', m: '每條路有外、中、內三層塔，基地前還有主塔；塔會隨時間變強，連續打同一個英雄會越打越痛',
           draw(c, x, y, w, h, t) {
             const gy = y + h * 0.84, L = ((t / 0.9) | 0) % 4;
             [['enemy_tower', '外塔'], ['enemy_tower2', '中塔'], ['enemy_tower3', '內塔'], ['enemy_tower4', '主塔']].forEach(([n, lab], i) => { const tx = x + w * (0.13 + i * 0.25); tower(c, n, tx, gy); G.cn(c, lab, tx, y + 4, i === L ? 13 : 6, 0.5); });
@@ -1567,7 +1592,7 @@ G.Menus = (() => {
           }
         },
         {
-          t: '圖鑑', m: '圖鑑也能左右滑動查看首領、小怪、塔、野怪與獵手；按「技能展示」看動作',
+          t: '圖鑑', m: '左右滑動查看首領、小怪、塔、野怪與獵手；上方切到「藥水」可以看全部藥水的效果和價格',
           draw(c, x, y, w, h, t, dk) {
             const T = t % 3.2, cat = ((t / 3.2) | 0) % 3, names = [['tiger', 'lion', 'cat'], ['babybear', 'eagle', 'boar'], ['gorilla', 'hippo', 'polarbear']][cat];
             const tw = Math.min(42, (w - 12) / 4), x0 = Math.round(x + w / 2 - tw * 2);

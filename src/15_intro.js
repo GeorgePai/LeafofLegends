@@ -1,12 +1,13 @@
 'use strict';
 /* =========================================================
-   開場動畫（約 2.8 秒，右下可跳過）
+   開場動畫（v2.5 延長為 5 秒，右下可跳過）
    0.0 一片葉子從天而降 → 0.7 落地發光、地面向兩側長出 → 1.0 英雄冒出來
-   → 1.3 我方小兵從左跑來、敵人從右逼近 → 2.1 衝鋒對撞 → 2.35 白光 → 標題畫面
+   → 1.3 雙方大軍一波波進場（我方植物從左、敵方野獸＋首領從右，前排大、後排小，仿貓咪大戰爭的兩軍對陣）
+   → 3.3 對峙：首領咆哮、畫面震動 → 4.2 全軍衝鋒 → 4.65 對撞白光 → 標題畫面
    ========================================================= */
 G.Intro = (() => {
   const I = { t: 0, flash: 0 }, P = G.PAL, R = G.Render, H = () => G.UI.h;
-  const END = 2.45, ss = t => t * t * (3 - 2 * t), seg = (t, a, b) => G.clamp((t - a) / (b - a), 0, 1);
+  const END = 5.0, TC = 4.65, TD = 4.2, ss = t => t * t * (3 - 2 * t), seg = (t, a, b) => G.clamp((t - a) / (b - a), 0, 1);
   let parts = [], snd = {};
   const once = (k, name) => { if (!snd[k]) { snd[k] = 1; G.Audio.play(name); } };
   I.reset = () => { I.t = 0; parts = []; snd = {}; I.tw = -1; I.st = -1; I.from = null; };
@@ -28,13 +29,13 @@ G.Intro = (() => {
     G.Menus.ui.tick(); I.t += G.Menus.dt || dt;
     const t = I.t, uw = R.uw, uh = R.uh, cx = Math.round(uw / 2), gy = Math.round(uh * 0.6), Ins = R.ins;
     // 震動
-    const shk = t > 2.3 && t < 2.45 ? Math.round((Math.random() - 0.5) * 6) : 0;
+    const shk = (t > TC - 0.02 && t < END) || (t > 3.35 && t < 3.6) ? Math.round((Math.random() - 0.5) * (t > TC ? 6 : 3)) : 0;
     c.fillStyle = P[0]; c.fillRect(0, 0, uw, uh);
     c.save(); c.translate(shk, 0);
     // 地面：從中間往兩側長出
     const gk = ss(seg(t, 0.7, 1.25));
     if (gk > 0) {
-      const gw = Math.round(uw * gk), gh = 26, strip = G.groundStrip(uw, gh * 2);
+      const gw = Math.round(uw * gk), gh = 32, strip = G.groundStrip(uw, gh * 2);
       c.save(); c.beginPath(); c.rect(Math.round(cx - gw / 2), 0, gw, uh); c.clip();
       c.drawImage(strip, 0, gh, uw, gh, Math.round(cx - gw / 2), gy - 6, gw, gh);
       G.stageDeco(c, 0, gy - 16, uw, gh, true);                     // 地面上緣一排樹（森林背景）
@@ -59,23 +60,45 @@ G.Intro = (() => {
     // B：嫩芽 → 英雄冒出
     const T = G.Team.get(), hero = G.HEROES[T.hero].name;
     if (t > 0.85 && t < 1.05) { const h = Math.round(seg(t, 0.85, 1.05) * 9); c.fillStyle = P[11]; c.fillRect(cx, gy - h, 1, h); c.fillRect(cx - 2, gy - h, 2, 1); c.fillRect(cx + 1, gy - h + 1, 2, 1); }
-    // 隊伍（我方從左、敵方從右）
-    const allies = (T.loadout.length ? [...new Set(T.loadout.map(e => e.n))] : G.STAGES[0].loadout).slice(0, 2), foes = [G.ROSTER.smalls[0], G.ROSTER.smalls[1] || G.ROSTER.smalls[0], G.ROSTER.bosses[0]];
-    const run = ss(seg(t, 1.25, 2.0)), dash = ss(seg(t, 2.05, 2.32)), fr = (t * 8) | 0;
+    // 兩軍（v2.5）：我方＝玩家的陣容＋其他植物；敵方＝各種野獸＋首領。前排大、後排小、越後面越晚到
+    const mine = T.loadout.length ? [...new Set(T.loadout.map(e => e.n))] : [], RM = G.ROSTER;
+    const allies = [...mine, ...RM.minions.filter(n => !mine.includes(n))].slice(0, 9), foes = [...RM.smalls.slice(0, 7), RM.bosses[0], RM.bosses[3] || RM.bosses[1], 'hunter'];
+    const dash = ss(seg(t, TD, TC - 0.03)), fr = (t * 8) | 0;
     const K = uw >= 300 ? 2 : 1, sp = K * 16;
+    if (t > 1.3 && t < 3.3) { const w = ((t - 1.3) / 0.6) | 0; once('dr' + w, 'opDrum'); }   // 進場戰鼓（每 0.6 秒一聲）
+    if (t > 3.35) once('roar', 'opRoar'); if (t > TD) once('chg', 'opCharge');
     // 聚光燈（英雄登場後）
-    if (t > 1.0) { const a = Math.min(1, (t - 1.0) / 0.3) * (t > 2.28 ? 0 : 1); c.fillStyle = P[9]; for (let y = 0; y < gy; y += 2) { const hw = Math.round(6 + y / gy * 30 * K); c.globalAlpha = a * (0.02 + y / gy * 0.07); c.fillRect(cx - 6 - hw, y, hw * 2 + 12, 2); } c.globalAlpha = a * 0.35; G.pxDisc(c, cx - 6, gy + 2, 26 * K, 6 * K, 9, 0.12); c.globalAlpha = 1; }
-    allies.forEach((n, i) => { const x0 = -20 - i * sp * 1.4, x1 = cx - sp * 2.4 - i * sp * 1.5, x = G.lerp(x0, x1, run) + dash * 20; if (t > 1.25) { spr(n, x, gy + 3 + i * 4, K, 1, run < 1 || dash > 0 ? fr : 0); if (run < 1 && fr % 2) parts.push({ x: x - 6, y: gy + 3 + i * 4, vx: -20, vy: -8, l: 0.3, c: 5 }); } });
-    foes.forEach((n, i) => { const big = i === 2, x0 = uw + 20 + i * sp * 1.5, x1 = cx + sp * 2.2 + i * sp * (big ? 1.4 : 1.15), x = G.lerp(x0, x1, run) - dash * (big ? 12 : 20); if (t > 1.25) { spr(n, x, gy + (big ? 0 : 3 + i * 4), K, -1, run < 1 || dash > 0 ? fr : 0, 0.15); if (run < 1 && fr % 2) parts.push({ x: x + 6, y: gy + 3, vx: 20, vy: -8, l: 0.3, c: 4 }); } });
+    if (t > 1.0) { const a = Math.min(1, (t - 1.0) / 0.3) * (t > TC - 0.05 ? 0 : 1); c.fillStyle = P[9]; for (let y = 0; y < gy; y += 2) { const hw = Math.round(6 + y / gy * 30 * K); c.globalAlpha = a * (0.02 + y / gy * 0.07); c.fillRect(cx - 6 - hw, y, hw * 2 + 12, 2); } c.globalAlpha = a * 0.35; G.pxDisc(c, cx - 6, gy + 2, 26 * K, 6 * K, 9, 0.12); c.globalAlpha = 1; }
+    // 排兵：三排（後排在上、小一號；前排在下、大），每隻有自己的出發時間 → 一波波湧進來
+    const army = (list, side) => {
+      const half = uw / 2 - sp * 1.6, out = [];
+      list.forEach((n, i) => {
+        const row = i < 3 ? 0 : i < 6 ? 1 : 2, col = row ? (i - (row === 1 ? 3 : 6)) : i, k = row === 0 ? K : Math.max(1, K - 1);
+        const big = RM.bosses.includes(n) || n === 'hunter', y = gy + 20 - row * 8 + (col % 2) * 2, span = half - 10;
+        const xEnd = cx - side * (sp * 1.6 + 6 + (col + 0.5) * span / (row === 2 ? 3.2 : 3.4) + row * 6), t0 = 1.3 + row * 0.45 + col * 0.12 + (big ? 0.2 : 0);
+        out.push({ n, y, k: big ? K : k, xEnd, t0, row, side, big });
+      });
+      return out;
+    };
+    for (const u of [...army(allies, 1), ...army(foes, -1)].sort((a, b) => a.y - b.y)) {
+      if (t < u.t0) continue;
+      const r = ss(seg(t, u.t0, u.t0 + 0.75)), x0 = u.side > 0 ? -24 : uw + 24, idle = r >= 1 && t < TD, bob = idle ? Math.round(Math.abs(Math.sin(t * 6 + u.xEnd)) * -1.5) : 0;
+      const x = G.lerp(x0, u.xEnd, r) + u.side * dash * (u.big ? 14 : 22), moving = r < 1 || dash > 0;
+      spr(u.n, x, u.y + bob, u.k, u.side, moving ? fr + u.row : 0, u.side < 0 ? (u.big && t > 3.35 && t < 3.7 ? 0.35 : 0.15) : 0);
+      if (moving && fr % 2 && Math.random() < 0.5) parts.push({ x: x - u.side * 6, y: u.y, vx: -u.side * 20, vy: -8, l: 0.3, c: u.side > 0 ? 5 : 4 });
+    }
+    // 對峙：首領咆哮的衝擊環＋敵方那半邊泛紅
+    if (t > 3.35 && t < 3.9) { const k = seg(t, 3.35, 3.9), bx = Math.round(uw - (uw / 2 - sp * 1.6) * 0.5); c.globalAlpha = 1 - k; G.pxEllipse(c, bx, gy - 10 * K, 6 + k * 50, 3 + k * 22, 10); c.globalAlpha = 1; }
+    if (t > 3.3 && t < TC) { const a = 0.18 * seg(t, 3.3, 3.6), g2 = c.createLinearGradient(cx, 0, uw, 0); g2.addColorStop(0, 'rgba(180,20,20,0)'); g2.addColorStop(1, 'rgba(180,20,20,' + a.toFixed(3) + ')'); c.fillStyle = g2; c.fillRect(cx, 0, uw - cx, uh); }
     if (t > 1.05) {
       const pop = seg(t, 1.05, 1.25), sq = pop < 1 ? Math.round(Math.sin(pop * Math.PI) * 6) : 0;
       once('pop', 'opPop');
-      spr(hero, cx - 6 + dash * 14, gy + 2 - sq, K + 1, 1, t > 1.3 ? fr : 0);
+      spr(hero, cx - 6 + dash * 14, gy + 14 - sq, K + 1, 1, t > 1.3 ? fr : 0);
     }
     // D：對撞白光＋星芒
-    if (t > 2.28) {
+    if (t > TC) {
       once('hit', 'opClash');
-      const k = seg(t, 2.28, 2.45), r = Math.round(6 + k * 60);
+      const k = seg(t, TC, END), r = Math.round(6 + k * 60);
       c.fillStyle = P[9];
       for (let a = 0; a < 8; a++) { const ang = a * Math.PI / 4, l = r * (a % 2 ? 0.6 : 1); G.pxLine(c, cx + 8, gy - 14, cx + 8 + Math.cos(ang) * l, gy - 14 + Math.sin(ang) * l * 0.7, a % 2 ? 1 : 2); }
       c.globalAlpha = Math.min(1, k * 1.6); c.fillRect(0, 0, uw, uh); c.globalAlpha = 1;

@@ -14,10 +14,11 @@ G.CHESTS = [
 // 以真實時間計算（關掉遊戲也會計時）；免費時間一到就廣播（首頁頂端橫幅／戰鬥中廣播）
 G.FREE_GAP = 300;
 G.FreeChest = {
-  last() { return G.Team.get().fc || 0; },
+  // v2.5：免費時間另外存在 leafwar_fc（不跟存檔碼、RESET 走），讀存檔碼不會再把免費寶箱刷新
+  last() { let l = 0; try { l = +localStorage.getItem('leafwar_fc') || 0; } catch (e) { } return Math.max(l, G.Team.get().fc || 0); },
   left() { return Math.max(0, G.FREE_GAP - (Date.now() - this.last()) / 1000); },
   ready() { return this.left() <= 0; },
-  use() { G.Team.get().fc = Date.now(); G.Team.save(); this.was = false; },
+  use() { const n = Date.now(); G.Team.get().fc = n; try { localStorage.setItem('leafwar_fc', String(n)); } catch (e) { } G.Team.save(); this.was = false; },
   tick() {
     const r = this.ready();
     if (this.was === false && r) {                    // 這次遊玩中「剛好到時間」才廣播（開遊戲時已經可以開就不洗版，商店選項有紅點）

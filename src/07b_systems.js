@@ -29,7 +29,7 @@ G.SHOP = [
   { id: 'xp', n: '經驗藥水', e: '+經驗', ic: 'p_xp', cost: 120, k: 'xp', v: 50, t: 60, d: '獲得經驗 +50%，60 秒' },
   { id: 'wave', n: '小兵藥水', e: '+出兵', ic: 'p_wave', cost: 200, k: 'wave', v: 50, t: 60, d: '我方出兵速度 +50%，60 秒' },
   { id: 'inv', n: '無敵藥水', e: '無敵', ic: 'p_inv', cost: 280, k: 'inv', v: 0, t: 2.5, d: '無敵 2.5 秒：不受傷害與控制' },
-  { id: 'rev', n: '復活藥水', e: '復活', ic: 'p_rev', cost: 350, k: 'rev', v: 50, t: 0, d: '陣亡時自動使用，原地復活並回復 50% HP' }
+  { id: 'rev', n: '復活藥水', e: '復活', ic: 'p_rev', cost: 350, k: 'rev', v: 50, t: 0, d: '先買好放在背包，陣亡時自動使用：原地復活並回復 50% HP（陣亡後才買，要等下次陣亡）' }
 ];
 G.SHOP_BY = Object.fromEntries(G.SHOP.map(s => [s.id, s]));
 G.TUNE.gold = { start: 150, perSec: 2, last: 16, near: 5, boss: 120, tower: 150, camp: 60, wild: 250 };
@@ -117,11 +117,12 @@ Object.assign(G.World.prototype, {
     c.u = u; G.FX.spawn(this, u);
   },
   // 中立怪 AI：被打才反擊；離開巢穴太遠就回家並回滿血
+  // v2.5 修正來回跑＋回血：不追出巢穴範圍（停在邊界、打得到就打）；只有攻擊者真的跑遠、或 4 秒沒被打才回家；被打的 2.5 秒內不回血
   wildAI(u, dt) {
-    const home = u.home, dh = Math.hypot(u.x - home[0], u.y - home[1]), leash = u.kind === 'boss' ? 190 : 150;
-    if (u.aggro && (!u.aggro.alive || dh > leash || Math.hypot(u.aggro.x - home[0], u.aggro.y - home[1]) > leash + 60)) { u.aggro = null; u.resetting = true; }
+    const home = u.home, dh = Math.hypot(u.x - home[0], u.y - home[1]), leash = u.kind === 'boss' ? 190 : 150, quiet = this.time - (u.lastHurt ?? -99);
+    if (u.aggro && (!u.aggro.alive || Math.hypot(u.aggro.x - home[0], u.aggro.y - home[1]) > leash + 220 || (quiet > 4 && dh > leash * 0.5))) { u.aggro = null; u.resetting = true; }
     if (u.resetting) {
-      u.hp = Math.min(u.st.hp, u.hp + u.st.hp * 0.5 * dt);
+      if (quiet > 2.5) u.hp = Math.min(u.st.hp, u.hp + u.st.hp * 0.5 * dt);
       if (this.moveTo(u, home[0], home[1], dt) || dh < 6) { u.resetting = false; u.face = home[0] > this.M.ww / 2 ? -1 : 1; }
       return;
     }
@@ -130,7 +131,10 @@ Object.assign(G.World.prototype, {
     u.target = t; u.skillCd = (u.skillCd ?? 3) - dt;
     const sid = u.kind === 'boss' && G.BOSS_SKILL[u.name];
     if (sid && u.skillCd <= 0) { const sd = G.ORIG.skills[sid]; if (this.dist(u, t) < sd.range) { u.skillCd = Math.max(4, sd.delay); this.beginCharge(u, sd, t, sd.lv1 || 1, G.TUNE.chgBoss); } }
-    if (this.inRange(u, t)) { this.brake(u, dt); this.tryAttack(u, t); } else this.moveTo(u, t.x, t.y, dt);
+    if (this.inRange(u, t)) { this.brake(u, dt); this.tryAttack(u, t); }
+    else { const tx = t.x - home[0], ty = t.y - home[1], td = Math.hypot(tx, ty) || 1;             // 目標在巢穴外：只追到邊界
+      if (td > leash) { const ex = home[0] + tx / td * leash, ey = home[1] + ty / td * leash; if (Math.hypot(ex - u.x, ey - u.y) > 6) this.moveTo(u, ex, ey, dt); else this.brake(u, dt); }
+      else this.moveTo(u, t.x, t.y, dt); }
   },
   // ----- 鑰匙：擊倒時依機率掉落，自動收進背包（飛向畫面上的鑰匙計數）-----
   tryKey(t, src) {
@@ -291,6 +295,7 @@ Object.assign(G.World.prototype, {
     if (!slot && this.bag.length >= G.TUNE.bagMax) return 'full';
     this.gold -= it.cost;
     if (slot) slot.n++; else this.bag.push({ id, n: 1 });
+    if (id === 'rev' && this.hero && !this.hero.alive && G.UI) G.UI.toastMsg('復活藥水要先放在背包，下次陣亡才會自動使用', 19);   // v2.5
     G.Audio.play('coin'); return 'ok';
   },
   useItem(id) {

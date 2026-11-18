@@ -138,9 +138,10 @@ G.Combat = {
     if (t.protectors && this.isProtected && this.isProtected(t)) { if (Math.random() < 0.3) G.FX.ring(this, t.x, t.y, t.r + 8, t.r + 10, 0.25, 12, 1); return; }
     const h = this.hero;
     if (h && h.alive && h.aura && src.side === h.side && src !== h && G.d2(src.x, src.y, h.x, h.y) < 160 * 160) power += h.aura.pow || 0;
-    if (t.side === 2 && src.side !== 2 && (!t.aggro || !t.aggro.alive || src.kind === 'hero')) { t.aggro = src; t.resetting = false; }
+    if (t.side === 2 && src.side !== 2) { t.lastHurt = this.time; if (!t.aggro || !t.aggro.alive || src.kind === 'hero') { t.aggro = src; t.resetting = false; } }
     let arm = t.st.armor * (t.bArm || 1) + (t.iArm || 0);
     if (h && h.alive && h.aura && t.side === h.side && t !== h && G.d2(t.x, t.y, h.x, h.y) < 160 * 160) arm += h.aura.arm || 0;
+    if (src.kind === 'tower' && t.kind === 'hero') { const TG = G.TUNE.towerGrow; if (src.heatT === t) src.heat = Math.min(TG.heatMax, (src.heat || 0) + 1); else { src.heatT = t; src.heat = 0; } power *= 1 + TG.heat * src.heat; }   // v2.5 塔「升溫」：連續打同一個英雄越打越痛（防越塔）
     let dmg = power * (src.bPow || 1) * (src.iPow || 1) * G.rr(0.9, 1.1), crit = false;
     if (o.crit && Math.random() * 100 < src.st.crit + (src.iCrit || 0)) { crit = true; dmg *= 2; }
     dmg = Math.max(1, Math.round((dmg - arm) * (1 - (t.bRed || 0))));

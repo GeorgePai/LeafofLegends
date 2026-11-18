@@ -177,7 +177,12 @@ G.UI = (() => {
     const A = U.aim, h = W && W.hero; if (!A || !A.on || !h) return;
     const sp = A.s.shape, cast = sp.cast || 0; let dx, dy, dist;
     if (A.mouse) { if (!U.mouse) return; const [wx, wy] = R.screenToWorld(U.mouse[0], U.mouse[1]); dx = wx - h.x; dy = wy - h.y; dist = Math.min(Math.hypot(dx, dy), cast); }
-    else { const m = Math.hypot(A.dx, A.dy), k = G.clamp((m - AIM_DEAD) / AIM_R, 0, 1); dx = A.dx / G.AX; dy = A.dy / G.AY; dist = k * cast; A.auto = k < 0.12; }
+    else {
+      // v2.5 靠邊補償：按鈕在右下角，往右／往下能拖的空間比較少 → 那個方向只要拖到螢幕邊就算拉滿（360 度都一樣好拉）
+      const sR = Math.max(10, R.uw - A.bx - 3), sD = Math.max(10, R.uh - A.by - 3), sL = Math.max(10, A.bx - 3), sU = Math.max(10, A.by - 3);
+      const ex = A.dx / Math.min(AIM_R, A.dx > 0 ? sR : sL), ey = A.dy / Math.min(AIM_R, A.dy > 0 ? sD : sU), m = Math.hypot(ex, ey), d0 = AIM_DEAD / AIM_R;
+      const k = G.clamp((m - d0) / (1 - d0), 0, 1); dx = ex / G.AX; dy = ey / G.AY; dist = k * cast; A.auto = k < 0.12; A.kx = ex; A.ky = ey;
+    }
     const l = Math.hypot(dx, dy) || 1; if (!(dx || dy)) { dx = h.face; dy = 0; }
     A.x = h.x + dx / l * (sp.k === 'line' ? Math.max(dist, 40) : dist); A.y = h.y + dy / l * (sp.k === 'line' ? Math.max(dist, 40) : dist);
     if (sp.k === 'unit') {                                 // 指定目標：選離落點最近、在施放距離內的敵人
@@ -200,6 +205,8 @@ G.UI = (() => {
   // 取消區：瞄準時出現在技能列左上方（手指拖過去會變紅）
   function aimCancelUI(c, x, y) {
     const A = U.aim; if (!A || !A.on || A.mouse) { U.cancelBtn = null; return; }
+    { const r = 16, m = Math.hypot(A.kx || 0, A.ky || 0) || 1, f = Math.min(1, m), kx = Math.round(A.bx + (A.kx || 0) / m * f * r), ky = Math.round(A.by + (A.ky || 0) / m * f * r);   // 搖桿：外圈＋拇指（顯示目前拉了多少）
+      c.globalAlpha = 0.5; G.pxEllipse(c, A.bx, A.by, r, r, A.cancel ? 10 : 13, 3, U.t * 4); c.globalAlpha = 1; G.pxDisc(c, kx, ky, 4, 4, A.cancel ? 10 : 13, 0.8); G.pxDisc(c, kx, ky, 2, 2, 9, 1); }
     const r = 11; U.cancelBtn = { x, y, r };
     const hot = A.cancel; c.fillStyle = 'rgba(0,0,0,0.6)'; c.beginPath(); c.arc(x, y, r + 2, 0, 6.2832); c.fill();
     c.fillStyle = P[hot ? 10 : 2]; c.beginPath(); c.arc(x, y, r, 0, 6.2832); c.fill();
@@ -431,6 +438,13 @@ G.UI = (() => {
     const cx2 = Rt - 13 - 8, cy2 = B - 26 - 16 - 20;
     box(c, cx2, cy2, 16, 16, R.cam.follow ? 1 : 3, R.cam.follow ? 5 : 9); icon(c, 'i_center', cx2 + 8, cy2 + 8);
     btn('center', cx2, cy2, 16, 16, () => { R.cam.follow = true; G.Audio.play('click'); });
+    // v2.5 一鍵解散跟隨：有跟隨小兵時才出現（視角置中鈕左邊；傳送冷卻圖示在時再往左）
+    { const nf = W.followCount(); if (nf) { const dx = cx2 - (W.tp && W.tp.cd > 0 ? 38 : 19), o = U.press.unf > 0 ? 1 : 0;
+      box(c, dx, cy2 + o, 16, 16, 0, 13);
+      c.fillStyle = P[6]; c.fillRect(dx + 5, cy2 + 3 + o, 1, 10); c.fillStyle = P[13]; c.fillRect(dx + 6, cy2 + 3 + o, 5, 4);   // 黃旗
+      c.fillStyle = P[10]; for (let k = 0; k < 9; k++) c.fillRect(dx + 3 + k, cy2 + 3 + k + o, 2, 1);                           // 紅色斜線
+      G.text(c, nf, dx + 15, cy2 + 10 + o, 9, 1, 0, 1);
+      btn('unf', dx, cy2, 16, 16, () => { U.press.unf = 0.12; }, () => { const n = W.clearFollow('全部解散，回到兵線'); if (n) G.Audio.play('click'); }); } }
     // 傳送：冷卻中 → 準心鈕上方顯示塔圖示 + 秒數；引導中 → 畫面中下方進度條
     const tp = W.tp;
     if (tp && tp.cd > 0) {
@@ -574,13 +588,13 @@ G.UI = (() => {
     const st = h.st, base = { hp: st.hp, mp: st.mp, power: st.power, armor: st.armor, crit: st.crit, aspd: 1 / st.delay, range: st.range, speed: st.speed };
     const cur = Object.assign({}, base, { power: st.power * (h.iPow || 1) * (h.bPow || 1), armor: st.armor * (h.bArm || 1) + (h.iArm || 0), crit: st.crit + (h.iCrit || 0), aspd: 1 / (st.delay * (h.iDel || 1) * (h.bDel || 1)), speed: st.speed * (h.iSpd || 1) });
     const wide = uw - L - I.r >= 270, mx = G.statMax('hero', h.level), w = wide ? Math.min(uw - L - I.r - 4, 264) : Math.min(uw - L - I.r - 4, 200), nst = base.mp > 0 ? 8 : 7;
-    const hh = 34 + Math.ceil(nst / (w >= 250 ? 2 : 1)) * 12 + 16, x = wide ? Math.round(uw / 2 - w / 2) : L, y = Math.round(G.clamp(wide ? uh / 2 - hh / 2 : I.t + 98, I.t + 2, uh - hh - 2));
+    const hh = 20 + Math.ceil((nst + 1) / (w >= 250 ? 2 : 1)) * 12 + 16, x = wide ? Math.round(uw / 2 - w / 2) : L, y = Math.round(G.clamp(wide ? uh / 2 - hh / 2 : I.t + 98, I.t + 2, uh - hh - 2));
     dim(c, 0.6);
     box(c, x, y, w, hh, 1, 7);
     btn('hpIn', x, y, w, hh, null, () => { U.heroPanel = false; });
     G.cn(c, G.nameOf(h.name), x + 6, y + 3, 9); G.text(c, 'LV' + h.level, x + w - 6, y + 6, 13, 1, 0, 1);
-    G.cn(c, '經驗', x + 6, y + 17, 5); bar(c, x + 32, y + 20, w - 70, 3, h.exp / W.expNeed(h), 'xp'); G.text(c, Math.floor(h.exp) + '/' + W.expNeed(h), x + w - 6, y + 20, 6, 1, 0, 1);
-    G.statBars(c, x + 6, y + 34, w - 12, base, mx, cur);
+    const xf = h.exp / W.expNeed(h);
+    G.statBars(c, x + 6, y + 20, w - 12, base, mx, cur, { extra: [{ lab: '經驗', f: xf, txt: Math.floor(xf * 100) + '%', col: 21 }] });   // v2.5 經驗條和其他數值條同長度、同粗細、左右對齊
     G.cn(c, '黃色＝增益中　點一下關閉', x + w / 2, y + hh - 14, 4, 0.5);
   }
 
@@ -603,7 +617,7 @@ G.UI = (() => {
       const x = px + 6 + (k % cols) * (cw + gap), y = py + 20 + ((k / cols) | 0) * (chh + gap), sel = U.shopSel === it.id, can = W.gold >= it.cost;
       const id = 'shop_' + it.id, o = U.press[id] > 0 ? 1 : 0;
       box(c, x, y + o, cw, chh, sel ? 2 : 1, sel ? 13 : 4);
-      icon(c, it.ic, x + cw / 2, y + 9 + o, !can);
+      if (!can) c.globalAlpha = 0.45; icon(c, it.ic, x + cw / 2, y + 9 + o); c.globalAlpha = 1;   // v2.5 錢不夠：圖示半透明（原本用暗色版，部分藥水沒有暗色圖 → 整個看不到）
       G.cn(c, it.n.replace('藥水', ''), x + cw / 2, y + 15 + o, can ? 8 : 5, 0.5);
       icon(c, 'i_gold', x + 8, y + chh - 6 + o); G.text(c, it.cost, x + 13, y + chh - 8 + o, can ? 13 : 5, 1);
       const have = (W.bag.find(b => b.id === it.id) || {}).n; if (have) G.text(c, 'X' + have, x + cw - 3, y + 3 + o, 9, 1, 0, 1);

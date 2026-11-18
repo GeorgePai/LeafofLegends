@@ -150,6 +150,13 @@ G.World = class {
     if (this.hitstop > 0) { this.hitstop -= dt; return; }
     dt *= this.timeScale;
     this.time += dt; if (!this.over) this.stats.time += dt;
+    if (!this.attract && ((this.tgT = (this.tgT || 0) - dt) <= 0)) { this.tgT = 1; this.towerGrow(); }
+    if ((this.leafT = (this.leafT || 0) - dt) <= 0) {   // v2.5 落葉：每 0.22 秒從鏡頭附近的一棵樹飄下一片
+      this.leafT = 0.22; const cam = G.Render.cam;
+      if (!this.leafPool || this.time - (this.leafPoolT || -9) > 1) { this.leafPoolT = this.time; this.leafPool = this.M.props.filter(p => p.tree && Math.abs(p.x - cam.x) < 420 && Math.abs(p.y - cam.y) < 320); }
+      const tr = this.leafPool.length && this.leafPool[(Math.random() * this.leafPool.length) | 0];
+      if (tr) this.parts.add(tr.x + G.rr(-8, 8), tr.y + G.rr(-2, 2), G.rr(30, 46), G.rr(10, 22), G.rr(-3, 3), G.rr(-4, 2), G.rr(2.8, 3.6), G.pick([11, 16, 20, 16]), 3, 1, 9, 0, 2);
+    }
     this.updateWaves(dt); this.updateSystems(dt);
     if (G.Ach && !this.attract) G.Ach.tick(this, dt);
     // 廣播：最多同時顯示 4 則（上下堆疊），其餘排隊；顯示中的才計時
@@ -276,6 +283,7 @@ G.World = class {
         if (d2 >= rr * rr || d2 < 0.0001) continue;
         const d = Math.sqrt(d2), ov = (rr - d) / d;
         let wa = a.static ? 0 : a.kind === 'hero' || a.kind === 'boss' ? 0.3 : 1, wb = b.static ? 0 : b.kind === 'hero' || b.kind === 'boss' ? 0.3 : 1;
+        if (a.side === b.side) { if (a.kind === 'hero') wa = 0; if (b.kind === 'hero') wb = 0; }   // v2.5 英雄不被自己人擠，小兵讓路
         const s = wa + wb; if (!s) continue; wa /= s; wb /= s;
         const k = 0.5;
         const ax = a.x - dx * ov * wa * k, ay = a.y - dy * ov * wa * k, bx = b.x + dx * ov * wb * k, by = b.y + dy * ov * wb * k;
@@ -333,6 +341,16 @@ G.World = class {
       else this.moveTo(u, t.x, t.y, dt);
     } else if (home) { if (G.d2(u.x, u.y, home[0], home[1]) > 100) this.moveTo(u, home[0], home[1], dt); else this.brake(u, dt); }
     else this.flowMove(u, dt);
+  }
+  // v2.5 塔隨時間變強（參考 LoL：塔的攻擊隨時間成長、到中期封頂）：第 2 分鐘起線性成長、第 14 分鐘封頂；雙方相同
+  towerGrow() {
+    const TG = G.TUNE.towerGrow, k = G.clamp((this.time / 60 - TG.from) / (TG.to - TG.from), 0, 1);
+    for (const u of this.units) {
+      if (!u.alive || u.kind !== 'tower') continue;
+      if (!u.st0) u.st0 = { hp: u.st.hp, power: u.st.power };
+      const nh = Math.round(u.st0.hp * (1 + TG.hp * k)); if (nh !== u.st.hp) { u.hp = u.hp * nh / u.st.hp; u.st.hp = nh; }
+      u.st.power = Math.round(u.st0.power * (1 + TG.pow * k));
+    }
   }
   towerAI(u, dt) {
     u.retarget -= dt;
@@ -466,7 +484,17 @@ G.World = class {
       if (G.UI) G.UI.toastMsg('解除跟隨，回到兵線', 7);
     }
   }
-  clearFollow() { let n = 0; for (const u of this.units) if (u.follow) { u.follow = false; u.path = null; n++; } if (n && G.UI) G.UI.toastMsg('英雄倒下，跟隨解除', 10); }
+  clearFollow(msg = '英雄倒下，跟隨解除') { let n = 0; for (const u of this.units) if (u.follow) { u.follow = false; u.path = null; u.target = null; G.FX.ring(this, u.x, u.y, u.r + 12, 3, 0.3, 6, 1); n++; } if (n && G.UI && msg) G.UI.toastMsg(msg, n && msg.includes('倒下') ? 10 : 7); return n; }
+  followCount() { let n = 0; for (const u of this.units) if (u.follow && u.alive) n++; return n; }
+  // v2.5 傘型隊形：跟隨的小兵依射程分三圈（近戰內圈、中距離、遠程外圈），在英雄行進方向的後方展開成扇形，不擋路也不擠成一團
+  followSlots() {
+    const h = this.hero; if (this.fSlotT != null && this.time - this.fSlotT < 0.3) return; this.fSlotT = this.time;
+    const sp = Math.hypot(h.vx, h.vy), dir = sp > 10 ? Math.atan2(h.vy / 0.7, h.vx) : (h.face > 0 ? 0 : Math.PI), back = dir + Math.PI;
+    const fs = this.units.filter(u => u.follow && u.alive).sort((a, b) => a.st.range - b.st.range || a.id - b.id), rings = [[], [], []];
+    for (const u of fs) rings[u.st.range <= 45 ? 0 : u.st.range <= 110 ? 1 : 2].push(u);
+    rings.forEach((rg, ri) => { const R0 = [26, 42, 58][ri] + Math.floor(rg.length / 9) * 12, span = Math.min(Math.PI * 0.95, (rg.length - 1) * (0.5 - ri * 0.08));
+      rg.forEach((u, i) => { const a = back + (rg.length > 1 ? -span / 2 + span * i / (rg.length - 1) : 0); u.fOff = [Math.cos(a) * R0, Math.sin(a) * R0 * 0.7]; }); });
+  }
   // 回傳 true = 本幀已處理
   followAI(u, dt) {
     const h = this.hero, T = G.TUNE;
@@ -486,9 +514,12 @@ G.World = class {
       else this.chase(u, t, dt, cm);
       return true;
     }
-    // 沒有目標：在英雄身邊排隊形
-    const fx = h.x + (u.fOff ? u.fOff[0] : 0) - h.face * 10, fy = h.y + (u.fOff ? u.fOff[1] : 0), d = Math.hypot(fx - u.x, fy - u.y);
-    if (d < 10) this.brake(u, dt); else this.chase(u, { x: fx, y: fy }, dt, d > 40 ? cm : 1);
+    // 沒有目標：在英雄後方排成扇形
+    this.followSlots();
+    let fx = h.x + (u.fOff ? u.fOff[0] : 0), fy = h.y + (u.fOff ? u.fOff[1] : 0);
+    if (!this.M.isWalk(fx, fy)) { fx = G.lerp(h.x, fx, 0.4); fy = G.lerp(h.y, fy, 0.4); }   // 隊形位置在牆裡：收靠英雄
+    const d = Math.hypot(fx - u.x, fy - u.y);
+    if (d < 8) this.brake(u, dt); else this.chase(u, { x: fx, y: fy }, dt, d > 40 ? cm : 1);
     return true;
   }
 
@@ -554,7 +585,7 @@ G.World = class {
     this.tryKey(t, src);
     if (t.side === 1) this.killGold(t, src);
     if (t.side === 2) { if (h && h.alive && src && src.side === 0) this.gainExp(h, t.st.exp); this.wildReward(t, src); }
-    if (t === h) { h.dead = G.TUNE.heroRespawnBase + G.TUNE.heroRespawnPer * h.level; h.cmd = null; h.pending = null; this.shake(0.5); this.clearFollow(); }
+    if (t === h) { h.dead = Math.min(G.TUNE.heroRespawnMax, G.TUNE.heroRespawnBase + G.TUNE.heroRespawnPer * h.level + G.TUNE.heroRespawnMin * Math.max(0, this.time / 60 - 5)); h.cmd = null; h.pending = null; this.shake(0.5); this.clearFollow(); }
     if (t.kind === 'holy' && !this.over) {
       this.over = { win: t.side === 1, t: 0 }; this.timeScale = 0.3; this.shake(1);
       this.overSt = Object.assign({}, this.stats, { lv: this.hero ? this.hero.level : 1, keys: this.keysGot || 0 });   // v2.4 結算數值在這一刻鎖住（背景戰鬥還會繼續）

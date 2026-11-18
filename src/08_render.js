@@ -139,6 +139,14 @@ G.Render = (() => {
       const drop = t < 0.18 ? (1 - t / 0.18) * 26 : 0, bounce = t < 0.18 ? 0 : Math.abs(Math.sin((t - 0.18) * 7)) * 3;
       mk.ax = Math.round(gx); mk.ay = Math.round(gy - 8 - drop - bounce); mk.fade = fade;
     }
+    // v2.5 河流微微流動：沿河道的短亮線順流移動、前後淡入淡出（只畫畫面內的，約幾十個像素）
+    { const rv = W.M.def.river, T = G.TILE; if (rv) { const pts = rv.pts; b.fillStyle = G.PAL[7];
+      for (let i = 0; i < pts.length - 1; i++) { const [x0, y0] = pts[i], [x1, y1] = pts[i + 1], L = Math.hypot(x1 - x0, y1 - y0), ux = (x1 - x0) / L, uy = (y1 - y0) / L, n = Math.ceil(L * 1.4);
+        for (let k = 0; k < n; k++) { const h1 = G.hash(i * 97 + k, 5), h2 = G.hash(i * 31 + k, 9), s2 = ((k + h1) / n + rt * (0.018 + h2 * 0.012)) % 1, lat = (h2 - 0.5) * 1.5 * rv.r;
+          const wx = (x0 + ux * s2 * L - uy * lat) * T, wy = (y0 + uy * s2 * L + ux * lat) * T, sx = Math.round(wx * G.AX - ox), sy = Math.round(wy * G.AY - oy);
+          if (sx < -4 || sy < -4 || sx > bw + 4 || sy > bh + 4) continue;
+          const fa = Math.sin(((s2 * n) % 1) * Math.PI); b.globalAlpha = 0.28 * fa; b.fillRect(sx, sy, 2 + ((h1 * 3) | 0), 1); }
+      } b.globalAlpha = 1; } }
     // v2.4 敵塔攻擊範圍：英雄靠近時淡入（淡粉紅填滿）；被鎖定時變紅、呼吸
     const h0 = W.hero, P0 = G.PAL;
     const zone = (x, y, r, col, fa, oa, dash) => {           // 地面範圍：半透明填滿＋外框（世界座標、半徑）
@@ -194,7 +202,15 @@ G.Render = (() => {
     for (const it of list) {
       if (it.p) {
         const p = it.p, s = p.s, ax = Math.round(p.x * G.AX - ox - s.w / 2), ay = Math.round(p.y * G.AY - oy - s.h + 2);
-        b.drawImage(s.n, ax, ay);
+        if (p.tree) {                                    // v2.5 樹隨風搖：樹冠上段擺最多、中段一半、樹幹不動（三段貼圖，幾乎不耗效能）
+          const ph = p.ph ?? (p.ph = G.hash(p.x | 0, p.y | 0) * 6.283), sw = Math.sin(rt * 1.3 + ph + p.x * 0.004) + Math.sin(rt * 2.9 + ph) * 0.25;
+          const h1 = Math.round(s.h * 0.4), h2 = Math.round(s.h * 0.72) - h1, o1 = Math.round(sw * 1.2), o2 = Math.round(sw * 0.55);
+          b.drawImage(s.n, 0, 0, s.w, h1, ax + o1, ay, s.w, h1); b.drawImage(s.n, 0, h1, s.w, h2, ax + o2, ay + h1, s.w, h2); b.drawImage(s.n, 0, h1 + h2, s.w, s.h - h1 - h2, ax, ay + h1 + h2, s.w, s.h - h1 - h2);
+        } else {
+          if (p.deco) G.pxDisc(b, ax + s.w / 2 + 2, ay + s.h - 1, s.w * 0.45, 2, 0, 0.5);
+          b.drawImage(s.n, ax, ay);
+          if (p.glow) { const fl = 0.75 + 0.15 * Math.sin(rt * 3 + p.x) + 0.1 * Math.sin(rt * 11 + p.y); G.glow(b, ax + s.w / 2, ay + 5, 9, 13, 0.32 * fl); G.glow(b, ax + s.w / 2, ay + s.h, 12, 13, 0.1 * fl, 0.5); }
+        }
       } else if (it.u) {
         const u = it.u, x = G.lerp(u.px, u.x, alpha), y = G.lerp(u.py, u.y, alpha);
         const moving = Math.hypot(u.vx, u.vy) > 10;

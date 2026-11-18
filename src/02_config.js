@@ -10,8 +10,11 @@ G.TUNE = {
   waveInterval: 20,        // 兵線間隔（秒）— 暫定
   firstAllyWave: 2,
   firstEnemyWave: 6,
-  heroRespawnBase: 8,      // 英雄復活秒數 = base + 等級*per — 暫定
-  heroRespawnPer: 1,
+  towerGrow: { from: 2, to: 14, hp: 0.4, pow: 0.5, heat: 0.25, heatMax: 3 },   // v2.5 塔成長：2→14 分鐘 HP +40%、攻擊 +50% 封頂；連續打同一個英雄每發 +25%（最多 +75%）— 暫定
+  heroRespawnBase: 5,      // v2.5 英雄復活秒數 = base + 等級×per + (分鐘−5)×min，上限 max（Lv1 7 秒、Lv10 約 25 秒、20 分鐘 Lv12 約 41 秒）— 暫定
+  heroRespawnPer: 2,
+  heroRespawnMin: 0.8,
+  heroRespawnMax: 50,
   sanctuaryHeal: 0.06,     // 在己方聖所旁每秒回復 6% HP/MP — 暫定
   sanctuaryRange: 130,
   levelUpEvery: 3,         // 敵方每 N 波升 1 級 — 暫定

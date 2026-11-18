@@ -160,6 +160,19 @@ G.buildMap = function (def) {
     else if (f >= 1.3 && rng() < 0.09) M.props.push({ x: px, y: py, s: G.SPR.trees[(rng() * 3) | 0], tree: 1 });
     else if (f < -0.9 && f > -1.6 && M.pathiness(px / T, py / T) > 0.9 && !(M.hasRiver && M.river(px / T, py / T) < 0.5) && rng() < 0.05) M.props.push({ x: px, y: py, s: G.SPR.rocks[(rng() * 3) | 0] });
   }
+  // v2.5 地標裝飾：每座塔旁一盞石燈籠、聖所兩側守護者石像、野怪營地旁古代斷柱。找「森林邊緣」（不能走、但旁邊就是路）放，不會擋路
+  const edge = (cx, cy, r0, r1, a0) => {
+    for (let r = r0; r <= r1; r += 0.5) for (let k = 0; k < 16; k++) {
+      const a = a0 + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 0.39, x = (cx + Math.cos(a) * r) * T, y = (cy + Math.sin(a) * r * 0.8) * T;
+      if (!M.isWalk(x, y) && M.isWalk((cx + Math.cos(a) * (r - 1)) * T, (cy + Math.sin(a) * (r - 1) * 0.8) * T)) return [x, y];
+    }
+    return null;
+  };
+  M.deco = [];
+  const addDeco = (p, k) => { if (!p) return; M.props = M.props.filter(q => !q.tree || Math.hypot(q.x - p[0], q.y - p[1]) > 18); const d = { x: p[0], y: p[1] + 2, s: G.SPR['d_' + k], deco: k, glow: k === 'lantern' }; M.props.push(d); M.deco.push(d); };
+  if (def.towers3) for (const side of ['player', 'enemy']) for (const [tp] of def.towers3[side]) addDeco(edge(tp[0], tp[1], 2.5, 5, -1.57), 'lantern');
+  if (def.holy) for (const side of ['player', 'enemy']) { const hp = def.holy[side], a = Math.atan2(def.h / 2 - hp[1], def.w / 2 - hp[0]); addDeco(edge(hp[0], hp[1], 6, 11, a + 1.3), 'statue'); addDeco(edge(hp[0], hp[1], 6, 11, a - 1.3), 'statue'); }
+  if (def.wild) for (const [, c] of def.wild) addDeco(edge(c[0], c[1], 3, 6, -1.57), 'pillar');
   return M;
 };
 

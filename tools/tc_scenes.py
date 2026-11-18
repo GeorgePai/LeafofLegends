@@ -8,7 +8,7 @@ S.append(['devpad',"G.Menus.devAsk(true)",300]); S.append(['devpad-x',"G.Menus.d
 S.append(['reset',up('rst'),300]); S.append(['reset-close',up('rsNo'),200])
 # v1.7：開場動畫、首頁滾輪、問候、成就、存檔
 S.append(['tap',"G.UI.screen='tap';G.Intro.tapT=2",150])
-for t in (0.3, 1.2, 1.7, 2.2): S.append([f'intro{t}',f"G.UI.screen='intro';G.Intro.t={t}",40])
+for t in (0.3, 1.2, 2.0, 3.0, 3.5, 4.4, 4.8): S.append([f'intro{t}',f"G.UI.screen='intro';G.Intro.t={t}",40])
 S.append(['menu2',"G.Intro.skip();",1600])
 for t in (0.3,0.5,0.62,0.9,1.6): S.append([f'logo{t}',f"G.Menus._mt({t})",30])
 for k in range(8): S.append([f'menuwheel{k}',f"G.Menus.menuWheel.go({k})",450])
@@ -83,6 +83,10 @@ S.append(['end',"Object.assign(G.W.stats,{kills:134,deaths:0,assists:112,towers:
 S.append(['end-full',"G.UI.endT=9",400])
 S.append(['end-lose',"G.UI.start();G.Ach.recent=[];G.W.over={win:false,t:3}",3200])
 S.append(['end-lose-full',"G.UI.endT=9",400])
+# v2.5 圖鑑藥水、解散跟隨鈕、英雄面板
+S.append(['book-pot',"G.UI.screen='book';G.Menus._btab(5)",400]); S.append(['book-pot2',"G.Menus.scroll(400,G.Render.uw/2,G.Render.uh/2)",300]); S.append(['book-pot-x',"G.Menus._btab(0)",200])
+S.append(['follow',"G.UI.start();var W=G.W,h=W.hero;for(var i=0;i<5;i++){var u=new G.Unit(W,'leafblower',0,h.x+10*i,h.y+20,1,'creep');W.units.push(u);W.toggleFollow(u);}",400])
+S.append(['hpanel',"G.UI.toast=null;G.UI.heroPanel=true",300]); S.append(['hpanel-x',"G.UI.heroPanel=false",100])
 # v2.4 技能瞄準＋取消區、被塔鎖定
 S.append(['aim',"G.UI.start();var h=G.W.hero;h.skills.forEach(s=>s.lv=1);h.mp=999;G.UI.aim={i:2,s:h.skills[2],on:true,pre:false,bx:G.Render.uw-20,by:G.Render.uh-20,dx:-40,dy:-24,ux:G.Render.uw-60,uy:G.Render.uh-44};",400])
 S.append(['aim-cancel',"var A=G.UI.aim,b=G.UI.cancelBtn;if(A&&b){A.ux=b.x;A.uy=b.y;G.UI.aimUpdate();}",200]); S.append(['aim-x',"G.UI.aim=null",100])
