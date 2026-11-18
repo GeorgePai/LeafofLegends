@@ -12,8 +12,10 @@ G.Audio = (() => {
   try { const v = JSON.parse(localStorage.getItem('leafwar_vol') || 'null'); if (v) { if (v.music >= 0) VOL.music = Math.min(1, v.music); if (v.sfx >= 0) VOL.sfx = Math.min(1, v.sfx); } } catch (e) { }
   const last = {}; let voices = 0;
 
+  // iPhone（Safari 16.4+）：音訊類別設成「播放」→ 靜音開關打開時音效也照樣出聲（和背景音樂一致）
+  try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) { }
   function init() {
-    if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
+    if (ac) { if (ac.state !== 'running' && ac.state !== 'closed') { try { const p = ac.resume(); if (p && p.catch) p.catch(() => { }); } catch (e) { } } return; }   // iPhone 被來電／鎖屏中斷時狀態是 'interrupted'，也要恢復
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
     ac = new AC();
     comp = ac.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 4; comp.attack.value = 0.003; comp.release.value = 0.15;
@@ -247,12 +249,31 @@ G.Audio = (() => {
           t.v += G.clamp(tgt - t.v, -dt / 0.7, dt / up);
           const lv = t.v * t.v;
           if (t.g) t.g.gain.value = lv; else { t.a.volume = G.clamp(lv * MUSIC_VOL * VOL.music, 0, 1); t.a.muted = muted; }
-          if (tgt > 0 && t.a.paused && ac.state === 'running') { if (t.rs) { t.rs = false; try { t.a.currentTime = 0; } catch (e) { } } t.a.play().catch(() => { }); }
+          if (tgt > 0 && t.a.paused && !t.blk && !t.pend && ac.state === 'running') start(t);
           if (t.v <= 0.001 && !t.a.paused) t.a.pause();
         }
-      }
+      },
+      // 在使用者手勢裡呼叫：被瀏覽器擋下的曲子（NotAllowedError）在這一下重新播放
+      kick() { if (!ac || !want) return; const t = get(want); t.blk = false; if (t.a.paused) start(t); }
     };
+    function start(t) {
+      if (t.rs) { t.rs = false; try { t.a.currentTime = 0; } catch (e) { } }
+      let p; try { p = t.a.play(); } catch (e) { t.blk = true; return; }
+      if (p && p.then) { t.pend = true; p.then(() => { t.pend = false; }, e => { t.pend = false; if (e && e.name === 'NotAllowedError') t.blk = true; }); }   // 被擋 → 等下一次點擊（kick）再播，不每幀重試
+    }
   })();
+
+  // 解鎖聲音：任何點擊／按鍵都試一次（恢復被中斷的音訊、播一個無聲樣本、補播被擋的音樂）
+  let unlocked = false;
+  function unlock() {
+    init(); if (!ac) return;
+    if (!unlocked || ac.state !== 'running') { try { const b = ac.createBuffer(1, 1, 22050), s = ac.createBufferSource(); s.buffer = b; s.connect(ac.destination); s.start(0); unlocked = true; } catch (e) { } }
+    Music.kick();
+  }
+  for (const ev of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown']) addEventListener(ev, unlock, { capture: true, passive: true });
+  // 切回遊戲（解鎖手機、從別的 App 回來）→ 恢復音訊；需要手勢的話，下一次點擊會補上
+  const wake = () => { if (document.visibilityState === 'visible' && ac) init(); };
+  document.addEventListener('visibilitychange', wake); addEventListener('pageshow', wake); addEventListener('focus', wake);
 
   return {
     init, play,

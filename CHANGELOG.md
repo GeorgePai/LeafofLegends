@@ -192,3 +192,12 @@ Pai 反映很多技能升級無感（例：騎士的護盾被動每級防禦只 
 6. **開發者模式**：戰鬥開局英雄直接到所有技能都能升 LV3 的等級，技能點全部自己分配
 7. **新英雄：死靈召喚力夫（神話）**：`01b_necro.js`（資料）、`06d_necro.js`（機制＋特效＋美術）。召喚物 `u.summoner`、自動跟隨、英雄復活後回來（玩家親手解除則不回）；被動替罪（`scapeHit`）；犧牲召喚／血祭控制／複製法術；受控敵人幽魂紫、複製體冰青半透明（`G.lookOf`、`G.rampOf`）；技能展示 `scNecro`；新音效 darkshot/sac/summon/blood/clone
 8. **教學**：稀有度頁加神話、新增「新角色」「召喚物」兩頁
+
+## 5zb. v2.6.1 聲音修正（2026-11-19）
+Pai 回報 V2.6 更新後背景音樂、音效都沒聲音。V2.6 沒動到音訊程式，headless Chrome 測 V2.5／V2.6 行為相同，推測是 iPhone 的聲音解鎖／中斷流程不夠穩，一次加固（`04_audio.js`）：
+1. `navigator.audioSession.type = 'playback'`（Safari 16.4+）：靜音開關打開時音效也會出聲（原本音效走 Web Audio 預設類別，靜音開關一開、或音樂沒播起來時就整個沒聲）。
+2. `init()` 原本只在 `suspended` 時恢復，iPhone 被來電／鎖屏中斷後狀態是 `interrupted` 就永遠不恢復 → 改成只要不是 `running` 就恢復。
+3. 全域解鎖 `unlock()`：pointerdown／pointerup／touchend／click／keydown（capture）都會恢復音訊＋播一個無聲樣本＋`Music.kick()` 在手勢裡補播被擋下的曲子。
+4. 音樂被瀏覽器擋下（NotAllowedError）時不再每幀重試，標記 `t.blk` 等下一次點擊再播；`t.pend` 避免重複呼叫 `play()`。
+5. `visibilitychange／pageshow／focus`：切回遊戲時自動恢復音訊。
+6. 版本號 V2.6.1。
