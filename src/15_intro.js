@@ -27,7 +27,7 @@ G.Intro = (() => {
   I.draw = c => {
     const dt = Math.min(0.05, G.Menus.dt || 1 / 60);
     G.Menus.ui.tick(); I.t += G.Menus.dt || dt;
-    const t = I.t, uw = R.uw, uh = R.uh, cx = Math.round(uw / 2), gy = Math.round(uh * 0.6), Ins = R.ins;
+    const t = I.t, uw = R.uw, uh = R.uh, cx = Math.round(uw / 2), gy = Math.round(uh * 0.6), Ins = R.ins, HX = cx - Math.round((uw >= 300 || uh > uw ? 2 : 1) * 16 * 0.9);   // HX：主角位置（v2.5 往左一點，站在我方陣前）
     // 震動
     const shk = (t > TC - 0.02 && t < END) || (t > 3.35 && t < 3.6) || I.shk > 0 ? Math.round((Math.random() - 0.5) * (t > TC ? 6 : 4)) : 0;
     c.fillStyle = P[0]; c.fillRect(0, 0, uw, uh);
@@ -50,16 +50,16 @@ G.Intro = (() => {
     if (t > 1.3 && t < 2.05) { const k = (t / 0.14) | 0; if (k !== I.st) { I.st = k; G.Audio.play('opStep', 1, 0.05); } }
     // A：落葉
     if (t < 0.75) {
-      const fr0 = I.from || [cx, -12], k = ss(seg(t, 0, 0.7)), lx = G.lerp(fr0[0], cx, k) + Math.sin(t * 9) * 14 * (1 - k) * (I.from ? 0.5 : 1), ly = G.lerp(fr0[1], gy - 4, k);
+      const fr0 = I.from || [cx, -12], k = ss(seg(t, 0, 0.7)), lx = G.lerp(fr0[0], HX, k) + Math.sin(t * 9) * 14 * (1 - k) * (I.from ? 0.5 : 1), ly = G.lerp(fr0[1], gy - 4, k);
       const lf = G.scaled(G.SPR.leaf_pt.n, 3), gl = G.glowOf(lf, 11, 1, 3); c.globalAlpha = 0.6 + Math.sin(t * 20) * 0.2; c.drawImage(gl.c, Math.round(lx - lf.width / 2) - gl.p, Math.round(ly - lf.height / 2) - gl.p); c.globalAlpha = 1; c.drawImage(lf, Math.round(lx - lf.width / 2), Math.round(ly - lf.height / 2));
       if (Math.random() < 0.6) parts.push({ x: lx + G.rr(-3, 3), y: ly, vx: G.rr(-8, 8), vy: G.rr(-6, 6), l: 0.5, c: G.pick([11, 16, 13]) });
     }
     if (t >= 0.7) { once('land', 'opLand'); once('swell', 'opSwell'); }
     // 落地光圈
-    { const k = seg(t, 0.7, 1.1); if (k > 0 && k < 1) { const r = Math.round(4 + k * 50); G.pxEllipse(c, cx, gy, r, Math.round(r * 0.32), k < 0.5 ? 13 : 11); } }
+    { const k = seg(t, 0.7, 1.1); if (k > 0 && k < 1) { const r = Math.round(4 + k * 50); G.pxEllipse(c, HX, gy, r, Math.round(r * 0.32), k < 0.5 ? 13 : 11); } }
     // B：嫩芽 → 英雄冒出
     const T = G.Team.get(), hero = G.HEROES[T.hero].name;
-    if (t > 0.85 && t < 1.05) { const h = Math.round(seg(t, 0.85, 1.05) * 9); c.fillStyle = P[11]; c.fillRect(cx, gy - h, 1, h); c.fillRect(cx - 2, gy - h, 2, 1); c.fillRect(cx + 1, gy - h + 1, 2, 1); }
+    if (t > 0.85 && t < 1.05) { const h = Math.round(seg(t, 0.85, 1.05) * 9); c.fillStyle = P[11]; c.fillRect(HX, gy - h, 1, h); c.fillRect(HX - 2, gy - h, 2, 1); c.fillRect(HX + 1, gy - h + 1, 2, 1); }
     // 兩軍（v2.5b 重做）：三層依序登場，越前排越大、越晚到、越有份量
     //   後排（1.3 起）：一整排小兵剪影從地平線後方「浮現」（淡入＋上升）
     //   中排（1.9 起）：英雄／首領成群衝進場
@@ -71,23 +71,23 @@ G.Intro = (() => {
     const big = ['bigbear', 'polarbear', 'firebear', 'lion', 'tiger', 'buffalo'].filter(n => RM.bosses.includes(n)), BS = [...big, ...RM.bosses.filter(n => !big.includes(n))];
     const dash = ss(seg(t, TD, TC - 0.03)), fr = (t * 8) | 0, port = uh > uw;
     const K = uw >= 300 || port ? 2 : 1, sp = K * 16, half = cx - sp * (port ? 1.1 : 1.4);   // 直屏也用 2 倍（畫面高、人物太小沒氣勢）
-    const nB = port ? 5 : 8, nM = port ? 3 : 4, nF = port ? 2 : 3, RY = port ? [2, 22, 44] : [2, 13, 25];   // 直屏畫面高：三排拉開成縱深
+    const nB = 8, nM = 4, nF = 3, RY = port ? [2, 20, 42] : [2, 13, 25], KM = port ? 1 : K;   // v2.5 直屏和橫屏一樣多（直屏中排小一號，靠縱深擠得下）   // 直屏畫面高：三排拉開成縱深
     // 高矮層次：巨型（坦克、大首領）放大一級、菁英小個子縮小一級，其他照排的大小 → 隊伍有大有小
     const GIANT = ['treeprotector', 'leafmuscle', 'muscleleafy', 'cannonleafy', 'bigbear', 'polarbear', 'firebear', 'buffalo', 'turtle'], SMALL = ['quickleafy', 'elitequickleafy', 'seedshooter', 'peasniper', 'twinflower', 'mouse', 'whitemouse', 'chipmunk', 'bat', 'gnome', 'penguin', 'cat'];
-    const sizeOf = (n, k) => GIANT.includes(n) ? Math.min(3, k + 1) : SMALL.includes(n) ? Math.max(1, k - 1) : k;
+    const sizeOf = (n, k) => GIANT.includes(n) ? Math.min(port ? 2 : 3, k + 1) : SMALL.includes(n) ? Math.max(1, k - 1) : k;
     const pick = (src, ns) => ns.filter(n => src.includes(n) && G.VIS[n]);
-    const AF = port ? pick([...PL, ...HN], ['treeprotector', HN[0]]) : pick([...PL, ...HN], ['treeprotector', HN[0], 'leafmuscle']);
-    const AM = (port ? [HN[1], 'quickleafy', HN[2]] : [HN[1], 'quickleafy', 'cannonleafy', HN[2], 'elitequickleafy']).filter(n => n && G.VIS[n] && !AF.includes(n));
-    const EF = port ? pick(BS, ['bigbear', 'tiger']) : pick(BS, ['bigbear', 'tiger', 'polarbear']);
-    const EM = (port ? ['firebear', 'gnome', 'lion'] : ['lion', 'firebear', 'penguin', 'buffalo', 'gnome']).filter(n => G.VIS[n] && !EF.includes(n));
+    const AF = pick([...PL, ...HN], ['treeprotector', HN[0], 'leafmuscle']);
+    const AM = [HN[1], 'quickleafy', 'cannonleafy', HN[2], 'elitequickleafy'].filter(n => n && G.VIS[n] && !AF.includes(n));
+    const EF = pick(BS, ['bigbear', 'tiger', 'polarbear']);
+    const EM = ['lion', 'firebear', 'penguin', 'buffalo', 'gnome'].filter(n => G.VIS[n] && !EF.includes(n));
     const gl = l => [...l.filter(n => !GIANT.includes(n)), ...l.filter(n => GIANT.includes(n))];   // 巨型角色排在外側（離中間遠），中間留給一般英雄與小個子菁英 → V 字形把主角框在中間
     const rows0 = side => side > 0
-      ? [{ l: PL.filter(n => !AF.includes(n) && !AM.includes(n)).slice(0, nB), k: 1, y: gy + RY[0], t0: 1.3, gap: 0.05, m: 'rise' }, { l: AM, k: K, y: gy + RY[1], t0: 1.9, gap: 0.11, m: 'run' }, { l: AF, k: K, y: gy + RY[2], t0: 2.5, gap: 0.2, m: 'drop' }]
-      : [{ l: RM.smalls.filter(n => !EM.includes(n)).slice(0, nB), k: 1, y: gy + RY[0], t0: 1.35, gap: 0.05, m: 'rise' }, { l: EM, k: K, y: gy + RY[1], t0: 1.95, gap: 0.11, m: 'run' }, { l: EF, k: K, y: gy + RY[2], t0: 2.6, gap: 0.2, m: 'drop' }];
+      ? [{ l: PL.filter(n => !AF.includes(n) && !AM.includes(n)).slice(0, nB), k: 1, y: gy + RY[0], t0: 1.3, gap: 0.05, m: 'rise' }, { l: AM, k: KM, y: gy + RY[1], t0: 1.9, gap: 0.11, m: 'run' }, { l: AF, k: K, y: gy + RY[2], t0: 2.5, gap: 0.2, m: 'drop' }]
+      : [{ l: RM.smalls.filter(n => !EM.includes(n)).slice(0, nB), k: 1, y: gy + RY[0], t0: 1.35, gap: 0.05, m: 'rise' }, { l: EM, k: KM, y: gy + RY[1], t0: 1.95, gap: 0.11, m: 'run' }, { l: EF, k: K, y: gy + RY[2], t0: 2.6, gap: 0.2, m: 'drop' }];
     const rows = side => rows0(side).map(r => Object.assign(r, { l: gl(r.l) }));
     const units = [];
     for (const side of [1, -1]) rows(side).forEach((r, ri) => r.l.forEach((n, i) => {
-      const f = r.l.length > 1 ? i / (r.l.length - 1) : 0.5, xEnd = cx - side * (sp * 1.5 + 8 + f * (half - 18 - sp * 0.4) * (ri === 0 ? 1 : 0.92)) + (ri === 1 ? side * -4 : 0);
+      const f = (i + 0.5 + (ri === 1 ? 0.3 : ri === 0 ? 0.15 : 0)) / (r.l.length + 0.3), a0 = side > 0 ? (port ? cx - 4 : HX - 18) : cx + 22, a1 = side > 0 ? 8 : uw - 8, xEnd = Math.round(G.lerp(a0, a1, f));   // 各自佔滿半邊（我方：畫面左緣～主角前；敵方：中線～右緣），前後排錯開
       units.push({ n, side, ri, k: sizeOf(n, r.k), y: r.y + ((i % 2) ? 2 : 0), xEnd, t0: r.t0 + i * r.gap * (ri === 2 ? 1 : 1) + (side < 0 ? 0.04 : 0), m: r.m });
     }));
     // 氣場：兩側的色光（我方綠金、敵方暗紅），隨兵力到齊越來越亮
@@ -97,6 +97,10 @@ G.Intro = (() => {
         if (Math.random() < 0.5 * pw) parts.push({ x: cx - Math.random() * half, y: gy + 20, vx: G.rr(-4, 4), vy: -G.rr(14, 30), l: G.rr(0.8, 1.4), c: G.pick([11, 16, 20]) });   // 我方：葉片光點上飄
         if (Math.random() < 0.6 * pw) parts.push({ x: cx + Math.random() * half, y: gy + 20, vx: G.rr(-4, 4), vy: -G.rr(16, 34), l: G.rr(0.8, 1.4), c: G.pick([10, 14, 15]) }); } }   // 敵方：火星上飄
     if (t > 1.3 && t < 3.3) { const w = ((t - 1.3) / 0.5) | 0; once('dr' + w, 'opDrum'); }
+    // 主角聚光燈（從上方打下來的柔光錐＋腳下光圈）
+    if (t > 1.0 && t < TC) { const a = Math.min(1, (t - 1.0) / 0.3), top = 0, fy = gy + (port ? 50 : 30), g3 = c.createLinearGradient(0, top, 0, fy);
+      g3.addColorStop(0, 'rgba(255,250,220,0)'); g3.addColorStop(1, 'rgba(255,250,220,' + (0.12 * a).toFixed(3) + ')'); c.fillStyle = g3;
+      c.beginPath(); c.moveTo(HX - 8, top); c.lineTo(HX + 2, top); c.lineTo(HX + 24 * K, fy); c.lineTo(HX - 34 * K, fy); c.closePath(); c.fill(); }
     for (const u of units.sort((a, b) => a.y - b.y)) {
       if (t < u.t0) continue;
       const lt = t - u.t0, x0 = u.side > 0 ? -28 : uw + 28, foe = u.side < 0;
@@ -115,7 +119,7 @@ G.Intro = (() => {
     // VS 蓋章（3.4）：白閃＋放大落下＋首領咆哮
     if (t > 3.35 && t < TD + 0.1) {
       once('roar', 'opRoar'); once('vs', 'opStomp');
-      const k = ss(seg(t, 3.35, 3.55)), sc = Math.max(2, Math.round((K + 2) * (1 + (1 - k) * 1.5))), vy = Math.round(uh * 0.18), fade = 1 - seg(t, TD - 0.1, TD + 0.1);
+      const k = ss(seg(t, 3.35, 3.55)), sc = Math.max(2, Math.round((K + 2) * (1 + (1 - k) * 1.5))), vy = Math.round(port ? gy - 64 : uh * 0.18), fade = 1 - seg(t, TD - 0.1, TD + 0.1);
       if (t < 3.45) { c.fillStyle = P[9]; c.globalAlpha = (3.45 - t) * 5; c.fillRect(0, 0, uw, uh); c.globalAlpha = 1; }
       c.globalAlpha = fade; for (const [dx, dy, col] of [[1, 1, 0], [-1, 0, 0], [1, 0, 0], [0, -1, 0], [0, 1, 0], [0, 0, 13]]) G.text(c, 'VS', cx + dx * Math.max(1, sc >> 1), vy + dy * Math.max(1, sc >> 1), col, sc, null, 0.5); c.globalAlpha = 1;
     }
@@ -123,7 +127,7 @@ G.Intro = (() => {
     if (t > 1.05) {
       const pop = seg(t, 1.05, 1.25), sq = pop < 1 ? Math.round(Math.sin(pop * Math.PI) * 6) : 0;
       once('pop', 'opPop');
-      spr(hero, cx - 6 + dash * 14, gy + (port ? 50 : 30) - sq, port ? 3 : K + 1, 1, t > 1.3 ? fr : 0);
+      spr(hero, HX - 6 + dash * 14, gy + (port ? 50 : 30) - sq, port ? 3 : K + 1, 1, t > 1.3 ? fr : 0);
     }
     // D：對撞白光＋星芒
     if (t > TC) {
