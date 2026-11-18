@@ -151,7 +151,18 @@ G.Menus = (() => {
     return (_med[key] = m);
   };
   const STATS = [['hp', '生命', 10], ['mp', '魔力', 11], ['power', '攻擊', 14], ['armor', '防禦', 12], ['crit', '爆擊', 19], ['aspd', '攻速', 18], ['range', '射程', 17], ['speed', '跑速', 20]];
-  // cur：目前值（含增益），base：基礎值；回傳結束 y
+  // v2.6 數值條補間：切換角色時，條長與數字從舊值平滑滑到新值（ease-out，約 0.35 秒）
+  // 同一個 id 超過 0.3 秒沒畫（剛打開畫面）就直接顯示目標值，不從 0 長出來
+  const _tw = {};
+  const tween = (id, to) => {
+    const now = performance.now(), s0 = _tw[id];
+    if (!s0 || now - s0.t > 300) { _tw[id] = { v: to, t: now }; return to; }
+    const dt = Math.min(0.05, (now - s0.t) / 1000); s0.t = now;
+    s0.v += (to - s0.v) * (1 - Math.exp(-dt * 11));
+    if (Math.abs(to - s0.v) <= Math.abs(to) * 0.004 + 0.002) s0.v = to;
+    return s0.v;
+  };
+  // cur：目前值（含增益），base：基礎值；回傳結束 y；opt.anim：補間用的 id（同一個畫面固定一個名稱）
   G.statBars = (c, x, y, w, base, mx, cur, opt = {}) => {
     const ex = opt.extra || [];                         // v2.5 額外的列（例：經驗），和數值條同欄寬、同長度、同粗細
     const keys = ex.map(e => [e, e.lab, e.col]).concat(STATS.filter(([k]) => (k !== 'mp' || base.mp > 0) && !(opt.skip || []).includes(k)));
@@ -159,13 +170,14 @@ G.Menus = (() => {
     keys.forEach(([k, lab, col], i) => {
       const xx = x + (i % cols) * (cw + 10), yy = y + ((i / cols) | 0) * 12, bx = xx + lw, bw = cw - lw - 30;
       if (typeof k === 'object') { G.cn(c, lab, xx, yy - 1, 5); G.bar3d(c, bx, yy + 3, bw, 4, G.clamp(k.f, 0, 1), col); G.text(c, k.txt, xx + cw, yy + 3, 9, 1, null, 1); return; }
-      const b0 = base[k], v = cur ? cur[k] : b0, f0 = G.clamp(b0 / (mx[k] || 1), 0.04, 1), f1 = G.clamp(v / (mx[k] || 1), 0.04, 1);
+      const an = opt.anim ? (q, val) => tween(opt.anim + k + q, val) : (q, val) => val;
+      const b0r = base[k], vr = cur ? cur[k] : b0r, b0 = an('b', b0r), v = an('v', vr), f0 = G.clamp(b0 / (mx[k] || 1), 0.04, 1), f1 = G.clamp(v / (mx[k] || 1), 0.04, 1);
       G.cn(c, lab, xx, yy - 1, 5);
       G.bar3d(c, bx, yy + 3, bw, 4, Math.min(f0, f1), col);
       if (f1 > f0) G.bar3d(c, bx + Math.round(bw * f0), yy + 3, Math.round(bw * (f1 - f0)), 4, 1, 13, true);
       c.fillStyle = 'rgba(0,0,0,0.55)'; for (let q = 1; q < 10; q++) c.fillRect(bx + Math.round(bw * q / 10), yy + 3, 1, 4);
       const txt = k === 'aspd' ? v.toFixed(2) : k === 'crit' ? Math.round(v) + '%' : Math.round(v);
-      G.text(c, txt, xx + cw, yy + 3, v > b0 + 0.001 ? 13 : v < b0 - 0.001 ? 10 : 9, 1, null, 1);
+      G.text(c, txt, xx + cw, yy + 3, vr > b0r + 0.001 ? 13 : vr < b0r - 0.001 ? 10 : 9, 1, null, 1);
     });
     return y + Math.ceil(keys.length / cols) * 12;
   };
@@ -204,7 +216,7 @@ G.Menus = (() => {
         cy += hh + 4;
       }
     }
-    cy = G.statBars(c, x, cy, w, statOf(name, 1, side), G.statMax(groupOf(name))) + 4;
+    cy = G.statBars(c, x, cy, w, statOf(name, 1, side), G.statMax(groupOf(name)), null, { anim: 'det' }) + 4;
     return cy;
   }
   // ---------- 技能展示（彈出視窗）：上方動畫、下方切換列、再下方是該技能的說明與數值 ----------
@@ -516,7 +528,7 @@ G.Menus = (() => {
       arrow('mwU', top - 6, -1, mw.tgt > 0); arrow('mwD', bot + 2, 1, mw.tgt < ITEMS.length - 1);
       c.globalAlpha = 1;
     }
-    G.text(c, 'V2.5', uw - I.r - 2, uh - I.b - 6, 3, 1, null, 1);
+    G.text(c, 'V2.6', uw - I.r - 2, uh - I.b - 6, 3, 1, null, 1);
     // 右上：鑰匙數；左下：開發者模式開關
     const kt = G.Team.dev ? '∞' : String(G.Team.keys()), kw = 22 + G.cnW(kt);
     H().box(c, uw - I.r - kw, I.t, kw, 14, 0, 13); H().icon(c, 'i_key', uw - I.r - kw + 9, I.t + 7); G.cn(c, kt, uw - I.r - 4, I.t + 1, 13, 1);
@@ -699,13 +711,17 @@ G.Menus = (() => {
       G.pxDisc(c, px, floor, f.w * sc * 0.35, f.w * sc * 0.1 + 1, 0, 0.6);
       // 外框光暈（隊伍＝稀有度色；圖鑑＝類別色）
       const gcol = mode === 'book' ? bookCol(nm) : G.RARITY[G.rarityOf(nm)].c, locked = mode !== 'book' && !G.Team.owns(nm);
-      const kk = Math.max(1, Math.round(sc)), gl = G.glowOf(G.scaled(img, kk), gcol, 1, kk >= 2 ? 3 : 2), q = sc / kk;
+      const kk = Math.max(1, Math.round(sc)), rr = G.rarityOf(nm), gl = mode !== 'book' && rr === 4 ? G.mythGlow(G.scaled(img, kk), 1, kk >= 2 ? 3 : 2) : G.glowOf(G.scaled(img, kk), gcol, 1, kk >= 2 ? 3 : 2), q = sc / kk;
       if (!locked) {
         c.globalAlpha = (1 - dark) * (0.75 + Math.sin(gt * 4 + i) * 0.25);
         c.drawImage(gl.c, Math.round(dx - gl.p * q), Math.round(dy - gl.p * q), Math.round(gl.c.width * q), Math.round(gl.c.height * q));
         c.globalAlpha = 1;
       }
       c.drawImage(img, dx, dy, fw, fh);
+      if (mode !== 'book' && G.Team.isNew(nm) && Math.abs(d) < 2.5) {     // v2.6 NEW 標記（右上角，中央那隻會輕輕彈跳）
+        const nb = 'NEW', bw2 = G.textW(nb) + 4, bx2 = Math.min(dx + fw - 2, x + w - bw2 - 4), by2 = Math.max(y + 3, dy - 4 - (centre ? Math.round(Math.abs(Math.sin(gt * 5)) * 2) : 0));
+        c.globalAlpha = 1 - dark * 0.6; c.fillStyle = P[0]; c.fillRect(bx2 - 1, by2 - 1, bw2 + 2, 9); c.fillStyle = P[13]; c.fillRect(bx2, by2, bw2, 7); G.text(c, nb, bx2 + 2, by2 + 1, 0); c.globalAlpha = 1;
+      }
       const dk2 = locked ? Math.max(0.88, dark) : dark;          // 未擁有：黑色剪影 + 鎖
       if (dk2 > 0.02) { c.globalAlpha = dk2; c.drawImage(G.glowOf(img, 0, 1, 2).tint, dx, dy, fw, fh); c.globalAlpha = 1; }
       if (locked && Math.abs(d) < 0.5) { const lk = G.SPR.i_lock; c.fillStyle = P[0]; c.fillRect(Math.round(px - lk.w / 2) - 2, Math.round(dy + fh / 2 - lk.h / 2) - 2, lk.w + 4, lk.h + 4); H().icon(c, 'i_lock', px, dy + fh / 2); }
@@ -743,16 +759,16 @@ G.Menus = (() => {
     if (mode === 'book') {
       const wd = WILD_OF(nm);
       if (wd) parts.push([wd.kind === 'wboss' ? '野生首領' : '野區小怪', wd.col]);
-    } else { const r = G.RARITY[G.rarityOf(nm)]; parts.push([r.n, r.c, 'dia']); }
+    } else { const rr = G.rarityOf(nm), r = G.RARITY[rr]; parts.push([r.n, r.c, 'dia', rr]); }
     if (mode === 'minion') parts.push([String(G.Team.cost(nm)) + '點', 13, 'leaf']);
     const pw = p => G.cnW(p[0]) + (p[2] ? 9 : 0);
     const tot = parts.reduce((a, p) => a + pw(p), 0) + (parts.length - 1) * 11;
     let sx = Math.round(x + w / 2 - tot / 2); const ly = y + 14;
     parts.forEach((p, i) => {
       if (i) { c.fillStyle = P[3]; c.fillRect(sx - 6, ly + 3, 1, 8); }
-      if (p[2] === 'dia') { const cx = sx + 3, cy = ly + 6; c.fillStyle = P[0]; c.fillRect(cx - 4, cy - 4, 9, 9); c.fillStyle = P[p[1]]; for (let k = 0; k < 4; k++) c.fillRect(cx - k, cy - 3 + k, k * 2 + 1, 1), c.fillRect(cx - k, cy + 3 - k, k * 2 + 1, 1); }
+      if (p[2] === 'dia') { const cx = sx + 3, cy = ly + 6; c.fillStyle = P[0]; c.fillRect(cx - 4, cy - 4, 9, 9); const rb = p[3] === 4, t6 = (performance.now() / 120) | 0; for (let k = 0; k < 4; k++) { c.fillStyle = P[rb ? G.RB[(k + t6) % 7] : p[1]]; c.fillRect(cx - k, cy - 3 + k, k * 2 + 1, 1); c.fillStyle = P[rb ? G.RB[(7 - k + t6) % 7] : p[1]]; c.fillRect(cx - k, cy + 3 - k, k * 2 + 1, 1); } }
       if (p[2] === 'leaf') c.drawImage(G.SPR.leaf_pt.n, sx, ly + 3);
-      G.cn(c, p[0], sx + (p[2] ? 9 : 0), ly, p[1]);
+      if (p[3] === 4) G.cnRb(c, p[0], sx + 9, ly); else G.cn(c, p[0], sx + (p[2] ? 9 : 0), ly, p[1]);
       sx += pw(p) + 11;
     });
     return tagChips(c, x, parts.length ? ly + 15 : ly, w, G.tagsOf(nm)) + 3;
@@ -775,6 +791,14 @@ G.Menus = (() => {
     tap(id, x, y, w, h, fn);
   }
 
+  // v2.6 寶箱開到新角色 →「前往隊伍」：切到對應分頁，角色直接站在聚光燈下
+  let nwSpot = null;
+  M.focusTeam = nm => {
+    const isH = G.HEROES.some(h => h.name === nm), list = isH ? G.HEROES.map(h => h.name) : G.ROSTER.minions, i = list.indexOf(nm); if (i < 0) return;
+    ttab = isH ? 0 : 1; if (!isH) sel.minion = nm;
+    const cr = cars.team; cr.inited = true; cr.pos = cr.tgt = i; cr.vel = 0; cr.settled = true; cr.bump = 1; nwSpot = null;
+    go('team');
+  };
   M.team = c => {
     tick(); bg(c); flash.t -= M.dt; car = cars.team;
     const y0 = header(c, '隊伍'), I = R.ins, L = I.l, Rr = R.uw - I.r, uh = R.uh, B = uh - I.b, T = G.Team.get(), LD = land();
@@ -784,11 +808,14 @@ G.Menus = (() => {
       if (i === ttab) return; ttab = i; G.Audio.play('tick');
       const sel2 = i === 0 ? G.HEROES[T.hero].name : (sel.minion || list[0]); car.pos = car.tgt = Math.max(0, lists[i].indexOf(sel2)); car.settled = true; sbKey = ''; skillSel = -1;
     });
+    { const tw2 = Math.min(120, Rr - L - 70) / 2; [0, 1].forEach(i => { if (i !== ttab && G.Team.newIn(lists[i])) { const nx = Math.round(L + 64 + tw2 * (i + 1) - 6), ny = R.ins.t + 2; c.fillStyle = P[0]; c.fillRect(nx - 1, ny - 1, 6, 6); c.fillStyle = P[13]; c.fillRect(nx, ny, 4, 4); } }); }   // 另一個分頁有 NEW → 黃點
     if (car.inited !== true) { car.inited = true; car.pos = car.tgt = T.hero; }
     const nm0 = list[G.clamp(Math.round(car.pos), 0, list.length - 1)];
     const ch = LD ? G.clamp(B - y0 - 3 - nameplateH(leftW, nm0, mode) - 18, 60, 118) : G.clamp(Math.round(uh * 0.27), 88, 124);
     carousel(c, L, y0, leftW, ch, list, mode);
     const nm = list[carIdx()]; if (!isHero) sel.minion = nm;
+    if (nwSpot && nwSpot !== nm) { G.Team.clearNew(nwSpot); nwSpot = null; }     // v2.6 看過的 NEW 角色滾走 → 標記消失
+    if (car.settled && G.Team.isNew(nm)) nwSpot = nm;
     const own = G.Team.ownedCount(list); G.cn(c, '擁有 ' + own + '/' + list.length, L + 5, y0 + 2, own === list.length ? 13 : 6);
     if (G.Team.dev) G.text(c, 'DEV', L + leftW - 6, y0 + 5, 13, 1, 0, 1);
     let y = nameplate(c, L, y0 + ch + 3, leftW, nm, mode);
@@ -883,8 +910,8 @@ G.Menus = (() => {
   G.stageDeco = (...a) => stage(...a);
   function stage(c, x, y, w, h, z) {
     const tr = G.SPR.trees, hs = (i, k) => G.hash(i * 13 + k, 77);
-    c.fillStyle = P[6]; for (let i = 0; i < Math.round(w * h / (z ? 260 : 520)); i++) { const gx = Math.round(x + hs(i, 1) * w), gy = Math.round(y + h * 0.3 + hs(i, 2) * h * 0.7); c.fillRect(gx, gy, 1, 1); c.fillRect(gx - 1, gy - 1, 1, 1); c.fillRect(gx + 1, gy - 1, 1, 1); }
-    c.fillStyle = P[3]; for (let i = 0; i < Math.round(w / 14); i++) { const gx = Math.round(x + hs(i, 5) * w), gy = Math.round(y + h * 0.35 + hs(i, 6) * h * 0.6); c.fillRect(gx, gy, 2, 1); }
+    c.fillStyle = G.NAT.grL; for (let i = 0; i < Math.round(w * h / (z ? 260 : 520)); i++) { const gx = Math.round(x + hs(i, 1) * w), gy = Math.round(y + h * 0.3 + hs(i, 2) * h * 0.7); c.fillRect(gx, gy, 1, 1); c.fillRect(gx - 1, gy - 1, 1, 1); c.fillRect(gx + 1, gy - 1, 1, 1); }
+    c.fillStyle = G.NAT.stD; for (let i = 0; i < Math.round(w / 14); i++) { const gx = Math.round(x + hs(i, 5) * w), gy = Math.round(y + h * 0.35 + hs(i, 6) * h * 0.6); c.fillRect(gx, gy, 2, 1); }
     if (!z) return;
     let tx = x - 6, i = 0; while (tx < x + w + 6) { const s2 = tr[i % tr.length]; c.drawImage(s2.n, Math.round(tx), Math.round(y - s2.h * 0.55 + hs(i, 9) * 3)); tx += s2.w * 0.7 + hs(i, 3) * 6; i++; }
   }
@@ -1139,6 +1166,18 @@ G.Menus = (() => {
             zcn(c, T > 4.3 ? '解除跟隨' : on ? '跟隨中' : '', x + w / 2, y + 2, on ? 13 : 7, 0.5);
             const tp = T < 0.9 ? [lerp(x + w * 0.5, mx, ss(seg(T, 0.1, 0.7))), lerp(y + h, gy + 2, ss(seg(T, 0.1, 0.7)))] : T > 3.7 && T < 4.4 ? [mx, gy + 2] : null;
             if (tp) ptr(dk)(c, Math.round(tp[0]), Math.round(tp[1]), (T > 0.7 && T < 0.9) || (T > 4.1 && T < 4.3));
+          }
+        },
+        {
+          t: '召喚物', m: '神話英雄「死靈召喚力夫」的技能會產生召喚物（紫色外框），自動跟著他，還會替他擋傷害',
+          draw(c, x, y, w, h, t) {
+            const T = t % 4, gy = Math.round(y + h * 0.7), hx = x + w * 0.42, ex = x + w * 0.84;
+            unit(c, 'bear', ex, gy, false, -1, T > 1 && ((t * 8) | 0) % 4 === 0);
+            const sm = [['leafblower', -22, -8], ['peasniper', -30, 8], ['leafmuscle', -14, 12]];
+            sm.forEach(([n, dx, dy]) => { const s = G.SPR[G.VIS[n].spr][((gt * 4) | 0) % 2], gl = G.glowOf(s.n, 17, 1, 2), px = Math.round(hx + dx - s.w / 2), py = Math.round(gy + dy - s.h + 1); shadow(c, hx + dx, gy + dy, 5); c.globalAlpha = 0.6 + Math.sin(gt * 5) * 0.25; c.drawImage(gl.c, px - gl.p, py - gl.p); c.globalAlpha = 1; c.drawImage(s.n, px, py); });
+            unit(c, 'necroleafy', hx, gy, false);
+            if (T > 1 && ((T * 2) % 1) < 0.4) { const [, dx, dy] = sm[((T * 2) | 0) % 3]; c.fillStyle = P[17]; G.pxLine(c, hx, gy - 10, hx + dx, gy + dy - 6, 1); G.glow(c, hx + dx, gy + dy - 6, 5, 17, 0.7); }
+            G.cn(c, T > 1 ? '傷害一部分轉給召喚物' : '召喚物跟著英雄', x + w / 2, y + 2, 17, 0.5);
           }
         },
         {
@@ -1521,6 +1560,20 @@ G.Menus = (() => {
           }
         },
         {
+          t: '新角色', m: '開到新角色時按「前往隊伍」，牠會直接站在聚光燈下；新角色標著 NEW，看過再滑走就消失',
+          draw(c, x, y, w, h, t) {
+            const T = t % 5, gy = Math.round(y + h * 0.7), cx = x + w / 2, sp = 34, k = ss(seg(T, 2.4, 3.0)), names = ['leafy', 'stemskewer', 'peasniper', 'leafblower'];
+            G.pxDisc(c, cx, gy, 20, 5, 4, 0.9); G.pxEllipse(c, cx, gy, 20, 5, 7);
+            names.forEach((n, i) => {
+              const d = i - 1 - k, px = cx + d * sp, sc = Math.abs(d) < 0.5 ? 1 : 0.8; if (Math.abs(d) > 2.2) return;
+              const s = G.SPR[G.VIS[n].spr][Math.abs(d) < 0.5 ? ((gt * 4) | 0) % 2 : 0], iw = Math.round(s.w * sc), ih = Math.round(s.h * sc), ix = Math.round(px - iw / 2), iy = Math.round(gy - ih + 1);
+              c.globalAlpha = Math.abs(d) < 0.5 ? 1 : 0.45; c.drawImage(s.n, ix, iy, iw, ih); c.globalAlpha = 1;
+              if (i === 1 && T < 3.0) { const bw2 = G.textW('NEW') + 4, by = iy - 9 - (Math.abs(d) < 0.5 ? Math.round(Math.abs(Math.sin(gt * 5)) * 2) : 0); c.fillStyle = P[0]; c.fillRect(ix + iw - 3, by - 1, bw2 + 2, 9); c.fillStyle = P[13]; c.fillRect(ix + iw - 2, by, bw2, 7); G.text(c, 'NEW', ix + iw, by + 1, 0); }
+            });
+            G.cn(c, T < 2.4 ? '看到新角色' : T < 3.0 ? '滑走…' : 'NEW 消失了', x + w / 2, y + 2, T < 2.4 ? 13 : 7, 0.5);
+          }
+        },
+        {
           t: '免費寶箱', m: '賭徒寶箱每 5 分鐘可以免費開一次；時間一到會跳出通知，商店也會亮綠色按鈕',
           draw(c, x, y, w, h, t) {
             const T = t % 4, gy = Math.round(y + h * 0.62), cx = Math.round(x + w * 0.32), on = T > 1.6, bw = 52, bx = Math.round(x + w * 0.58), by = gy - 22;
@@ -1531,13 +1584,13 @@ G.Menus = (() => {
           }
         },
         {
-          t: '稀有度', m: '角色外框顏色代表稀有度：白 普通、綠 稀有、紫 史詩、橘 傳說',
+          t: '稀有度', m: '角色外框顏色代表稀有度：白 普通、綠 稀有、紫 史詩、橘 傳說、七彩 神話',
           draw(c, x, y, w, h, t) {
-            const ex = ['leafblower', 'stemskewer', 'peasniper', 'iceshooter'], gw = Math.min(46, (w - 10) / 4), x0 = Math.round(x + w / 2 - gw * 2), gy = y + h * 0.62;
+            const ex = ['leafblower', 'stemskewer', 'peasniper', 'iceshooter', 'necroleafy'], gw = Math.min(40, (w - 6) / 5), x0 = Math.round(x + w / 2 - gw * 2.5), gy = y + h * 0.62;
             ex.forEach((n, i) => {
-              const s = G.SPR[G.VIS[n].spr][((gt * 3) | 0) % 2], r = G.RARITY[i], gl = G.glowOf(s.n, r.c, 1, 2), px = Math.round(x0 + gw * i + gw / 2 - s.w / 2), py = Math.round(gy - s.h);
+              const s = G.SPR[G.VIS[n].spr][((gt * 3) | 0) % 2], r = G.RARITY[i], gl = G.rarGlow(s.n, i, 1, 2), px = Math.round(x0 + gw * i + gw / 2 - s.w / 2), py = Math.round(gy - s.h);
               c.globalAlpha = 0.75 + Math.sin(gt * 4 + i) * 0.25; c.drawImage(gl.c, px - gl.p, py - gl.p); c.globalAlpha = 1; c.drawImage(s.n, px, py);
-              G.cn(c, r.n, x0 + gw * i + gw / 2, gy + 6, r.c, 0.5);
+              G.cnRar(c, r.n, x0 + gw * i + gw / 2, gy + 6, i, 0.5);
             });
           }
         },

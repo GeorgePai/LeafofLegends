@@ -34,7 +34,7 @@ G.Unit = class {
   }
   calc() {
     this.st = G.stats(this.name, this.level, this.side, this.kind);
-    this.aura = null; this.lifesteal = 0; this.mpDisc = 0;
+    this.aura = null; this.lifesteal = 0; this.mpDisc = 0; this.scape = 0;
     const ps = this.pskills || (this.passives || []).map(id => ({ s: G.ORIG.skills[id], lv: 1 }));
     for (const sl of ps) {                          // 被動技能（原著 attribute；依技能等級成長，0 級不生效）
       if (!sl.lv) continue;
@@ -48,6 +48,7 @@ G.Unit = class {
         case 'range': st.range += v; break;
         case 'return': this.lifesteal += v; break;
         case 'mp_discount': this.mpDisc += v; break;
+        case 'scape': this.scape = v; break;                 // v2.6 替罪（%）
         case 'power': st.power += v; if (p.type === 'multi_buff') this.aura = Object.assign(this.aura || {}, { pow: v }); break;
         case 'armor': st.armor += v; if (p.type === 'multi_buff') this.aura = Object.assign(this.aura || {}, { arm: v }); break;
       }
@@ -67,7 +68,7 @@ G.World = class {
     this.M = G.mapCache[this.stage.map].M; this.ground = G.mapCache[this.stage.map].ground;
     this.units = []; this.projs = []; this.effects = []; this.decals = []; this.parts = new G.Particles(2600);
     this.spawnQ = []; this.time = 0; this.trauma = 0; this.flashScreen = 0; this.hitstop = 0; this.timeScale = 1;
-    this.notices = []; this.stats = { kills: 0, time: 0, deaths: 0, assists: 0, camps: 0, towers: 0, gold: 0, dmg: 0, taken: 0, tower: 0, bosses: 0, hunters: 0, wboss: 0, potions: 0, tps: 0, maxFollow: 0, streak: 0, minHoly: 1 }; this.killT = [];   // 即時戰鬥數據
+    this.notices = []; this.stats = { kills: 0, time: 0, deaths: 0, assists: 0, camps: 0, towers: 0, gold: 0, dmg: 0, taken: 0, tower: 0, bosses: 0, hunters: 0, wboss: 0, potions: 0, tps: 0, maxFollow: 0, streak: 0, minHoly: 1, spent: 0 }; this.killT = [];   // 即時戰鬥數據
     this.over = null; this.attract = !!opt.attract; this.frame = 0;
     // 聖所與塔
     this.holy = [
@@ -155,7 +156,7 @@ G.World = class {
       this.leafT = 0.22; const cam = G.Render.cam;
       if (!this.leafPool || this.time - (this.leafPoolT || -9) > 1) { this.leafPoolT = this.time; this.leafPool = this.M.props.filter(p => p.tree && Math.abs(p.x - cam.x) < 420 && Math.abs(p.y - cam.y) < 320); }
       const tr = this.leafPool.length && this.leafPool[(Math.random() * this.leafPool.length) | 0];
-      if (tr) this.parts.add(tr.x + G.rr(-8, 8), tr.y + G.rr(-2, 2), G.rr(30, 46), G.rr(10, 22), G.rr(-3, 3), G.rr(-4, 2), G.rr(2.8, 3.6), G.pick([11, 16, 20, 16]), 3, 1, 9, 0, 2);
+      if (tr) this.parts.add(tr.x + G.rr(-8, 8), tr.y + G.rr(-2, 2), G.rr(30, 46), G.rr(10, 22), G.rr(-3, 3), G.rr(-4, 2), G.rr(2.8, 3.6), G.pick([22, 23, 22, 24, 16]), 3, 1, 9, 0, 2);
     }
     this.updateWaves(dt); this.updateSystems(dt);
     if (G.Ach && !this.attract) G.Ach.tick(this, dt);
@@ -317,6 +318,7 @@ G.World = class {
     if (u.atkT <= 0) { u.windup = u.melee ? 0.13 : 0.09; u.wTarget = t; u.atkT = 9; }
   }
   creepAI(u, dt) {
+    if (u.summoner && !u.follow && !u.noRe && u.summoner === this.hero && u.summoner.alive) this.makeSummon(u.summoner, u);   // v2.6 召喚物：英雄復活後自動回到身邊
     if (u.follow && this.followAI(u, dt)) return;
     u.retarget -= dt;
     if (!this.valid(u, u.target) || u.retarget <= 0) { u.retarget = 0.35; u.target = this.nearestEnemy(u, Math.max(G.TUNE.aggro, u.st.range + 20)); }
@@ -327,6 +329,7 @@ G.World = class {
     } else this.flowMove(u, dt);
   }
   bossAI(u, dt) {
+    if (u.summoner && !u.follow && !u.noRe && u.summoner === this.hero && u.summoner.alive) this.makeSummon(u.summoner, u);
     if (u.follow && this.followAI(u, dt)) return;
     u.retarget -= dt; u.skillCd = (u.skillCd ?? 3) - dt;
     const home = u.home;
@@ -472,7 +475,7 @@ G.World = class {
   // ---------- 召集：點友方小兵 → 跟隨英雄（一起移動、打同一個目標）；再點一次解除 ----------
   toggleFollow(u) {
     const h = this.hero; if (!h || !h.alive || !u.alive) return;
-    u.follow = !u.follow; u.path = null; u.target = null; u.repath = 0;
+    u.follow = !u.follow; u.path = null; u.target = null; u.repath = 0; if (u.summoner) u.noRe = !u.follow;   // 玩家親手解除的召喚物不會自動跟回來
     if (u.follow) {
       const n = this.units.filter(v => v.follow && v.alive).length, a = n * 2.4;
       this.stats.maxFollow = Math.max(this.stats.maxFollow, n);
@@ -484,7 +487,7 @@ G.World = class {
       if (G.UI) G.UI.toastMsg('解除跟隨，回到兵線', 7);
     }
   }
-  clearFollow(msg = '英雄倒下，跟隨解除') { let n = 0; for (const u of this.units) if (u.follow) { u.follow = false; u.path = null; u.target = null; G.FX.ring(this, u.x, u.y, u.r + 12, 3, 0.3, 6, 1); n++; } if (n && G.UI && msg) G.UI.toastMsg(msg, n && msg.includes('倒下') ? 10 : 7); return n; }
+  clearFollow(msg = '英雄倒下，跟隨解除') { let n = 0; for (const u of this.units) if (u.follow) { u.follow = false; if (u.summoner && !msg.includes('倒下')) u.noRe = true; u.path = null; u.target = null; G.FX.ring(this, u.x, u.y, u.r + 12, 3, 0.3, 6, 1); n++; } if (n && G.UI && msg) G.UI.toastMsg(msg, n && msg.includes('倒下') ? 10 : 7); return n; }
   followCount() { let n = 0; for (const u of this.units) if (u.follow && u.alive) n++; return n; }
   // v2.5 傘型隊形：跟隨的小兵依射程分三圈（近戰內圈、中距離、遠程外圈），在英雄行進方向的後方展開成扇形，不擋路也不擠成一團
   followSlots() {
@@ -532,6 +535,7 @@ G.World = class {
     if (h.chg) return 'busy';
     if (s.cd > 0) return 'cd';
     if (h.mp < Math.round(s.mp * (1 - (h.mpDisc || 0) / 100))) return 'mp';
+    if (s.s.type === 'necro') { const why = this.necroWhy(h, s.s); if (why) { if (G.UI && G.UI.toastMsg) G.UI.toastMsg(why, 17); return 'necro'; } }
     this.cancelTeleport(true);
     if (!s.needT) { this.castSkill(h, i, null); return 'ok'; }
     let t = this.valid(h, h.target) && this.dist(h, h.target) <= s.range + 10 ? h.target : this.nearestEnemy(h, s.range + 10);
@@ -546,6 +550,7 @@ G.World = class {
     const s = h.skills[i]; if (!s) return 'none';
     if (!s.lv) return 'lock'; if (h.chg) return 'busy'; if (s.cd > 0) return 'cd';
     if (h.mp < Math.round(s.mp * (1 - (h.mpDisc || 0) / 100))) return 'mp';
+    if (s.s.type === 'necro') { const why = this.necroWhy(h, s.s); if (why) { if (G.UI && G.UI.toastMsg) G.UI.toastMsg(why, 17); return 'necro'; } }
     this.cancelTeleport(true); h.pending = null;
     const k = s.shape.k;
     if (k === 'self' || k === 'buff') { this.castSkill(h, i, null); return 'ok'; }

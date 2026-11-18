@@ -11,7 +11,36 @@ G.PAL = ['#0a0a0a', '#1a1a1a', '#2b2b2b', '#3f3f3f', '#575757', '#737373', '#959
   // 介面專用（數值條）：18 青 攻速 / 19 粉 爆擊 / 20 黃綠 移速
   '#3fc6d6', '#ec64a6', '#a8d94a',
   // 21 米色：經驗值
-  '#d9c08c'];
+  '#d9c08c',
+  // v2.6 自然色（落葉粒子等）：22 柔葉綠 / 23 嫩芽黃綠 / 24 枯葉棕 / 25 河水淺藍
+  '#6f9a55', '#a3b866', '#b58a4c', '#9cc3cc',
+  // 26 神話（鑽石淺青；實際外框是七彩）
+  '#b8fff4',
+  // 27 死靈淡紫（亮）／28 死靈深紫（暗）
+  '#d6b4ff', '#2c0f3d'];
+// v2.6 戰場自然色盤：低彩度、彼此色相相近（綠偏黃、藍偏青、木偏暖），當背景不搶角色
+G.NAT = {
+  // 森林地面（樹冠下）：深墨綠
+  fSh: '#121b16', fD: '#18261d', fM: '#203325', fHi: '#2f4a35',
+  // 森林邊緣崖面：深木色土壁
+  cl0: '#1b1814', cl1: '#28231c', cl2: '#383024',
+  // 草地：鼠尾草綠三階＋草叢亮綠
+  grD: '#4a6443', grM: '#56744c', grL: '#7a9a5e', grDk: '#3c5438',
+  // 泥土路：暖灰褐
+  rdD: '#6f6350', rdM: '#857862', rdL: '#978a72', rdPb: '#ada288',
+  // 崖下陰影
+  shD: '#24301f', shM: '#33412c',
+  // 河水：深→淺的青藍
+  wDeep: '#1f3a4c', wD: '#27485b', wM: '#32576a', wHi: '#4b7688',
+  sD: '#3d6872', sM: '#4a7880', sL: '#6b9898', foam: '#a7c7c0',
+  // 濕潤河岸
+  bkD: '#34452f', bkM: '#42563b',
+  // 點綴：小白花、小黃花、小粉花、碎石
+  fl1: '#e4dec4', fl2: '#d6c26a', fl3: '#d7a6a0', stD: '#5a574f', stL: '#9f9a88'
+};
+G.hexRGB = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+// 自訂調色盤（精靈用）：以 G.PAL_RGB 為底，map = {索引: '#hex'} 覆寫
+G.palWith = map => { const a = G.PAL.map(G.hexRGB); for (const k in map) a[k] = G.hexRGB(map[k]); return a; };
 // 色票加亮（k>0，往白）／加暗（k<0，往黑），結果快取
 G._tint = {};
 G.tint = (i, k) => { const key = i + ':' + k; let v = G._tint[key]; if (v) return v; const c = G.PAL_RGB[i] || [128, 128, 128], t = k > 0 ? 255 : 0, a = Math.abs(k); v = 'rgb(' + c.map(q => Math.round(q + (t - q) * a)).join(',') + ')'; G._tint[key] = v; return v; };
@@ -68,7 +97,7 @@ G.spriteFromGrid = function (grid, w, h, opt = {}) {
     for (let yy = 0; yy < H; yy++) for (let xx = 0; xx < W; xx++) {
       const v = g[yy * W + (mirror ? W - 1 - xx : xx)];
       if (v < 0) continue;
-      const o = (yy * W + xx) * 4, rgb = flash ? [255, 255, 255] : G.PAL_RGB[v];
+      const o = (yy * W + xx) * 4, rgb = flash ? [255, 255, 255] : (opt.pal && opt.pal[v]) || G.PAL_RGB[v];
       id.data[o] = rgb[0]; id.data[o + 1] = rgb[1]; id.data[o + 2] = rgb[2]; id.data[o + 3] = 255;
     }
     x.putImageData(id, 0, 0); return c;
@@ -204,9 +233,40 @@ G.redOf = function (src) {
   x.putImageData(d, 0, 0); G._redCache.set(src, c); return c;
 };
 // 稀有度：0 普通(白) 1 稀有(綠) 2 史詩(紫) 3 傳說(橘)
-G.RARITY = [{ n: '普通', c: 9 }, { n: '稀有', c: 11 }, { n: '史詩', c: 17 }, { n: '傳說', c: 14 }];
+// v2.6 新增 4 神話（傳說之上）：外框是流動的七彩光＋鑽石閃光（G.mythGlow），文字用七彩逐字變色（G.cnRb）
+G.RARITY = [{ n: '普通', c: 9 }, { n: '稀有', c: 11 }, { n: '史詩', c: 17 }, { n: '傳說', c: 14 }, { n: '神話', c: 26, myth: true }];
+G.MYTHIC = { necroleafy: 1 };
+// 七彩鑽石光暈：以白色外框為遮罩，疊上斜向流動的彩虹漸層，外圈再加幾顆旋轉的十字星芒；預先做 12 張，依時間輪播
+G._mythCache = new WeakMap();
+G.mythGlow = function (src, ring = 1, halo = 3, t = performance.now() / 1000) {
+  let m = G._mythCache.get(src); if (!m) G._mythCache.set(src, m = {});
+  const key = ring + '_' + halo, N = 12;
+  if (!m[key]) {
+    const base = G.glowOf(src, 9, ring, halo), W = base.c.width, H = base.c.height, bd = base.c.getContext('2d').getImageData(0, 0, W, H).data;
+    const rim = []; for (let i = 0; i < W * H; i++) if (bd[i * 4 + 3] === 255) rim.push(i);
+    m[key] = [];
+    for (let k = 0; k < N; k++) {
+      const c = G.canvas(W, H), x = c.getContext('2d'); x.drawImage(base.c, 0, 0); x.globalCompositeOperation = 'source-atop';
+      const L = Math.max(W, H), gr = x.createLinearGradient(0, 0, L, L);
+      for (let j = 0; j <= 6; j++) gr.addColorStop(j / 6, 'hsl(' + Math.round((j / 6 * 360 + k / N * 360) % 360) + ',95%,68%)');
+      x.fillStyle = gr; x.fillRect(0, 0, W, H); x.globalCompositeOperation = 'source-over';
+      // 鑽石閃光：外框上 3 顆十字星芒，位置隨幀輪轉
+      x.fillStyle = '#ffffff';
+      for (let q = 0; q < 3 && rim.length; q++) {
+        const i = rim[Math.floor(((q / 3 + k / N * 0.5) % 1) * rim.length)], px = i % W, py = (i / W) | 0, big = (k + q * 4) % N < 4;
+        x.fillRect(px, py, 1, 1); if (big) { x.fillRect(px - 1, py, 3, 1); x.fillRect(px, py - 1, 1, 3); if ((k + q) % 3 === 0) { x.fillRect(px - 2, py, 1, 1); x.fillRect(px + 2, py, 1, 1); x.fillRect(px, py - 2, 1, 1); x.fillRect(px, py + 2, 1, 1); } }
+      }
+      m[key].push(c);
+    }
+    m[key].p = base.p; m[key].tint = base.tint;
+  }
+  const A = m[key]; return { c: A[Math.floor(t * 10) % N], p: A.p, tint: A.tint };
+};
+// 依稀有度取外框（神話＝七彩）
+G.rarGlow = (src, rar, ring, halo) => rar === 4 ? G.mythGlow(src, ring, halo) : G.glowOf(src, G.RARITY[rar].c, ring, halo);
 G.rarityOf = function (name) {
   const u = G.ORIG && G.ORIG.units[name]; if (!u) return 0;
+  if (G.MYTHIC[name]) return 4;
   if (u.type === 'player') return ({ leafy: 0, quickleafy: 0, spearleafy: 1, splashleafy: 1, muscleleafy: 1, eliteleafy: 2, elitequickleafy: 2, elitespearleafy: 2, cannonleafy: 3, berserkerleafy: 3 })[name] || 0;
   if (u.type === 'mercenary') return 3;
   if (u.type === 'npc') return G.clamp((u.unit_point || 2) - 2, 0, 3);

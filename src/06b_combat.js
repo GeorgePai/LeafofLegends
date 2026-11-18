@@ -28,7 +28,7 @@ G.skillIcon = (sd) => {
   return 'i_mistic';
 };
 const SFX_OF = w => {
-  const n = (w.name || '').toLowerCase();
+  const n = (w.name || '').toLowerCase(); if (n === 'darkspike') return 'darkshot';
   if (w.type === 'line') return 'magic2'; if (/seed|sniper/.test(n)) return 'seed'; if (/tower/.test(n)) return 'tower';
   if (/fruit|cannon|stone|tomato|mud|turtle/.test(n)) return 'lob'; if (/fire|flame/.test(n)) return 'fire'; if (/spear|wave|air|sonic/.test(n)) return 'punch';
   if (/ice/.test(n)) return 'ice'; if (/punch|strike/.test(n)) return 'punch'; if (/thunder|tunder/.test(n)) return 'thunder'; if (/meteor/.test(n)) return 'meteor';
@@ -59,7 +59,8 @@ G.Combat = {
       this.shoot(u, t, {
         vis: G.RES_VIS[w.resource] || 'magicball', speed: w.speed || 400, arc: w.curve ? w.height_rate : 0, power: pow, crit: true,
         splash: w.attack_type === 'splash' ? (opt || 40) : 0, pierce: w.attack_type === 'piercing' ? u.st.range + (opt || 20) : 0,
-        slow: w.attribute === 'slow' ? (opt || 2) : 0, poison: w.attribute === 'poison' ? (opt || 10) : 0, stun: w.attribute === 'stun' ? 1 : 0
+        slow: w.attribute === 'slow' ? (opt || 2) : 0, poison: w.attribute === 'poison' ? (opt || 10) : 0, stun: w.attribute === 'stun' ? 1 : 0,
+        ...(w.name === 'darkspike' ? { fx: 'necro', trail: 3 } : {})
       });
       if (u.kind === 'tower') G.FX.smoke(this, u.x, u.y, 44, 4, u.side === 0 ? 7 : 3);
       this.sfx(SFX_OF(w), u.x, u.y);
@@ -145,6 +146,7 @@ G.Combat = {
     let dmg = power * (src.bPow || 1) * (src.iPow || 1) * G.rr(0.9, 1.1), crit = false;
     if (o.crit && Math.random() * 100 < src.st.crit + (src.iCrit || 0)) { crit = true; dmg *= 2; }
     dmg = Math.max(1, Math.round((dmg - arm) * (1 - (t.bRed || 0))));
+    if (t.scape > 0) dmg = this.scapeHit(src, t, dmg);                   // v2.6 替罪：一部分傷害改由召喚物承受
     if (this.stats && h) { const real = Math.min(dmg, Math.max(0, t.hp)); if (src === h) { this.stats.dmg += real; t.heroHitT = this.time; if (t.static) this.stats.tower += real; } if (t === h) this.stats.taken += real; }
     t.hp -= dmg; t.flash = 0.09; t.lastHit = src;
     // 吸血
@@ -191,7 +193,7 @@ G.Combat = {
   // 施放前搖（v2.3）：先蓄力 dur 秒（站定、腳下法陣、光點往身上聚、身體發光），時間到才真的放出技能
   beginCharge(u, sd, t, lv, dur, refund) {
     const w0 = G.WEAPONS_BY_ID[sd.weapon_id];
-    const el = sd.type === 'buff' ? (sd.attribute === 'armor_per' ? 'shield' : sd.attribute === 'weapon' ? 'zap' : 'rage') : G.elemOf(w0);
+    const el = sd.type === 'necro' ? (sd.attribute === 'ctrl' ? 'rage' : sd.attribute === 'clone' ? 'clone' : 'necro') : sd.type === 'buff' ? (sd.attribute === 'armor_per' ? 'shield' : sd.attribute === 'weapon' ? 'zap' : 'rage') : G.elemOf(w0);
     u.chg = { sd, t, lv, T: 0, dur, el, refund, big: dur >= 0.45 };
     if (t) u.face = t.x > u.x ? 1 : -1;
     this.sfx(dur >= 0.45 ? 'chargeBig' : 'charge', u.x, u.y);
@@ -206,7 +208,7 @@ G.Combat = {
     if (Math.random() < dt * (c.big ? 40 : 24)) { const a = Math.random() * 6.28, r = G.rr(22, 40); this.parts.add(u.x + Math.cos(a) * r, u.y + Math.sin(a) * r * 0.6, G.rr(4, 24), -Math.cos(a) * r * 3, -Math.sin(a) * r * 1.8, 0, 0.32, Math.random() < 0.5 ? E.c : E.c2, E.c, 1, 0, 0); }
     if (c.T >= c.dur) {
       u.chg = null;
-      const needT = c.sd.type !== 'buff' && !(G.WEAPONS_BY_ID[c.sd.weapon_id] && G.WEAPONS_BY_ID[c.sd.weapon_id].type === 'effect' && G.WEAPONS_BY_ID[c.sd.weapon_id].attack_type === 'round');
+      const needT = c.sd.type !== 'buff' && c.sd.type !== 'necro' && !(G.WEAPONS_BY_ID[c.sd.weapon_id] && G.WEAPONS_BY_ID[c.sd.weapon_id].type === 'effect' && G.WEAPONS_BY_ID[c.sd.weapon_id].attack_type === 'round');
       if (needT && !(c.t && c.t.alive)) { if (c.refund) c.refund(); return; }
       this.skFx(() => this.useSkill(u, c.sd, c.t, c.lv));
     }
@@ -215,6 +217,7 @@ G.Combat = {
   useSkill(u, sd, t, lv = 1) {
     const dmg = sd.value_1 + sd.grow_value_1 * (lv - 1), v2 = sd.value_2 + sd.grow_value_2 * (lv - 1);
     u.cast = 0.3;
+    if (sd.type === 'necro') { G.VFX.cast(this, u, sd.attribute === 'clone' ? 'clone' : 'necro'); return this.necroSkill(u, sd, lv); }   // v2.6 死靈技能
     if (t) u.face = t.x > u.x ? 1 : -1;
     const w0 = G.WEAPONS_BY_ID[sd.weapon_id];
     const el = sd.type === 'buff' ? (sd.attribute === 'armor_per' ? 'shield' : sd.attribute === 'weapon' ? 'zap' : 'rage') : G.elemOf(w0), S = G.elemStrong(w0);

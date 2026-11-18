@@ -180,55 +180,58 @@ G.buildMap = function (def) {
 G.renderGround = function (M) {
   const T = G.TILE, PAD = 110, GW = Math.ceil(M.ww * G.AX) + PAD * 2, GH = Math.ceil(M.wh * G.AY) + PAD * 2;
   const c = G.canvas(GW, GH), x = c.getContext('2d'), id = x.createImageData(GW, GH), d = id.data;
+  // v2.6 地面改用自然色盤 G.NAT：idx 存「色名的編號」
+  const NK = Object.keys(G.NAT), NI = {}, NRGB = NK.map((k, i) => (NI[k] = i, G.hexRGB(G.NAT[k])));
   const idx = new Int8Array(GW * GH);
-  const step = 1 / (G.AX * T);   // 美術 1px = 多少格
   for (let ay = 0; ay < GH; ay++) for (let ax = 0; ax < GW; ax++) {
     const tx = (ax - PAD + 0.5) / G.AX / T, ty = (ay - PAD + 0.5) / G.AY / T;
     const f = M.field(tx, ty), b = G.bayer(ax, ay);
     let v;
     if (f >= 0) {
-      const below = M.field(tx, ty + 0.42) < 0;                        // 森林邊緣的「崖面」
-      if (below) v = (G.fbm(tx * 3, ty * 0.6) > 0.5 ? 2 : 1) + ((ax & 1) && b > 0.6 ? 1 : 0);
+      const below = M.field(tx, ty + 0.42) < 0;                        // 森林邊緣的「崖面」（土壁）
+      if (below) { const q = (G.fbm(tx * 3, ty * 0.6) > 0.5 ? 1 : 0) + ((ax & 1) && b > 0.6 ? 1 : 0); v = ['cl0', 'cl1', 'cl2'][q]; }
       else {
         const n = G.fbm(tx * 1.6, ty * 1.6);
-        v = n + (b - 0.5) * 0.25 > 0.52 ? 2 : 1;
-        if (f < 0.35 && b < 0.5) v = 0;
-        if (G.hash(ax * 3, ay * 7) > 0.985) v = 3;
+        v = n + (b - 0.5) * 0.25 > 0.52 ? 'fM' : 'fD';
+        if (f < 0.35 && b < 0.5) v = 'fSh';
+        if (G.hash(ax * 3, ay * 7) > 0.985) v = 'fHi';
       }
     } else {
-      const p = M.pathiness(tx, ty), n = G.fbm(tx * 0.8 + 50, ty * 0.8);
-      if (p < 0.55) v = (n + (b - 0.5) * 0.35 > 0.5) ? 6 : 5;            // 路面
-      else if (p < 0.7) v = b < 0.5 ? 5 : 4;                             // 路邊抖動
-      else v = (n + (b - 0.5) * 0.3 > 0.55) ? 5 : 4;                     // 草地
-      if (M.field(tx, ty - 0.35) >= 0) v = b < 0.65 ? 2 : 3;             // 崖下陰影
-      else if (M.field(tx, ty - 0.6) >= 0) v = Math.max(3, v - 1 - (b < 0.4 ? 1 : 0));
+      const p = M.pathiness(tx, ty), n = G.fbm(tx * 0.8 + 50, ty * 0.8), g2 = G.fbm(tx * 0.35 + 7, ty * 0.35 + 3);
+      let road = false;
+      if (p < 0.55) { v = (n + (b - 0.5) * 0.35 > 0.5) ? 'rdL' : 'rdM'; road = true; }    // 泥土路
+      else if (p < 0.7) v = b < 0.5 ? 'rdD' : 'grM';                                       // 路邊：土與草交錯
+      else v = (n + (b - 0.5) * 0.3 > 0.55) ? 'grM' : (g2 + (b - 0.5) * 0.2 > 0.62 ? 'grDk' : 'grD');   // 草地（大片深淺變化）
+      if (M.field(tx, ty - 0.35) >= 0) v = b < 0.65 ? 'shD' : 'shM';                     // 崖下陰影
+      else if (M.field(tx, ty - 0.6) >= 0) v = b < 0.4 ? 'shM' : road ? 'rdD' : 'grDk';
       if (M.hasRiver) {
         const rv = M.river(tx, ty);
-        if (rv < 0) {                                                    // 水面：深色 + 橫向波紋；路經過處為淺灘
+        if (rv < 0) {                                                    // 水面：深青藍 + 橫向波紋；路經過處為淺灘
           const shallow = p < 0.75, wav = G.fbm(tx * 2.2, ty * 7) + (b - 0.5) * 0.2;
-          if (shallow) v = wav > 0.58 ? 6 : (b < 0.5 ? 4 : 5);
-          else v = rv > -0.35 ? 3 : (wav > 0.62 ? 4 : wav > 0.56 && b < 0.5 ? 3 : 2);
-          if (rv > -0.18) v = shallow ? 7 : 6;                            // 岸邊浪花
-        } else if (rv < 0.35) v = b < 0.5 ? 3 : Math.min(v, 4);          // 濕潤河岸
+          if (shallow) v = wav > 0.58 ? 'sL' : (b < 0.5 ? 'sD' : 'sM');
+          else v = rv > -0.35 ? 'wD' : (wav > 0.62 ? 'wHi' : wav > 0.56 && b < 0.5 ? 'wM' : 'wDeep');
+          if (rv > -0.18) v = shallow ? 'foam' : 'sL';                     // 岸邊浪花
+        } else if (rv < 0.35) v = b < 0.5 ? 'bkD' : 'bkM';                 // 濕潤河岸
       }
     }
-    idx[ay * GW + ax] = v;
+    idx[ay * GW + ax] = NI[v];
   }
   // 草叢、花、碎石
   const rng = G.mulberry(M.def.seed * 31);
-  const put = (ax, ay, v) => { if (ax >= 0 && ay >= 0 && ax < GW && ay < GH) idx[ay * GW + ax] = v; };
+  const put = (ax, ay, k) => { if (ax >= 0 && ay >= 0 && ax < GW && ay < GH) idx[ay * GW + ax] = NI[k]; };
   for (let i = 0; i < GW * GH / 55; i++) {
     const ax = (rng() * GW) | 0, ay = (rng() * GH) | 0;
     const tx = (ax - PAD) / G.AX / T, ty = (ay - PAD) / G.AY / T;
     if (M.field(tx, ty) > -0.15) continue;
+    if (M.hasRiver && M.river(tx, ty) < 0.35) continue;                  // 水裡不長草
     const p = M.pathiness(tx, ty), r = rng();
     if (p > 0.75) {
-      if (r < 0.7) { put(ax, ay, 6); put(ax - 1, ay - 1, 6); put(ax + 1, ay - 1, 6); put(ax, ay + 1, 3); }   // 草
-      else if (r < 0.8) { put(ax, ay, 9); put(ax, ay + 1, 3); }                                          // 小白花
-      else { put(ax, ay, 3); put(ax + 1, ay, 3); put(ax, ay - 1, 7); }                                     // 小石
-    } else if (r < 0.25) { put(ax, ay, 7); put(ax + 1, ay + 1, 4); }
+      if (r < 0.7) { put(ax, ay, 'grL'); put(ax - 1, ay - 1, 'grL'); put(ax + 1, ay - 1, 'grL'); put(ax, ay + 1, 'grDk'); }   // 草
+      else if (r < 0.8) { put(ax, ay, r < 0.75 ? 'fl1' : r < 0.78 ? 'fl2' : 'fl3'); put(ax, ay + 1, 'grDk'); }           // 小花（白／黃／粉）
+      else { put(ax, ay, 'stD'); put(ax + 1, ay, 'stD'); put(ax, ay - 1, 'stL'); }                                    // 小石
+    } else if (r < 0.25) { put(ax, ay, 'rdPb'); put(ax + 1, ay + 1, 'rdD'); }
   }
-  for (let i = 0; i < GW * GH; i++) { const rgb = G.PAL_RGB[idx[i]]; d[i * 4] = rgb[0]; d[i * 4 + 1] = rgb[1]; d[i * 4 + 2] = rgb[2]; d[i * 4 + 3] = 255; }
+  for (let i = 0; i < GW * GH; i++) { const rgb = NRGB[idx[i]]; d[i * 4] = rgb[0]; d[i * 4 + 1] = rgb[1]; d[i * 4 + 2] = rgb[2]; d[i * 4 + 3] = 255; }
   x.putImageData(id, 0, 0);
   // 樹影烘進地面
   G.setPatOffset(0, 0);
@@ -238,7 +241,7 @@ G.renderGround = function (M) {
   for (let y = 0; y < M.h * MR; y++) for (let xx = 0; xx < M.w * MR; xx++) {
     const fx = (xx + 0.5) / MR, fy = (y + 0.5) / MR, f = M.field(fx, fy);
     const wet = M.hasRiver && f < 0 && M.river(fx, fy) < 0;
-    const rgb = G.PAL_RGB[wet ? 2 : f < 0 ? (M.pathiness(fx, fy) < 0.6 ? 5 : 4) : 1], i = (y * mm.width + xx) * 4;
+    const rgb = G.hexRGB(G.NAT[wet ? 'wM' : f < 0 ? (M.pathiness(fx, fy) < 0.6 ? 'rdM' : 'grD') : 'fD']), i = (y * mm.width + xx) * 4;
     mid.data[i] = rgb[0]; mid.data[i + 1] = rgb[1]; mid.data[i + 2] = rgb[2]; mid.data[i + 3] = 255;
   }
   mx.putImageData(mid, 0, 0);

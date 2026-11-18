@@ -24,6 +24,11 @@ G.ACH = [
   { id: 'tower20', c: 0, t: 2, n: '拆遷大隊', d: '累計推倒 20 座敵塔', g: 20, v: P => P.towers },
   { id: 'tower100', c: 0, t: 3, n: '城牆粉碎機', d: '累計推倒 100 座敵塔', g: 100, v: P => P.towers },
   { id: 'gold', c: 0, t: 3, n: '富可敵國', d: '累計賺到 10 萬金幣', g: 100000, v: P => Math.floor(P.gold) },
+  // v2.6 新增
+  { id: 'wins50', c: 0, t: 3, n: '百戰百勝', d: '累計贏得 50 場勝利', g: 50, v: P => P.wins },
+  { id: 'camp100', c: 0, t: 2, n: '野區常客', d: '累計清掉 100 個野怪營地', g: 100, v: P => P.camps },
+  { id: 'dmg', c: 0, t: 3, n: '毀天滅地', d: '英雄累計造成 50 萬點傷害', g: 500000, v: P => Math.floor(P.dmg) },
+  { id: 'tp50', c: 0, t: 2, n: '傳送大師', d: '累計用我方塔傳送 50 次', g: 50, v: P => P.tps },
   // ----- 戰鬥：單場挑戰 -----
   { id: 'win1', c: 1, t: 1, n: '首勝', d: '贏得第一場勝利', g: 1, v: P => P.wins },
   { id: 'flawless', c: 1, t: 3, n: '毫髮無傷', d: '一次都沒倒下就獲勝', g: 1, v: (P, B, M) => M && M.win && M.st.deaths === 0 ? 1 : 0 },
@@ -42,6 +47,14 @@ G.ACH = [
   { id: 'army', c: 1, t: 1, n: '召集令', d: '同時讓 6 隻小兵跟隨英雄', g: 6, v: (P, B) => B.follow },
   { id: 'potion', c: 1, t: 1, n: '藥罐子', d: '單場喝掉 10 瓶藥水', g: 10, v: (P, B) => B.potions },
   { id: 'fullbag', c: 1, t: 1, n: '全副武裝', d: '背包同時裝滿 6 種藥水', g: 6, v: (P, B) => B.bag },
+  // v2.6 新增
+  { id: 'pacifist', c: 1, t: 3, n: '不戰而勝', d: '英雄擊倒不超過 5 個敵人，仍然獲勝', hint: '讓小兵們去打吧。', g: 1, v: (P, B, M) => M && M.win && M.st.kills <= 5 ? 1 : 0 },
+  { id: 'marathon', c: 1, t: 2, n: '持久戰', d: '打超過 30 分鐘才獲勝', g: 1, v: (P, B, M) => M && M.win && M.st.time >= 1800 ? 1 : 0 },
+  { id: 'tank', c: 1, t: 2, n: '銅牆鐵壁', d: '單場承受 5000 點傷害，仍然獲勝', g: 1, v: (P, B, M) => M && M.win && M.st.taken >= 5000 ? 1 : 0 },
+  { id: 'jungle12', c: 1, t: 2, n: '野區霸主', d: '單場清掉 12 個野怪營地', g: 12, v: (P, B) => B.camps },
+  { id: 'allmax', c: 1, t: 2, n: '技藝精通', d: '單場把英雄所有技能都升到 LV3', g: 1, v: (P, B) => B.allmax },
+  { id: 'spend', c: 1, t: 1, n: '揮金如土', d: '單場在商店花掉 2000 金幣', g: 2000, v: (P, B) => B.spent },
+  { id: 'streak10', c: 1, t: 4, n: '殺神降臨', d: '4 秒內連續擊倒 10 個敵人', g: 10, v: (P, B) => B.streak },
   // ----- 收藏 -----
   { id: 'chest1', c: 2, t: 1, n: '開箱初體驗', d: '第一次開寶箱', g: 1, v: P => P.chests },
   { id: 'gamble5', c: 2, t: 3, n: '賭神降臨', d: '賭徒寶箱一次開出 5 把鑰匙', hint: '運氣好到不行。', g: 1, v: P => P.gamble5 },
@@ -50,19 +63,27 @@ G.ACH = [
   { id: 'minion10', c: 2, t: 2, n: '植物園長', d: '擁有 10 隻小兵', g: 10, v: () => G.Team.get().owned.m.length },
   { id: 'minionAll', c: 2, t: 4, n: '森羅萬象', d: '擁有全部小兵', g: () => G.ROSTER.minions.length, v: () => G.Team.get().owned.m.length },
   { id: 'ach15', c: 2, t: 3, n: '成就獵人', d: '完成 15 個成就', g: 15, v: () => G.Ach.doneCount('ach15') },
+  // v2.6 新增
+  { id: 'chest30', c: 2, t: 2, n: '開箱成癮', d: '累計開 30 次寶箱', g: 30, v: P => P.chests },
+  { id: 'legend3', c: 2, t: 3, n: '傳說收藏家', d: '擁有 3 個傳說以上稀有度的角色', g: 3, v: () => { const o = G.Team.get().owned; return [...o.h, ...o.m].filter(n => G.rarityOf(n) >= 3).length; } },
+  { id: 'mythic', c: 2, t: 4, n: '神話降臨', d: '擁有一位神話英雄', hint: '傳說之上，還有傳說。', g: 1, v: () => G.Team.get().owned.h.filter(n => G.rarityOf(n) === 4).length },
   // ----- 探索 -----
   { id: 'guide', c: 3, t: 1, n: '好學生', d: '看過教學的每一頁', g: () => G.Ach.guideTotal(), v: P => P.guide.length },
   { id: 'book', c: 3, t: 2, n: '博物學家', d: '在圖鑑看過每一種角色', g: () => G.Ach.bookTotal(), v: P => P.book.length },
   { id: 'demo', c: 3, t: 1, n: '招式研究員', d: '看過 20 種不同的技能展示', g: 20, v: P => P.demo.length },
   { id: 'save', c: 3, t: 1, n: '未雨綢繆', d: '第一次產生存檔碼', g: 1, v: P => P.codes },
-  { id: 'night', c: 3, t: 1, n: '夜貓子', d: '在凌晨 0～5 點打完一場戰鬥', hint: '月亮出來的時候……', g: 1, v: P => P.night }
+  { id: 'night', c: 3, t: 1, n: '夜貓子', d: '在凌晨 0～5 點打完一場戰鬥', hint: '月亮出來的時候……', g: 1, v: P => P.night },
+  // v2.6 新增
+  { id: 'early', c: 3, t: 1, n: '早起的鳥兒', d: '在早上 5～8 點打完一場戰鬥', hint: '太陽剛升起的時候……', g: 1, v: P => P.morning },
+  { id: 'demoAll', c: 3, t: 3, n: '武學大全', d: '看過每位英雄每一招的技能展示', g: () => G.Ach.heroSkillIds().size, v: P => { const S = G.Ach.heroSkillIds(); return P.demo.filter(x => S.has(x)).length; } },
+  { id: 'scout', c: 3, t: 1, n: '戰場觀察家', d: '在戰鬥中打開大地圖 10 次', g: 10, v: P => P.maps }
 ];
 G.ACH_BY = Object.fromEntries(G.ACH.map(a => [a.id, a]));
 
 G.Ach = (() => {
   const A = {};
-  const ADD = ['kills', 'deaths', 'assists', 'camps', 'towers', 'gold', 'time', 'bosses', 'hunters', 'wboss', 'potions'];
-  const BEST = ['streak', 'towers', 'gold', 'assists', 'level', 'wboss', 'follow', 'potions', 'bag'];
+  const ADD = ['kills', 'deaths', 'assists', 'camps', 'towers', 'gold', 'time', 'bosses', 'hunters', 'wboss', 'potions', 'dmg', 'tps'];
+  const BEST = ['streak', 'towers', 'gold', 'assists', 'level', 'wboss', 'follow', 'potions', 'bag', 'camps', 'allmax', 'spent'];
   A.recent = [];                                     // 本場新達成（結算畫面用）
   A.banner = null;                                   // 選單畫面的成就通知
   // 檔案：缺的欄位自動補上（舊存檔相容）
@@ -70,7 +91,7 @@ G.Ach = (() => {
     const v = G.Team.get();
     if (!v.p) v.p = {};
     const p = v.p;
-    for (const k of [...ADD, 'games', 'wins', 'chests', 'gamble5', 'codes', 'night']) if (typeof p[k] !== 'number') p[k] = 0;
+    for (const k of [...ADD, 'games', 'wins', 'chests', 'gamble5', 'codes', 'night', 'morning', 'maps']) if (typeof p[k] !== 'number') p[k] = 0;
     for (const k of ['guide', 'book', 'demo']) if (!Array.isArray(p[k])) p[k] = [];
     if (!p.best) p.best = {}; for (const k of BEST) if (typeof p.best[k] !== 'number') p.best[k] = 0;
     if (!v.ach) v.ach = {};
@@ -82,6 +103,7 @@ G.Ach = (() => {
   A.doneCount = except => G.ACH.filter(a => a.id !== except && A.state(a.id) > 0).length;
   A.unclaimed = () => G.ACH.filter(a => A.state(a.id) === 1).length;
   A.value = (a, M) => { const P = A.P(); return a.v(P, P.best, M) || 0; };
+  A.heroSkillIds = () => new Set(G.HEROES.flatMap(h => [...h.skills, ...h.passives]).map(String));
   A.guideTotal = () => (G.Menus && G.Menus.guidePageCount ? G.Menus.guidePageCount() : 50);
   A.bookTotal = () => new Set([...G.ROSTER.bosses, ...G.ROSTER.smalls, ...G.ROSTER.towers, ...Object.keys(G.WILD).map(k => G.WILD[k].unit), ...G.ROSTER.hunters]).size;
   // 檢查所有未達成的成就（M＝本場打完的情境）
@@ -110,6 +132,7 @@ G.Ach = (() => {
     const P = A.P();
     if (ev === 'chest') { P.chests++; if (x && x.keys === 5) P.gamble5++; }
     else if (ev === 'guide' || ev === 'book' || ev === 'demo') { if (P[ev].includes(x)) return; P[ev].push(x); }
+    else if (ev === 'map') P.maps++;
     else if (ev === 'code') { P.codes++; const v = G.Team.get(); v.bk = { n: 0, t: Date.now() }; }
     G.Team.save(); A.check(null, null);
   };
@@ -119,7 +142,8 @@ G.Ach = (() => {
     if (A.off() || !W || W.attract || !W._cm) return;
     const P = A.P(), st = W.stats;
     for (const k of ADD) { const d = (st[k] || 0) - W._cm[k]; if (d) { P[k] += d; W._cm[k] = st[k] || 0; } }
-    const live = { streak: st.streak, towers: st.towers, gold: st.gold, assists: st.assists, level: W.hero ? W.hero.level : 0, wboss: st.wboss, follow: st.maxFollow, potions: st.potions, bag: W.bag.length };
+    const live = { streak: st.streak, towers: st.towers, gold: st.gold, assists: st.assists, level: W.hero ? W.hero.level : 0, wboss: st.wboss, follow: st.maxFollow, potions: st.potions, bag: W.bag.length, camps: st.camps, spent: st.spent || 0,
+      allmax: W.hero && [...W.hero.skills, ...W.hero.pskills].every(q => q.lv >= G.SKILL_MAX) ? 1 : 0 };
     for (const k of BEST) P.best[k] = Math.max(P.best[k], live[k] || 0);
     G.Team.save();
   };
@@ -134,7 +158,7 @@ G.Ach = (() => {
     if (A.off()) return;
     A.commit(W);
     const P = A.P(), win = !!W.over.win; P.games++; if (win) P.wins++;
-    const hr = new Date().getHours(); if (hr < 5) P.night++;
+    const hr = new Date().getHours(); if (hr < 5) P.night++; if (hr >= 5 && hr < 8) P.morning++;
     G.Team.save();
     A.check({ win, st: W.stats, pts: W.loadPts }, W);
   };

@@ -414,7 +414,7 @@ G.UI = (() => {
     btn('pause', Rt - 16, by, 14, 12, () => { U.press.pause = 0.1; G.Audio.play('click'); U.paused = true; });
     // 展開大地圖（暫停左邊）
     U.h.key(c, Rt - 32, by, 14, 12, U.bigMap, U.bigMap ? 13 : 5); expandIcon(c, Rt - 32 + 3, by + 2, 8, 8, U.bigMap ? 13 : 8);
-    btn('bigmap', Rt - 32, by, 14, 12, () => { U.bigMap = !U.bigMap; G.Audio.play(U.bigMap ? 'open' : 'click'); });
+    btn('bigmap', Rt - 32, by, 14, 12, () => { U.bigMap = !U.bigMap; G.Audio.play(U.bigMap ? 'open' : 'click'); if (U.bigMap && G.Ach && G.W && !G.W.attract) G.Ach.on('map'); });
     // 鎖定中的目標：圖示 + 血條（點一下鏡頭移過去）
     const lt = h.alive && h.cmd && h.cmd.lock && h.cmd.t && h.cmd.t.alive ? h.cmd.t : null;
     if (lt) {

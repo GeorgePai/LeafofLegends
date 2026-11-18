@@ -142,7 +142,13 @@ G.Audio = (() => {
     stamp: t => { osc('sine', 120, 40, t, 0.4, 0.5); noise(t, 0.3, 0.4, 'lowpass', 1500, 100); noise(t, 0.05, 0.25, 'bandpass', 3000, 1500, 1); [1047, 1319, 1568, 2093].forEach((f, i) => osc('pulse', f, f, t + 0.12 + i * 0.06, 0.3, 0.07, sfxBus, { lp: 5000 })); },
     endWin: t => { [392, 523, 659, 784].forEach((f, i) => osc('pulse', f, f, t + i * 0.09, 0.3, 0.09, sfxBus, { lp: 4000 })); [523, 659, 784, 1047].forEach(f => osc('triangle', f, f, t + 0.4, 1.4, 0.07, sfxBus, { atk: 0.02 })); osc('triangle', 131, 131, t + 0.4, 1.4, 0.12); noise(t + 0.4, 1.0, 0.05, 'highpass', 6000, 9000, 1); },
     endLose: t => { [330, 311, 294].forEach((f, i) => osc('triangle', f, f * 0.99, t + i * 0.3, 0.5, 0.12)); [220, 262, 330].forEach(f => osc('triangle', f, f, t + 0.9, 1.4, 0.06, sfxBus, { atk: 0.05 })); osc('sine', 110, 82, t + 0.9, 1.4, 0.12); },
-    rage: t => { osc('sawtooth', 110, 70, t, 0.5, 0.1, sfxBus, { lp: 700 }); noise(t, 0.4, 0.2, 'lowpass', 800, 200); }
+    rage: t => { osc('sawtooth', 110, 70, t, 0.5, 0.1, sfxBus, { lp: 700 }); noise(t, 0.4, 0.2, 'lowpass', 800, 200); },
+    // v2.6 死靈召喚力夫
+    darkshot: t => { osc('sawtooth', 520, 150, t, 0.12, 0.07, sfxBus, { lp: 1600 }); osc('sine', 260, 90, t, 0.1, 0.12); noise(t, 0.08, 0.06, 'bandpass', 2400, 900, 2); },
+    sac: t => { osc('sine', 220, 55, t, 0.7, 0.28); osc('triangle', 330, 82, t + 0.02, 0.6, 0.08); noise(t, 0.7, 0.18, 'lowpass', 700, 90); osc('sine', 660, 165, t + 0.1, 0.5, 0.04); },
+    summon: t => { osc('sine', 180, 540, t, 0.38, 0.14); osc('triangle', 270, 810, t + 0.05, 0.32, 0.06); noise(t, 0.3, 0.05, 'bandpass', 1800, 5000, 3); },
+    blood: t => { osc('sine', 95, 45, t, 0.16, 0.55); osc('sine', 95, 45, t + 0.22, 0.16, 0.45); osc('sawtooth', 140, 520, t + 0.3, 0.45, 0.06, sfxBus, { lp: 1200 }); noise(t + 0.3, 0.4, 0.12, 'lowpass', 1400, 200); },
+    clone: t => { [880, 1175, 1480, 1760, 2349].forEach((f, i) => osc('sine', f, f * 1.01, t + i * 0.045, 0.28, 0.07)); osc('triangle', 440, 1760, t, 0.32, 0.05); noise(t, 0.45, 0.06, 'bandpass', 4000, 9000, 2); }
   };
 
   function play(name, vol = 1, minGap = 0.035) {

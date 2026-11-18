@@ -140,7 +140,7 @@ G.Render = (() => {
       mk.ax = Math.round(gx); mk.ay = Math.round(gy - 8 - drop - bounce); mk.fade = fade;
     }
     // v2.5 河流微微流動：沿河道的短亮線順流移動、前後淡入淡出（只畫畫面內的，約幾十個像素）
-    { const rv = W.M.def.river, T = G.TILE; if (rv) { const pts = rv.pts; b.fillStyle = G.PAL[7];
+    { const rv = W.M.def.river, T = G.TILE; if (rv) { const pts = rv.pts; b.fillStyle = '#bcd8dc';
       for (let i = 0; i < pts.length - 1; i++) { const [x0, y0] = pts[i], [x1, y1] = pts[i + 1], L = Math.hypot(x1 - x0, y1 - y0), ux = (x1 - x0) / L, uy = (y1 - y0) / L, n = Math.ceil(L * 1.4);
         for (let k = 0; k < n; k++) { const h1 = G.hash(i * 97 + k, 5), h2 = G.hash(i * 31 + k, 9), s2 = ((k + h1) / n + rt * (0.018 + h2 * 0.012)) % 1, lat = (h2 - 0.5) * 1.5 * rv.r;
           const wx = (x0 + ux * s2 * L - uy * lat) * T, wy = (y0 + uy * s2 * L + ux * lat) * T, sx = Math.round(wx * G.AX - ox), sy = Math.round(wy * G.AY - oy);
@@ -250,9 +250,9 @@ G.Render = (() => {
         if (u.cast > 0.12) ddy -= 2;
         const zz = u.z + u.spawnT * 70 + (u.vis.fly ? Math.sin(u.anim * 2.5) * 3 : 0);
         const red = u.side === 1 && !u.static;                 // 敵方單位：赤紅配色
-        const img = u.flash > 0 ? (u.face < 0 ? s.fm : s.f) : red ? G.redOf(u.face < 0 ? s.m : s.n) : (u.face < 0 ? s.m : s.n);
+        const base = G.lookOf(u, u.face < 0 ? s.m : s.n);             // v2.6 受控＝幽魂紫、複製體＝冰青
+        const img = u.flash > 0 ? (u.face < 0 ? s.fm : s.f) : base;
         const ax = Math.round(gx - s.w / 2 + ddx), ay = Math.round(gy - zz * G.AZ - s.h + 1 + ddy);
-        const base = red ? G.redOf(u.face < 0 ? s.m : s.n) : (u.face < 0 ? s.m : s.n);
         // 層次感（v2.3）：光從左上來 → 斜向投影（落在右下方地面）＋左上亮邊＋右下暗邊
         if (!u.vis.fly && u.spawnT <= 0.01) {
           const sil = G.glowOf(base, 0, 1, 0).tint, fx = Math.round(gx + ddx), fy = Math.round(gy) + 1;
@@ -260,8 +260,9 @@ G.Render = (() => {
         }
         const shielded = u.protectors && W.isProtected(u);
         // 稀有度外框（我方英雄與小兵）
-        if (u.side === 0 && (u.kind === 'hero' || u.kind === 'creep') && u.rar != null) {
-          const gl = G.glowOf(base, G.RARITY[u.rar].c, 1, u.rar >= 2 ? 3 : 2);
+        if (u.charm || u.clone) { const gl = G.glowOf(base, u.clone ? 25 : 17, 1, 2); b.globalAlpha = 0.6 + Math.sin(rt * 5 + u.id) * 0.25; b.drawImage(gl.c, ax - gl.p, ay - gl.p); b.globalAlpha = 1; }   // 召喚物外框
+        else if (u.side === 0 && (u.kind === 'hero' || u.kind === 'creep') && u.rar != null) {
+          const gl = G.rarGlow(base, u.rar, 1, u.rar >= 2 ? 3 : 2);
           b.globalAlpha = u.rar === 0 ? 0.55 : 0.75 + Math.sin(rt * 4 + u.id) * 0.2; b.drawImage(gl.c, ax - gl.p, ay - gl.p); b.globalAlpha = 1;
         }
         // 中立野怪：黃色淡外框
@@ -276,10 +277,12 @@ G.Render = (() => {
           const cp = Math.min(1, u.chg.T / u.chg.dur), E = G.ELEM[u.chg.el] || G.ELEM.arcane, gl = G.glowOf(base, E.c, 1, 2);
           b.globalAlpha = 0.25 + 0.6 * cp * (0.75 + 0.25 * Math.sin(rt * 30)); b.drawImage(gl.c, ax - gl.p, ay - gl.p); b.globalAlpha = 1;
         }
+        if (u.clone) b.globalAlpha = 0.68 + Math.sin(rt * 9 + u.id) * 0.1;      // 複製體：半透明、微微閃爍
         if (psx !== 1 || psy !== 1 || psk !== 0) {              // 以腳底為支點做擠壓／傾斜
           const fx = ax + s.w / 2, fy = ay + s.h;
           b.save(); b.setTransform(psx, 0, psk, psy, fx, fy); b.drawImage(img, -s.w / 2, -s.h); b.restore();
         } else b.drawImage(img, ax, ay);
+        b.globalAlpha = 1;
         if (u.chg && u.chg.T > u.chg.dur - 0.06) { b.globalAlpha = 0.8; b.drawImage(G.glowOf(base, 9, 1, 0).tint, ax, ay); b.globalAlpha = 1; }   // 放招瞬間白閃
         if (u.lunge > 0.25 && !u.static) G.FX.swingArc(b, u, ax, ay, s, 1 - u.lunge);
         if (u.recoil > 0.55) { const mx = Math.round(ax + (u.face > 0 ? s.w + 1 : -2)), my = Math.round(ay + s.h * 0.45); b.fillStyle = G.PAL[u.side === 1 ? 14 : 9]; b.fillRect(mx - 1, my, 3, 1); b.fillRect(mx, my - 1, 1, 3); }

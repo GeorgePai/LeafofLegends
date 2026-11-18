@@ -77,7 +77,7 @@ for hi in range(12):
     for lv in (0,1,3): S.append([f'card-h{hi}-s{sk}-lv{lv}',f"const h=G.W.hero, s=h.skills[{sk}]; if(s){{ s.lv={lv}; G.UI.hold={{id:'x',t:1,s,fired:true,x:G.Render.uw-120+{sk}*28,y:G.Render.uh-24,w:24}}; }}",150])
 S.append(['cardx',"G.UI.hold=null",100])
 S.append(['charge',"G.UI.hold=null; G.UI.screen='battle'; G.newWorld({hero:0}); var h=G.W.hero; h.skills.forEach(s=>s.lv=1); h.chg={sd:h.skills[0].s,t:null,lv:1,T:0.2,dur:0.5,el:'arcane',big:true};",200])
-for hi in range(10):
+for hi in range(11):
   S.append([f'skup-h{hi}',f"G.UI.hold=null; G.UI.screen='battle'; G.newWorld({{hero:{hi}}}); var W=G.W,h=W.hero; h.level=12; var A=[...h.skills,...h.pskills]; A.forEach(s=>s.lv=1); h.sp=9; W.notices=[]; A.forEach(s=>W.levelSkill(s)); W.notices.forEach(n=>n.age=1);",400])
 S.append(['end',"Object.assign(G.W.stats,{kills:134,deaths:0,assists:112,towers:16,camps:17,gold:123456,dmg:1234567,taken:234567,bosses:13,time:3812});G.W.keysGot=13;G.Ach.recent=['games1','win1','speed','tame','comeback','gamble5'];G.W.over={win:true,t:3}",3200])
 S.append(['end-full',"G.UI.endT=9",400])
@@ -91,7 +91,14 @@ S.append(['hpanel',"G.UI.toast=null;G.UI.heroPanel=true",300]); S.append(['hpane
 S.append(['aim',"G.UI.start();var h=G.W.hero;h.skills.forEach(s=>s.lv=1);h.mp=999;G.UI.aim={i:2,s:h.skills[2],on:true,pre:false,bx:G.Render.uw-20,by:G.Render.uh-20,dx:-40,dy:-24,ux:G.Render.uw-60,uy:G.Render.uh-44};",400])
 S.append(['aim-cancel',"var A=G.UI.aim,b=G.UI.cancelBtn;if(A&&b){A.ux=b.x;A.uy=b.y;G.UI.aimUpdate();}",200]); S.append(['aim-x',"G.UI.aim=null",100])
 S.append(['guide',"G.UI.screen='guide'",300])
-for k in range(62):
+for k in range(66):
   S.append([f'guide{k}',"G.Menus.guideTurn(1)",120])
   S.append([f'guide{k}b',"G.Menus._gt(1.9)",60]); S.append([f'guide{k}c',"G.Menus._gt(3.0)",60])
+# v2.6 寶箱新角色→前往隊伍、NEW、死靈召喚力夫戰鬥
+S.append(['open-hero',F+"G.Team.get().keys=30;G.UI.screen='store';G.Store._open(1,3)",600])
+S.append(['open-hero-go',up('opGo'),600])
+S.append(['team-new-away',"G.Menus.carStep(1)",700])
+S.append(['necro-battle',"G.UI.hold=null;G.UI.screen='battle';G.newWorld({hero:10});var W=G.W,h=W.hero;[...h.skills,...h.pskills].forEach(s=>s.lv=1);h.mp=999;for(var i=0;i<4;i++){var u=new G.Unit(W,'leafblower',0,h.x+20+i*8,h.y+10,1,'creep');u.lane=1;W.add(u);}W.trySkill(0);",1500])
+S.append(['necro-clone',"var W=G.W;W.hero.mp=999;W.trySkill(2);",1500])
+S.append(['necro-nobody',"G.newWorld({hero:10});var h=G.W.hero;[...h.skills,...h.pskills].forEach(s=>s.lv=1);h.mp=999;G.W.trySkill(1);",300])
 json.dump(S,open('/tmp/tc.json','w'))

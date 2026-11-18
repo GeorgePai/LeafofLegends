@@ -7,7 +7,7 @@
    ========================================================= */
 G.CHESTS = [
   { id: 'gamble', n: '賭徒寶箱', cost: 1, col: 10, d: '碰碰運氣，可能開出 0～5 把鑰匙。', keys: [44, 26, 15, 9, 4, 2] },   // 平均拿回約 1.09 把（玩家福利，不寫進說明）
-  { id: 'hero', n: '英雄寶箱', cost: 5, col: 13, d: '獲得一位還沒擁有的英雄。', pool: 'h', rates: [0, 60, 30, 10] },
+  { id: 'hero', n: '英雄寶箱', cost: 5, col: 13, d: '獲得一位還沒擁有的英雄。', pool: 'h', rates: [0, 58, 29, 10, 3] },
   { id: 'minion', n: '小兵寶箱', cost: 3, col: 11, d: '獲得一隻還沒擁有的小兵。', pool: 'm', rates: [0, 50, 35, 15] }
 ];
 // ---------- 賭徒寶箱：每 5 分鐘免費開一次（v2.3）----------
@@ -42,7 +42,7 @@ G.Store = (() => {
   const left = ch => all(ch).filter(n => !realOwns(n));
   // 目前實際機率（扣掉已全部擁有的稀有度後重新分配）
   S.effRates = ch => {
-    const L = left(ch), cnt = [0, 1, 2, 3].map(r => L.filter(n => G.rarityOf(n) === r).length);
+    const L = left(ch), cnt = ch.rates.map((_, r) => L.filter(n => G.rarityOf(n) === r).length);
     const w = ch.rates.map((p, r) => cnt[r] ? p : 0), sum = w.reduce((a, b) => a + b, 0);
     return { pct: w.map(v => sum ? v / sum * 100 : 0), cnt };
   };
@@ -200,7 +200,7 @@ G.Store = (() => {
     H().btn('ipBg', 0, 0, uw, uh, null, () => { info = null; });
     H().dim(c, 0.7);
     const w = Math.min(uw - I.l - I.r - 8, 220);
-    const rows = ch.pool ? (() => { const e = S.effRates(ch); return [1, 2, 3].map(r => [G.RARITY[r].n, G.RARITY[r].c, e.cnt[r] ? e.pct[r].toFixed(1).replace(/\.0$/, '') + '%' : '已全部擁有', ch.rates[r] + '%', e.cnt[r]]); })()
+    const rows = ch.pool ? (() => { const e = S.effRates(ch); return ch.rates.map((_, r) => r).filter(r => r >= 1).map(r => [G.RARITY[r].n, G.RARITY[r].c, e.cnt[r] ? e.pct[r].toFixed(1).replace(/\.0$/, '') + '%' : '已全部擁有', ch.rates[r] + '%', e.cnt[r], r]); })()
       : ch.keys.map((p, i) => [i + ' 把鑰匙', i ? 13 : 5, p + '%']);
     const notes = ch.pool ? ['不會開到已擁有的角色。', '某稀有度全部擁有後，它的機率會按比例分給其他稀有度。']
       : [];                                             // 賭徒寶箱：不顯示期望值
@@ -215,7 +215,7 @@ G.Store = (() => {
     yy += 14;
     rows.forEach((r, i) => {
       if (i % 2 === 0) { c.fillStyle = P[2]; c.fillRect(x + 4, yy - 1, w - 8, 13); }
-      G.cn(c, r[0], x + 8, yy - 1, r[1]);
+      if (r[5] === 4) G.cnRb(c, r[0], x + 8, yy - 1); else G.cn(c, r[0], x + 8, yy - 1, r[1]);
       if (ch.pool) { G.cn(c, r[4] + ' 隻', x + w / 2 + 6, yy - 1, r[4] ? 8 : 4, 0.5); G.cn(c, r[2], x + w - 8, yy - 1, r[4] ? 9 : 4, 1); }
       else G.cn(c, r[2], x + w - 8, yy - 1, 9, 1);
       yy += 13;
@@ -297,12 +297,12 @@ G.Store = (() => {
     if (T > TO + 0.1) {
       const e = 1 - Math.pow(1 - Math.min(1, (T - TO - 0.1) / 0.5), 3), pop = backOut((T - TO - 0.1) / 0.45);
       if (o.res.name) {
-        const nm = o.res.name, fr = G.SPR[G.VIS[nm].spr][((T * 4) | 0) % 2], sk = LD ? 2 : 3, img = G.scaled(fr.n, sk), gl = G.glowOf(img, col, 1, 3);
+        const nm = o.res.name, fr = G.SPR[G.VIS[nm].spr][((T * 4) | 0) % 2], sk = LD ? 2 : 3, img = G.scaled(fr.n, sk), gl = G.rarGlow(img, tier, 1, 3);
         const cy = G.lerp(rc, midY, e), iw = Math.max(1, Math.round(img.width * pop)), ih = Math.max(1, Math.round(img.height * pop)), ix = Math.round(cx - iw / 2), iy = Math.round(cy - ih / 2 + Math.sin(T * 3) * 2);
         c.globalAlpha = 0.7 + Math.sin(T * 5) * 0.3; c.drawImage(gl.c, ix - gl.p, iy - gl.p, iw + gl.p * 2 * pop, ih + gl.p * 2 * pop); c.globalAlpha = 1; c.drawImage(img, ix, iy, iw, ih);
         if (T > TO + 0.5) {                                         // 稀有度在上、名字在下，與角色圖分開
           const isH = G.HEROES.some(h => h.name === nm);
-          G.cn(c, G.RARITY[tier].n + (tier === 3 ? '！！' : tier === 2 ? '！' : ''), cx, Math.max(I.t + 18, iy - gl.p - 16), col, 0.5, 0);
+          G.cnRar(c, G.RARITY[tier].n + (tier === 4 ? '！！！' : tier === 3 ? '！！' : tier === 2 ? '！' : ''), cx, Math.max(I.t + 18, iy - gl.p - 16), tier, 0.5, 0);
           G.cn(c, (isH ? '英雄　' : '小兵　') + G.nameOf(nm), cx, iy + ih + gl.p + 4, 9, 0.5, 0);
           const nb = 'NEW', bw2 = G.textW(nb) + 4; c.fillStyle = P[0]; c.fillRect(ix + iw - 2, iy - 3, bw2 + 2, 9); c.fillStyle = P[13]; c.fillRect(ix + iw - 1, iy - 2, bw2, 7); G.text(c, nb, ix + iw + 1, iy - 1, 0);
         }
@@ -324,13 +324,22 @@ G.Store = (() => {
     if (o.flash > 0) { c.fillStyle = P[9]; c.globalAlpha = o.flash * 0.85; c.fillRect(0, 0, uw, uh); c.globalAlpha = 1; o.flash -= dt * 3; }
     // ---- 按鈕 ----
     if (T >= tBtn) {
-      const bw = 70, again = canOpen(o.ch);
-      const y = LD ? by - 40 : Math.round(uh - I.b - 20), x1 = LD ? cx + 44 : again ? Math.round(cx - bw - 4) : Math.round(cx - bw / 2), y2 = LD ? y + 20 : y, x2 = LD ? x1 : Math.round(cx + 4);
-      const oo = pr('opOk') ? 1 : 0; c.fillStyle = P[(Math.sin(gt * 6) > 0) ? 13 : 14]; c.fillRect(x1 - 1, y - 1 + oo, bw + 2, 18); H().key(c, x1, y + oo, bw, 16, oo, 14, 13, G.tint(14, -0.5)); G.cn(c, '收下', x1 + bw / 2, y + 2 + oo, 0, 0.5);
-      tap('opOk', x1, y, bw, 16, () => { op = null; });
-      if (again) { const ao = pr('opAg') ? 1 : 0; H().key(c, x2, y2 + ao, bw, 16, ao, 7); G.cn(c, '再開一次', x2 + bw / 2, y2 + 2 + ao, 9, 0.5); tap('opAg', x2, y2, bw, 16, () => { const ch = o.ch; op = null; open(ch); }); }
+      // v2.6 開到新角色時多一顆「前往隊伍」（右下）：直屏三顆並排、橫屏三顆直排
+      const again = canOpen(o.ch), goT = !!o.res.name && !G.Team.dev, nm = o.res.name;
+      const btns = [['opOk', '收下', () => { op = null; }, 'ok']].concat(again ? [['opAg', '再開一次', () => { const ch = o.ch; op = null; open(ch); }, 'sec']] : []).concat(goT ? [['opGo', '前往隊伍', () => { op = null; G.Menus.focusTeam(nm); }, 'go']] : []);
+      const n = btns.length, avail = uw - I.l - I.r - 8 - (n - 1) * 4, wOf = pad => btns.map(q => LD ? 70 : Math.min(70, Math.max(40, G.cnW(q[1]) + pad)));
+      let ws = wOf(16); if (ws.reduce((a, b) => a + b, 0) > avail) ws = wOf(8);
+      const nmW = nm ? G.cnW((G.HEROES.some(h => h.name === nm) ? '英雄　' : '小兵　') + G.nameOf(nm)) : 0, lx = Math.min(uw - I.r - 74, Math.max(cx + 52, Math.round(cx + nmW / 2 + 8)));   // 橫屏：按鈕避開角色名字
+      const tot = ws.reduce((a, b) => a + b, 0) + (n - 1) * 4; let px = Math.round(uw / 2 - tot / 2);
+      btns.forEach(([id, lab, fn, kind], i) => {
+        const bw = ws[i], x = LD ? lx : px, y = LD ? by - (n - 1) * 20 - 18 + i * 20 : Math.round(uh - I.b - 20), oo = pr(id) ? 1 : 0; px += bw + 4;
+        if (kind === 'ok') { c.fillStyle = P[(Math.sin(gt * 6) > 0) ? 13 : 14]; c.fillRect(x - 1, y - 1 + oo, bw + 2, 18); H().key(c, x, y + oo, bw, 16, oo, 14, 13, G.tint(14, -0.5)); G.cn(c, lab, x + bw / 2, y + 2 + oo, 0, 0.5); }
+        else { H().key(c, x, y + oo, bw, 16, oo, kind === 'go' ? 12 : 7); G.cn(c, lab, x + bw / 2, y + 2 + oo, 9, 0.5); }
+        tap(id, x, y, bw, 16, fn);
+      });
     }
   }
   S.drawChest = drawChest;
+  S._open = (i, t) => { open(G.CHESTS[i]); if (op && t) op.t = t; };   // 測試用：開寶箱並跳到指定時間
   return S;
 })();

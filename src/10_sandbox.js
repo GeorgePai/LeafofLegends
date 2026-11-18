@@ -35,6 +35,14 @@ G.cnImg = function (s, col, ol) {
 };
 // 畫中文（y 為字的頂端；行高 13）
 G.cn = (ctx, s, x, y, col = 9, align = 0, ol = null) => { const e = G.cnImg(String(s), col, ol); ctx.drawImage(e.c, Math.round(x - e.w * align) - 2, Math.round(y) - 1); return e.w; };
+// v2.6 七彩文字（神話）：逐字換色、隨時間流動
+G.RB = [10, 14, 13, 11, 18, 12, 17];
+G.cnRb = (ctx, s, x, y, align = 0, ol = null) => {
+  s = String(s); const w = G.cnW(s), x0 = x - w * align, t = (performance.now() / 120) | 0;
+  [...s].forEach((ch, i) => G.cn(ctx, ch, x0 + G.cnW(s.slice(0, i)), y, G.RB[(i + t) % G.RB.length], 0, ol)); return w;
+};
+// 依稀有度畫文字（神話＝七彩）
+G.cnRar = (ctx, s, x, y, rar, align = 0, ol = null) => rar === 4 ? G.cnRb(ctx, s, x, y, align, ol) : G.cn(ctx, s, x, y, G.RARITY[rar].c, align, ol);
 G.cnLines = (ctx, s, x, y, col = 9, align = 0, lh = 14) => String(s).split('\n').forEach((l, i) => G.cn(ctx, l, x, y + i * lh, col, align));
 
 // ---------- 文字資料（取自 G.TXT：原著字串轉繁中） ----------
@@ -60,6 +68,7 @@ G.tagsOf = n => {
   if (u.jungler) t.push(['打野', 14]);
   if (G.VIS[n] && G.VIS[n].fly) t.push(['飛行', 7]);
   if (n === 'twinflower') t.push(['一次兩隻', 7]);
+  if (n === 'necroleafy') t.push(['召喚', 17]);
   // 攻擊方式
   const grpMax = G.statMax ? G.statMax(G.groupOf(n)) : null;
   t.push([st.range <= 40 ? '近戰' : grpMax && st.range >= grpMax.range * 0.8 && st.range >= 180 ? '狙擊' : '遠程', 9]);
@@ -131,7 +140,11 @@ G.Team = {
   keys() { return this.dev ? Infinity : this.get().keys; },
   spend(k) { if (this.dev) return true; const v = this.get(); if (v.keys < k) return false; v.keys -= k; this.save(); return true; },
   addKeys(k) { if (this.dev) return; this.get().keys += k; this.save(); },
-  grant(n) { if (this.dev) return; const v = this.get(), arr = G.HEROES.some(h => h.name === n) ? v.owned.h : v.owned.m; if (!arr.includes(n)) { arr.push(n); if (G.SaveUI) G.SaveUI.bump(); } this.save(); },
+  grant(n) { if (this.dev) return; const v = this.get(), arr = G.HEROES.some(h => h.name === n) ? v.owned.h : v.owned.m; if (!arr.includes(n)) { arr.push(n); (v.nw = v.nw || []).push(n); if (G.SaveUI) G.SaveUI.bump(); } this.save(); },
+  // v2.6 NEW 標記：寶箱新拿到的角色在隊伍轉盤上標 NEW；在聚光燈下看過、再滾走後消失
+  isNew(n) { const v = this.get(); return !!(v.nw && v.nw.includes(n)); },
+  clearNew(n) { const v = this.get(); if (v.nw && v.nw.includes(n)) { v.nw = v.nw.filter(q => q !== n); this.save(); } },
+  newIn(list) { const v = this.get(); return !!(v.nw && v.nw.some(n => list.includes(n))); },
   // 出戰英雄／陣容裡若有未擁有的角色就移除（關閉開發者模式、舊存檔升級時）
   sanitize(silent) { const v = this.v; if (!v || !v.owned) return; if (!this.owns(G.HEROES[v.hero].name)) v.hero = Math.max(0, G.HEROES.findIndex(h => this.owns(h.name))); v.loadout = v.loadout.filter(e => this.owns(e.n)); if (!silent) this.save(); else this.save(); },
   save() { try { localStorage.setItem('leafwar_team', JSON.stringify(this.v)); } catch (e) { } },
@@ -145,14 +158,16 @@ G.Team = {
 // ---------- 地面小圖（預覽/教學共用） ----------
 G._strip = {};
 G.groundStrip = (w, h) => {
+  if (!G.NATRGB) { G.NATRGB = {}; for (const k in G.NAT) G.NATRGB[k] = G.hexRGB(G.NAT[k]); }
   const k = w + 'x' + h; if (G._strip[k]) return G._strip[k];
   const c = G.canvas(w, h), x = c.getContext('2d'), id = x.createImageData(w, h);
   for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) {
     const n = G.fbm(xx * 0.05, yy * 0.08), b = G.bayer(xx, yy), band = Math.abs(yy / h - 0.66) < 0.2 + (n - 0.5) * 0.12;
-    let v = band ? (n + (b - 0.5) * 0.35 > 0.5 ? 6 : 5) : (n + (b - 0.5) * 0.3 > 0.55 ? 5 : 4);
-    if (yy < h * 0.18) v = yy < h * 0.12 ? (b < 0.5 ? 1 : 2) : (b < 0.6 ? 2 : 3);
-    if (!band && G.hash(xx * 5, yy * 3) > 0.985) v = 7;
-    const rgb = G.PAL_RGB[v], o = (yy * w + xx) * 4; id.data[o] = rgb[0]; id.data[o + 1] = rgb[1]; id.data[o + 2] = rgb[2]; id.data[o + 3] = 255;
+    // v2.6 和戰場同一套自然色：上緣森林、中間泥土路、其餘草地
+    let v = band ? (n + (b - 0.5) * 0.35 > 0.5 ? 'rdL' : 'rdM') : (n + (b - 0.5) * 0.3 > 0.55 ? 'grM' : 'grD');
+    if (yy < h * 0.18) v = yy < h * 0.12 ? (b < 0.5 ? 'fSh' : 'fD') : (b < 0.6 ? 'shD' : 'shM');
+    if (!band && G.hash(xx * 5, yy * 3) > 0.985) v = 'fl1';
+    const rgb = G.NATRGB[v], o = (yy * w + xx) * 4; id.data[o] = rgb[0]; id.data[o + 1] = rgb[1]; id.data[o + 2] = rgb[2]; id.data[o + 3] = 255;
   }
   x.putImageData(id, 0, 0); return (G._strip[k] = c);
 };
@@ -181,7 +196,7 @@ G.Sandbox = class {
     this.dname = side === 0 ? (G.VIS[name].fly ? 'eagle' : 'bear') : (kind === 'tower' ? 'leafblower' : 'treeprotector');
     this.units = [this.A];
     const sd = this.sid != null ? G.ORIG.skills[this.sid] : null;
-    this.run = !sd ? this.scBasic() : !sd.active ? this.scPassive(sd) : sd.type === 'buff' ? this.scBuff(sd) : this.scActive(sd);
+    this.run = !sd ? this.scBasic() : sd.type === 'necro' ? this.scNecro(sd) : !sd.active ? this.scPassive(sd) : sd.type === 'buff' ? this.scBuff(sd) : this.scActive(sd);
     // 面向：攻擊者面對敵人（敵方角色在展示時也面向右邊的目標，不會背對背）
     for (const u of this.units) { if (u === this.A || u.ghost) u.face = 1; else u.face = u.x >= this.A.x ? -1 : 1; }
   }
@@ -241,6 +256,55 @@ G.Sandbox = class {
     A.home = [A.x, A.y];
     const P = w.type === '2d_drop' ? 3.4 : 2.8; let next = 0.45;
     return () => { if (this.t >= next) { next += P; this.soundT = 1; this.useSkill(A, sd, tgt, 1); } };
+  }
+  // ----- v2.6 死靈技能：每一輪重擺場景再施放一次 -----
+  scNecro(sd) {
+    const A = this.A, W = this.W, H = this.H, gy = H * 0.72, at = sd.attribute, R = sd.range || G.NECRO.R;
+    const keep = new Set([A]), reset = () => { this.units = this.units.filter(u => keep.has(u)); for (const u of this.units) { u.hp = u.st.hp; u.side = u.home0 != null ? u.home0 : u.side; } this.effects = []; this.projs = []; };
+    const ring = (n, f, side, names) => Array.from({ length: n }, (_, i) => { const a = -2.4 + i * (4.8 / Math.max(1, n - 1)), d = this.dummy(A.x + Math.cos(a) * R * f, gy + Math.sin(a) * R * f * 0.55, names[i % names.length], side); d.home0 = side; return d; });
+    if (at === 'sac') {                                     // 身邊的小兵 → 換成隨機小兵（會出現各種稀有度）
+      A.x = W * 0.5; A.home = [A.x, A.y]; this.rings = [[A, R, 17]];
+      let next = 0.9, T0 = 0, mins = [];
+      return () => {
+        if (this.t >= T0) { T0 += 4.2; next = T0 - 3.3; reset(); mins = ring(4, 0.62, 0, ['leafblower', 'potatoblower', 'stemskewer', 'leafblower']); this.cap = ['身邊的我方小兵', 9]; }
+        if (this.t >= next) { next = 1e9; this.soundT = 1; this.useSkill(A, sd, null, 1); this.cap = ['換成隨機小兵', 17]; }
+      };
+    }
+    if (at === 'ctrl') {                                    // 身邊的敵人 → 變成召喚物，回頭打其他敵人
+      A.x = W * 0.36; A.home = [A.x, A.y]; this.rings = [[A, R, 10]]; this.bars = 'hp';
+      const far = this.dummy(W * 0.88, gy, 'bear', 1); far.home0 = 1; keep.add(far);
+      let T0 = 0, next = 0, foes = [];
+      return () => {
+        if (this.t >= T0) { T0 += 6; next = T0 - 5.2; reset(); A.hp = A.st.hp; foes = ring(4, 0.6, 1, ['bear', 'bear', 'eagle', 'bear']); this.cap = ['身邊的敵人', 10]; }
+        if (this.t >= next) { next = 1e9; this.soundT = 1; this.useSkill(A, sd, null, 1); this.cap = ['敵人變成召喚物', 10]; }
+        for (const f of foes) if (f.charm) { f.face = 1; this.atk(f, far); }
+      };
+    }
+    if (at === 'clone') {                                   // 每隻召喚物複製一隻（冰青色、1 點血）
+      A.x = W * 0.22; A.home = [A.x, A.y];
+      const D = this.dummy(W * 0.86, gy, 'bear', 1); D.home0 = 1; keep.add(D);
+      const S = [[0.36, -34], [0.44, 0], [0.36, 34]].map(([fx, dy], i) => { const s = this.dummy(W * fx, gy + dy, ['leafmuscle', 'peasniper', 'bear'][i], 0); s.summoner = A; if (i === 2) s.charm = true; s.home0 = 0; keep.add(s); return s; });
+      let T0 = 0, next = 0;
+      return () => {
+        if (this.t >= T0) { T0 += 5.5; next = T0 - 4.6; reset(); this.cap = ['你的召喚物', 17]; }
+        if (this.t >= next) { next = 1e9; this.soundT = 1; this.useSkill(A, sd, null, 1); this.cap = ['各複製一隻', 18]; }
+        for (const u of this.units) if (u.summoner === A) { u.face = 1; if (Math.abs(u.x - D.x) < u.st.range + 30 || u.st.range >= 100) this.atk(u, D); }
+      };
+    }
+    // 被動「替罪」：上排沒有召喚物、下排有召喚物站在身邊 → 同樣挨打，下排本體掉血少一半
+    const g = this.mk(this.name, this.side, 0, H * 0.46, 'hero', []); g.ghost = true; this.units.push(g);
+    A.y = H * 0.86; this.rows = [['沒有召喚物', H * 0.46, 5], [G.skillName(this.sid), H * 0.86, 17]];
+    g.x = A.x = W * 0.58; A.home = [A.x, A.y];
+    const Dg = this.dummy(A.x + 34, H * 0.46, 'bear'), D = this.dummy(A.x + 34, H * 0.86, 'bear'), S = this.dummy(A.x - 24, H * 0.86 - 6, 'leafmuscle', 0);
+    S.summoner = A; Dg.st.power *= 2; D.st.power *= 2;
+    let lg = g.hp, la = A.hp, ls = S.hp;
+    const pop = (u, last, col) => { if (u.hp < last - 0.5) this.pop(u, '-' + Math.round(last - u.hp), col); return u.hp; };
+    return () => {
+      if (this.t % 6 < 0.05) { A.hp = A.st.hp; g.hp = g.st.hp; S.hp = S.st.hp; lg = g.hp; la = A.hp; ls = S.hp; }
+      this.atk(Dg, g); this.atk(D, A);
+      lg = pop(g, lg, 10); la = pop(A, la, 10); ls = S.hp > ls + 1 ? S.hp : pop(S, ls, 17);
+      this.cap = ['召喚物替你扛 ' + G.skillVal(sd, 1).v1 + '%', 17];
+    };
   }
   // ----- 主動增益技 -----
   scBuff(sd) {
@@ -358,10 +422,11 @@ G.Sandbox = class {
     if (!u.static && Math.sin(u.anim * 3) > 0.7) dy = -1;
     if (u.cast > 0.12) dy -= 2;
     const z = u.z + (u.vis.fly ? Math.sin(u.anim * 2.5) * 3 : 0);
-    const img = u.flash > 0 ? (u.face < 0 ? s.fm : s.f) : (u.side === 1 && !u.static ? G.redOf(u.face < 0 ? s.m : s.n) : (u.face < 0 ? s.m : s.n));
+    const img = u.flash > 0 ? (u.face < 0 ? s.fm : s.f) : G.lookOf(u, u.face < 0 ? s.m : s.n);
     const ax = Math.round(gx - s.w / 2 + dx), ay = Math.round(gy - z * G.AZ - s.h + 1 + dy);
     if (!u.ghost) G.VFX.auraBack(b, u, ax, ay, u.face < 0 ? s.m : s.n, gx, gy, this.t, this);
     if (u.ghost) b.globalAlpha = 0.55;
+    if (u.charm || u.clone) { const gl = G.glowOf(G.lookOf(u, u.face < 0 ? s.m : s.n), u.clone ? 25 : 17, 1, 2); b.globalAlpha = 0.7; b.drawImage(gl.c, ax - gl.p, ay - gl.p); b.globalAlpha = u.clone ? 0.7 : 1; }
     b.drawImage(img, ax, ay);
     if (!u.ghost) G.VFX.auraFront(b, u, ax, ay, s, gx, gy, this.t, this);
     b.globalAlpha = 1;

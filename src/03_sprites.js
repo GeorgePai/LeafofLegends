@@ -212,15 +212,23 @@ G.buildSprites = function () {
     { w: 18, h: 30, c: [[9, 7, 5, 6], [9, 12, 7, 6], [9, 18, 8, 6]], trunk: [8, 10, 22, 30] },
     { w: 26, h: 26, c: [[8, 10, 7], [17, 9, 8], [13, 15, 9, 6], [12, 6, 6]], trunk: [11, 15, 19, 26] }
   ];
+  // v2.6 上色：三種樹各用一種綠（中性綠／偏青的松綠／偏黃的橄欖綠），樹幹木頭色（索引 14、15 借用）
+  const LEAF = [['#0c140f', '#1a2c1e', '#284430', '#3a5d3d', '#52794b'], ['#0a1411', '#152a23', '#1f402f', '#2e5640', '#43704f'], ['#10160c', '#222f19', '#344924', '#4a6531', '#66833f']];
+  const WOOD = { 14: '#3a2a1d', 15: '#523c28' };
   treeDefs.forEach((d, i) => {
     const g = new Int8Array(d.w * d.h).fill(-1);
-    G.paintRect(g, d.w, d.trunk[0], d.trunk[2], d.trunk[1], d.trunk[3], (x, y) => ((x + y) & 1) ? 1 : 2);
+    G.paintRect(g, d.w, d.trunk[0], d.trunk[2], d.trunk[1], d.trunk[3], (x, y) => ((x + y) & 1) ? 14 : 15);
     G.paintBlob(g, d.w, d.h, d.c, [0, 1, 2, 3, 4], { noise: 0.5, seed: i * 31 });
-    S.trees.push(G.spriteFromGrid(g, d.w, d.h, { outline: 0 }));
+    const pal = G.palWith(Object.assign({}, WOOD, ...LEAF[i].map((h, k) => ({ [k]: h }))));
+    S.trees.push(G.spriteFromGrid(g, d.w, d.h, { outline: 0, pal }));
   });
+  // v2.6 石材（石頭、石燈籠、石像、斷柱）：偏暖的灰褐石色
+  const STONE = G.palWith({ 1: '#1f1d1a', 2: '#3a3833', 3: '#4d4a43', 4: '#5f5b52', 5: '#747064', 6: '#8a8578', 7: '#a19b8b', 8: '#bab4a2', 9: '#d4cfbd', 16: '#3f5a33' });
+  S.STONE_PAL = STONE;
+  for (const k of ['d_statue', 'd_lantern', 'd_pillar']) S[k] = G.sprite(G.ART_SMALL[k], { outline: 0, pal: STONE });
   // 石頭
   S.rocks = [[12, 8, [[6, 4.5, 5.5, 3.6]]], [8, 6, [[4, 3.4, 3.6, 2.6]]], [14, 9, [[5, 5, 4.5, 3.6], [9.5, 5.2, 4, 3.2]]]].map(([w, h, c], i) => {
-    const g = new Int8Array(w * h).fill(-1); G.paintBlob(g, w, h, c, [2, 3, 4, 5, 6, 7], { noise: 0.3, seed: i * 9 }); return G.spriteFromGrid(g, w, h, { outline: 1 });
+    const g = new Int8Array(w * h).fill(-1); G.paintBlob(g, w, h, c, [2, 3, 4, 5, 6, 7], { noise: 0.3, seed: i * 9 }); return G.spriteFromGrid(g, w, h, { outline: 1, pal: STONE });
   });
 
   // 我方聖所：白色聖樹 + 石台
@@ -228,10 +236,13 @@ G.buildSprites = function () {
     const w = 44, h = 50, g = new Int8Array(w * h).fill(-1);
     G.paintBlob(g, w, h, [[22, 43, 20, 6]], [3, 4, 5, 6, 7]);                 // 石台
     G.paintBlob(g, w, h, [[22, 41, 15, 4.2, 0.2]], [5, 6, 7, 8]);
-    G.paintRect(g, w, 19, 22, 25, 42, (x, y) => (x === 19 ? 6 : x === 24 ? 5 : ((y + x) % 5 === 0 ? 6 : 7)));  // 樹幹
-    G.paintRect(g, w, 16, 37, 19, 41, () => 6); G.paintRect(g, w, 25, 37, 28, 41, () => 5);
-    G.paintBlob(g, w, h, [[22, 12, 12, 10], [12, 18, 8, 7], [32, 18, 8, 7], [22, 20, 10, 7], [16, 8, 6], [28, 8, 6]], [5, 6, 7, 8, 9, 9], { noise: 0.35, seed: 5 });
-    S.pholy = [G.spriteFromGrid(g, w, h, { outline: 0 })];
+    G.paintRect(g, w, 19, 22, 25, 42, (x, y) => (x === 19 ? 19 : x === 24 ? 18 : ((y + x) % 5 === 0 ? 19 : 20)));  // 樹幹（木頭色）
+    G.paintRect(g, w, 16, 37, 19, 41, () => 19); G.paintRect(g, w, 25, 37, 28, 41, () => 18);
+    G.paintBlob(g, w, h, [[22, 12, 12, 10], [12, 18, 8, 7], [32, 18, 8, 7], [22, 20, 10, 7], [16, 8, 6], [28, 8, 6]], [22, 23, 24, 25, 26, 27], { noise: 0.35, seed: 5 });
+    // v2.6 聖樹上色：溫潤木色樹幹＋明亮嫩綠樹冠（頂端帶一點新芽黃綠），石台用暖石色
+    const HP = G.palWith({ 0: '#0d130e', 3: '#4d4a43', 4: '#5f5b52', 5: '#747064', 6: '#8a8578', 7: '#a19b8b', 8: '#bab4a2', 18: '#5a3e28', 19: '#7a5638', 20: '#95704c',
+      22: '#2f5532', 23: '#46743f', 24: '#62924f', 25: '#82af62', 26: '#a8c97a', 27: '#cfe2a2' });
+    S.pholy = [G.spriteFromGrid(g, w, h, { outline: 0, pal: HP })];
   }
   // 敵方聖所：黑色巨石祭壇 + 骷髏
   {

@@ -9,7 +9,7 @@
 G.SKILL_MAX = 3;
 G.skillVal = (sd, lv) => {
   const L = Math.max(1, lv) - 1;
-  return { v1: sd.value_1 + sd.grow_value_1 * L, v2: sd.value_2 + sd.grow_value_2 * L, cd: +(sd.delay * (1 - 0.1 * L)).toFixed(1), mp: sd.mp, req: sd['lv' + Math.max(1, lv)] || 1 };
+  return { v1: sd.value_1 + sd.grow_value_1 * L, v2: sd.value_2 + sd.grow_value_2 * L, cd: sd.cds ? sd.cds[Math.min(L, sd.cds.length - 1)] : +(sd.delay * (1 - 0.1 * L)).toFixed(1), mp: sd.mp, req: sd['lv' + Math.max(1, lv)] || 1 };
 };
 G.skillReq = (sd, lv) => sd['lv' + lv] || 1;
 
@@ -90,9 +90,15 @@ Object.assign(G.World.prototype, {
     this.tp = { cd: 0, ch: null };
     const h = this.hero;
     if (h) {
-      h.sp = 1;                                    // 1 級時有 1 點，自動學第一個可學技能
-      const first = [...h.skills, ...h.pskills].find(s => G.skillReq(s.s, 1) <= 1);
-      if (first) this.levelSkill(first, true);
+      const all = [...h.skills, ...h.pskills];
+      if (G.Team.dev && !this.attract) {          // v2.6 開發者模式：開局直接滿級（所有技能都能升到 LV3 的等級），全部技能點自己分配
+        h.level = Math.max(1, ...all.flatMap(s => [1, 2, 3].map(k => G.skillReq(s.s, k)))); h.exp = 0; h.calc(); h.hp = h.st.hp; h.mp = h.st.mp;
+        h.sp = all.length * G.SKILL_MAX;
+      } else {
+        h.sp = 1;                                  // 1 級時有 1 點，自動學第一個可學技能
+        const first = all.find(s => G.skillReq(s.s, 1) <= 1);
+        if (first) this.levelSkill(first, true);
+      }
     }
   },
   // ----- 每幀 -----
@@ -293,7 +299,7 @@ Object.assign(G.World.prototype, {
     const it = G.SHOP_BY[id]; if (!it || this.gold < it.cost) return 'gold';
     const slot = this.bag.find(b => b.id === id);
     if (!slot && this.bag.length >= G.TUNE.bagMax) return 'full';
-    this.gold -= it.cost;
+    this.gold -= it.cost; if (this.stats) this.stats.spent = (this.stats.spent || 0) + it.cost;
     if (slot) slot.n++; else this.bag.push({ id, n: 1 });
     if (id === 'rev' && this.hero && !this.hero.alive && G.UI) G.UI.toastMsg('復活藥水要先放在背包，下次陣亡才會自動使用', 19);   // v2.5
     G.Audio.play('coin'); return 'ok';
@@ -385,10 +391,18 @@ G.skillRows = function (sd) {
       delay: ['攻擊間隔', lv => v(lv), 'ms'], speed: ['跑速', lv => '+' + v(lv)], critical: ['爆擊率', lv => '+' + v(lv), '%'],
       range: ['射程', lv => '+' + v(lv)], return: ['吸血', lv => v(lv), '%'], mp_discount: ['MP 消耗', lv => '−' + v(lv), '%'],
       power: [sd.type === 'multi_buff' ? '攻擊（含周圍友軍）' : '攻擊力', lv => '+' + v(lv)], armor: [sd.type === 'multi_buff' ? '防禦（含周圍友軍）' : '防禦', lv => '+' + v(lv)]
+      , scape: ['承受比例', lv => v(lv), '%']
     }[sd.attribute];
     if (P) add(P[0], P[1], P[2] || '', P[3] || P[2] || '');
+    if (sd.attribute === 'scape') add('範圍', () => sd.range);
     return rows;
   }
+  if (sd.type === 'necro') {                              // v2.6 死靈技能
+    if (sd.attribute === 'ctrl') add('消耗 HP', lv => V(lv).v1, '%');
+    if (sd.attribute === 'clone') add('複製體血量', lv => V(lv).v1);
+    if (sd.attribute !== 'clone') add('範圍', () => sd.range);
+    add('召喚上限', () => G.NECRO.cap);
+  } else
   if (sd.type === 'buff') {
     if (sd.attribute === 'armor_per') add('減傷', lv => V(lv).v1, '%');
     else if (sd.attribute === 'berserker' || sd.attribute === 'berserker2') { add('攻擊', lv => '×' + G.rageOf(lv).pow); if (sd.attribute === 'berserker2') add('攻速', lv => '+' + G.rageOf(lv).spd + '%'); add('防禦', lv => '×' + G.rageOf(lv).arm); }
