@@ -498,6 +498,18 @@ G.VFX = {
   },
   auraFront(ctx, u, ax, ay, s, gx, gy, rt, W) {
     const bt = u.buffT || {};
+    if (u.inv > 0) {   // v2.4 無敵：金色光殼＋流光
+      const cx = gx, cy = ay + s.h / 2, rx = s.w / 2 + 5, ry = s.h / 2 + 4, end = u.inv < 0.6 && (((rt * 16) | 0) & 1);
+      if (!end) { G.glow(ctx, cx, cy, Math.max(rx, ry) + 3, 13, 0.32 + 0.12 * Math.sin(rt * 14), ry / Math.max(rx, ry)); G.pxEllipse(ctx, cx, cy, rx, ry, 13, 5, rt * 14); G.pxEllipse(ctx, cx, cy, rx - 2, ry - 2, 9, 2, -rt * 20); }
+      if (W.frame % 4 === 0) W.parts.add(u.x + G.rr(-8, 8), u.y + G.rr(-3, 3), G.rr(2, 16), 0, 0, G.rr(30, 60), 0.4, 13, 9, 1, -30, 1, 2);
+    }
+    if (u.tLock && u === W.hero && u.alive) {   // v2.4 被敵塔鎖定：頭上紅色驚嘆號（跳出來後輕輕跳動）
+      const k = Math.min(1, (u.lockT || 0) / 0.12), by = Math.round(ay - 12 - (1 - k) * 6 + Math.abs(Math.sin(rt * 7)) * -2), bx = Math.round(gx);
+      ctx.fillStyle = G.PAL[0]; ctx.fillRect(bx - 2, by - 1, 5, 11);
+      ctx.fillStyle = G.PAL[(((rt * 6) | 0) & 1) ? 10 : 15]; ctx.fillRect(bx - 1, by, 3, 6); ctx.fillRect(bx - 1, by + 7, 3, 2);
+      ctx.fillStyle = G.PAL[9]; ctx.fillRect(bx - 1, by, 1, 2);
+      G.glow(ctx, bx, by + 4, 9, 10, 0.35);
+    }
     if (bt.red) {   // 護盾泡泡
       const cx = gx, cy = ay + s.h / 2, rx = s.w / 2 + 4, ry = s.h / 2 + 3, hit = u.shieldHit && now() - u.shieldHit < 160;
       G.glow(ctx, cx, cy, Math.max(rx, ry), 12, hit ? 0.45 : 0.18, ry / Math.max(rx, ry));
@@ -514,5 +526,51 @@ G.VFX = {
     if (u.stun > 0 && !u.static) {   // 暈眩星星
       for (let i = 0; i < 3; i++) { const a = rt * 6 + i * 2.1, x = Math.round(gx + Math.cos(a) * 6), y = Math.round(ay - 3 + Math.sin(a) * 1.8); ctx.fillStyle = G.PAL[13]; ctx.fillRect(x - 1, y, 3, 1); ctx.fillRect(x, y - 1, 1, 3); ctx.fillStyle = G.PAL[9]; ctx.fillRect(x, y, 1, 1); }
     }
+  }
+};
+
+// ---------- v2.4 藥水使用特效（每種藥水一套光影＋音效）----------
+G.VFX.potion = function (W, h, it) {
+  const V = G.VFX, x = h.x, y = h.y, z = 10, k = it.k, A = G.Audio;
+  const col = { hp: 10, mp: 11, del: 13, crit: 14, arm: 12, pow: 17, spd: 9, cdr: 18, xp: 20, wave: 11, inv: 13, rev: 19 }[k] || 9;
+  const rise = (n, c1, c2, up0, up1, R = 10, sz = 1) => { for (let i = 0; i < n; i++) W.parts.add(x + G.rr(-R, R), y + G.rr(-R * 0.4, R * 0.4), G.rr(0, 12), G.rr(-6, 6), G.rr(-4, 4), G.rr(up0, up1), G.rr(0.5, 1), c1, c2, sz, -20, 1.5, 2); };
+  W.sfx('gulp'); V.later(W, 0.12, () => W.sfx('pot_' + k));
+  // 共通：瓶子破開的小光點＋腳下光圈
+  V.light(W, x, y, z, 22, col, 0.5, 0.55); G.FX.ring(W, x, y, 4, 24, 0.35, col, 1);
+  if (k === 'hp' || k === 'mp') {      // 回復：十字光點往上飄＋身體一閃＋數字
+    const c2 = k === 'hp' ? 15 : 16;
+    for (let i = 0; i < 14; i++) V.later(W, i * 0.04, () => { const a = Math.random() * 6.28; W.parts.add(x + Math.cos(a) * 9, y + Math.sin(a) * 4, G.rr(0, 6), 0, 0, G.rr(40, 70), 0.7, i % 3 ? col : 9, c2, i % 4 ? 1 : 2, -10, 1, 2); });
+    V.groundLight(W, x, y, 26, col, 0.8, 0.5); G.FX.popText(W, x, y, 30, '+' + it.v, col);
+    if (k === 'mp') for (let i = 0; i < 16; i++) { const a = i / 16 * 6.28, r = 26; W.parts.add(x + Math.cos(a) * r, y + Math.sin(a) * r * 0.6, 8, -Math.cos(a) * r * 2.6, -Math.sin(a) * r * 1.6, 20, 0.4, 11, 9, 1, 0, 0); }   // 魔力從四周吸進來
+  } else if (k === 'del') {            // 攻速：黃色快速往上的環＋速度線
+    for (let i = 0; i < 3; i++) V.later(W, i * 0.08, () => V.ringAir(W, x, y, 6 + i * 8, 6, 16, 0.3, 13));
+    rise(18, 13, 14, 80, 160, 8);
+  } else if (k === 'crit') {           // 爆擊：頭上一顆大星芒＋橘色火花爆開
+    V.spark(W, x, y, 30, 12, 14, 0.4); V.burst(W, x, y, 20, 22, 14, 13, 40, 110, 0.3, 0.6, 200, 3, 1, 20, 90);
+  } else if (k === 'arm') {            // 防禦：藍色護殼從外面收進身上
+    G.FX.ring(W, x, y, 34, 8, 0.4, 12, 2); V.later(W, 0.36, () => { V.ringAir(W, x, y, 10, 12, 20, 0.35, 12, 2); V.light(W, x, y, 10, 18, 12, 0.4, 0.7); });
+  } else if (k === 'pow') {            // 攻擊：紫色火焰往上竄＋一記低沉衝擊
+    V.groundLight(W, x, y, 24, 17, 0.7, 0.55); rise(26, 17, 10, 60, 130, 9, 1); W.shake(0.15);
+  } else if (k === 'spd') {            // 跑速：左右兩側白色風線
+    for (let i = 0; i < 14; i++) { const d = i % 2 ? 1 : -1; W.parts.add(x + d * G.rr(4, 10), y + G.rr(-5, 5), G.rr(2, 16), d * G.rr(90, 160), 0, 0, G.rr(0.25, 0.4), 9, 7, 1, 0, 2); }
+  } else if (k === 'cdr') {            // 冷卻：青色時鐘環，指針轉一圈
+    W.effects.push({ t: 0, dur: 0.9, layer: 1, draw(ctx, o) {
+      const p = this.t / this.dur, cx = Math.round(SX(x, o)), cy = Math.round(SY(y, 14, o)), r = 9 + Math.min(1, p * 5) * 3, a = -1.57 + p * 6.283 * 1.5;
+      ctx.globalAlpha = 1 - Math.max(0, p - 0.7) / 0.3; G.glow(ctx, cx, cy, r + 4, 18, 0.3);
+      G.pxEllipse(ctx, cx, cy, r, r, 18); for (let i = 0; i < 4; i++) { const b = i * 1.5708; ctx.fillStyle = G.PAL[9]; ctx.fillRect(Math.round(cx + Math.cos(b) * (r - 2)), Math.round(cy + Math.sin(b) * (r - 2)), 1, 1); }
+      ctx.fillStyle = G.PAL[9]; G.pxLine(ctx, cx, cy, cx + Math.cos(a) * (r - 3), cy + Math.sin(a) * (r - 3), 1); ctx.globalAlpha = 1;
+    } });
+  } else if (k === 'xp') {             // 經驗：黃綠光球從四周飛進身體
+    for (let i = 0; i < 10; i++) V.later(W, i * 0.05, () => { const a = Math.random() * 6.28, r = G.rr(30, 44); W.parts.add(x + Math.cos(a) * r, y + Math.sin(a) * r * 0.6, 14, -Math.cos(a) * r * 3, -Math.sin(a) * r * 1.8, 0, 0.33, 20, 9, 2, 0, 0); });
+    V.later(W, 0.4, () => { V.light(W, x, y, 12, 20, 20, 0.4, 0.7); G.FX.popText(W, x, y, 30, 'EXP', 20); });
+  } else if (k === 'wave') {           // 小兵：葉片旋起＋向外擴散的大波紋＋廣播
+    for (let i = 0; i < 3; i++) V.later(W, i * 0.15, () => G.FX.ring(W, x, y, 8, 60 + i * 20, 0.6, 11, 1));
+    for (let i = 0; i < 18; i++) { const a = i / 18 * 6.28; W.parts.add(x + Math.cos(a) * 6, y + Math.sin(a) * 4, 4, Math.cos(a) * 60, Math.sin(a) * 36, G.rr(60, 120), G.rr(0.6, 1), i % 2 ? 11 : 16, 20, 2, 120, 1.5, 2); }
+    W.say({ s: '我方出兵加速', ic: 'p_wave', col: 11, t: 2 });
+  } else if (k === 'inv') {            // 無敵：白閃＋金色光柱
+    W.flashScreen = Math.max(W.flashScreen || 0, 0.08); V.light(W, x, y, 12, 30, 13, 0.6, 0.8); V.ringAir(W, x, y, 12, 4, 26, 0.4, 13, 2);
+    G.FX.levelUp && W.effects.push({ t: 0, dur: 0.5, layer: 1, draw(ctx, o) { const p = this.t / this.dur, cx = Math.round(SX(x, o)), cy = Math.round(SY(y, 0, o)), w = Math.round(6 * (1 - p)) + 1; ctx.globalAlpha = 1 - p; ctx.fillStyle = G.PAL[9]; ctx.fillRect(cx - (w >> 1), cy - 80, w, 80); ctx.fillStyle = G.PAL[13]; ctx.fillRect(cx - (w >> 1) - 1, cy - 80, 1, 80); ctx.fillRect(cx + w - (w >> 1), cy - 80, 1, 80); ctx.globalAlpha = 1; } });
+  } else if (k === 'rev') {            // 復活：天上光柱＋粉色光環＋葉片
+    G.FX.respawn(W, h); G.FX.ring(W, x, y, 6, 50, 0.6, 19, 2); V.light(W, x, y, 12, 34, 19, 0.8, 0.8); W.flashScreen = Math.max(W.flashScreen || 0, 0.12); W.shake(0.3);
   }
 };

@@ -186,7 +186,7 @@ G.World = class {
   updateWaves(dt) {
     if (this.over) return;
     for (let s = 0; s < 2; s++) {
-      this.waveT[s] -= dt;
+      this.waveT[s] -= dt * (s === 0 && this.hero ? 1 + (this.hero.iWave || 0) / 100 : 1);   // 小兵藥水：我方出兵加速
       if (this.waveT[s] <= 0) { this.waveT[s] = G.TUNE.waveInterval * (this.attract ? 0.5 : 1); this.spawnWave(s); }
     }
     for (const q of this.spawnQ) q.t -= dt;
@@ -344,6 +344,10 @@ G.World = class {
   heroAI(h, dt) {
     const T = G.TUNE;
     let nd = 1e9; for (const t of this.units) if (t.alive && t.side !== h.side) { const d = Math.hypot(t.x - h.x, t.y - h.y) - t.r - h.r * 0.4; if (d < nd) nd = d; }
+    if (h.inv > 0) h.inv = Math.max(0, h.inv - dt);
+    if (h.hot) { const d = Math.min(h.hot.left, h.hot.rate * dt), k = h.hot.k; if (k === 'hp') h.hp = Math.min(h.st.hp, h.hp + d); else h.mp = Math.min(h.st.mp, h.mp + d); h.hot.left -= d; if (h.hot.left <= 0.01 || (k === 'hp' ? h.hp >= h.st.hp : h.mp >= h.st.mp)) h.hot = null; }
+    { let lk = false; for (const t of this.units) if (t.alive && t.kind === 'tower' && t.side !== h.side && t.target === h) { lk = true; break; }
+      if (lk && !h.tLock && !this.attract && this.time - (h.lockSnd || -9) > 1.5) { h.lockSnd = this.time; h.lockT = 0; this.sfx('alarm'); } if (lk) h.lockT = (h.lockT || 0) + dt; h.tLock = lk; }   // 被敵塔鎖定：頭上紅色驚嘆號＋警示音
     h.nearD = nd; h.rangeA = G.clamp((h.rangeA || 0) + (nd < h.st.range + 110 ? 4 : -3) * dt, 0, 1);
     const cdr = 1 / (1 - Math.min(60, h.iCdr || 0) / 100);
     for (const s of h.skills) { if (s.cd > 0) { s.cd -= dt * cdr; if (s.cd <= 0) { s.ready = 0.4; this.sfx('ready'); } } s.ready = Math.max(0, s.ready - dt); }
@@ -505,6 +509,19 @@ G.World = class {
     if (t) { h.pending = { i, t }; h.cmd = null; return 'queued'; }
     return 'none';
   }
+  // v2.4 指定施放（拖曳瞄準放開／按住快捷鍵放開）：A = { x, y, t }
+  castAim(i, A) {
+    const h = this.hero; if (!h || !h.alive) return 'none';
+    const s = h.skills[i]; if (!s) return 'none';
+    if (!s.lv) return 'lock'; if (h.chg) return 'busy'; if (s.cd > 0) return 'cd';
+    if (h.mp < Math.round(s.mp * (1 - (h.mpDisc || 0) / 100))) return 'mp';
+    this.cancelTeleport(true); h.pending = null;
+    const k = s.shape.k;
+    if (k === 'self' || k === 'buff') { this.castSkill(h, i, null); return 'ok'; }
+    if (k === 'area' || k === 'line') { this.castSkill(h, i, { x: A.x, y: A.y, r: 0, alive: true, vis: { fly: 0 }, static: false, pt: true }); return 'ok'; }
+    if (A.t && this.valid(h, A.t) && this.dist(h, A.t) <= s.range + 10) { this.castSkill(h, i, A.t); return 'ok'; }
+    return 'none';
+  }
   castSkill(h, i, t) {
     const s = h.skills[i], cost = Math.round(s.mp * (1 - (h.mpDisc || 0) / 100));
     if (h.mp < cost || s.cd > 0) { G.Audio.play('deny'); return false; }
@@ -515,6 +532,7 @@ G.World = class {
   }
   say(n) { if (this.attract) return; n.age = 0; n.t = Math.max(2.2, n.t || 2.4); this.notices.push(n); }
   kill(t, src) {
+    if (t === this.hero && this.tryRevive(t)) return;
     t.alive = false; t.hp = 0;
     G.FX.shatter(this, t);
     if (t.static) {
@@ -539,6 +557,7 @@ G.World = class {
     if (t === h) { h.dead = G.TUNE.heroRespawnBase + G.TUNE.heroRespawnPer * h.level; h.cmd = null; h.pending = null; this.shake(0.5); this.clearFollow(); }
     if (t.kind === 'holy' && !this.over) {
       this.over = { win: t.side === 1, t: 0 }; this.timeScale = 0.3; this.shake(1);
+      this.overSt = Object.assign({}, this.stats, { lv: this.hero ? this.hero.level : 1, keys: this.keysGot || 0 });   // v2.4 結算數值在這一刻鎖住（背景戰鬥還會繼續）
       for (let k = 0; k < 6; k++) setTimeout(() => this.impactFx(t.x + G.rr(-30, 30), t.y + G.rr(-20, 20)), k * 120);
       if (!this.attract) { G.Audio.play(this.over.win ? 'win' : 'lose'); G.Audio.setMode('menu'); }
       if (!this.attract && G.Ach) G.Ach.final(this);
@@ -546,7 +565,7 @@ G.World = class {
   }
   impactFx(x, y) { G.FX.ring(this, x, y, 6, 70, 0.6, 9, 2); G.FX.hit(this, x, y, 10, true); for (let k = 0; k < 30; k++) { const a = Math.random() * 6.28, s = G.rr(60, 200); this.parts.add(x, y, 10, Math.cos(a) * s, Math.sin(a) * s * 0.7, G.rr(80, 260), G.rr(0.5, 1), 9, 4, 2, 500, 1.5); } }
   gainExp(h, n) {
-    h.exp += n;
+    h.exp += Math.round(n * (1 + (h.iXp || 0) / 100));   // 經驗藥水
     const need = () => G.ORIG.units[h.name].exp * h.level;
     while (h.exp >= need()) {
       h.exp -= need(); h.level++; h.sp = (h.sp || 0) + 1; h.calc();

@@ -114,6 +114,29 @@ G.Audio = (() => {
     swoosh: t => { noise(t, 0.32, 0.12, 'bandpass', 600, 3200, 1.2); noise(t + 0.05, 0.25, 0.05, 'highpass', 2500, 6000, 0.8); },
     charge: t => { osc('sine', 330, 990, t, 0.26, 0.07, sfxBus, { atk: 0.2 }); noise(t, 0.26, 0.05, 'bandpass', 1500, 5000, 2); },
     chargeBig: t => { osc('sine', 220, 880, t, 0.48, 0.09, sfxBus, { atk: 0.4 }); osc('triangle', 110, 220, t, 0.48, 0.08, sfxBus, { atk: 0.35 }); noise(t, 0.48, 0.07, 'bandpass', 800, 6000, 1.5); },
+    // v2.4 藥水：喝下（咕嚕）＋各自的效果音
+    gulp: t => { osc('sine', 300, 520, t, 0.07, 0.12); osc('sine', 360, 640, t + 0.08, 0.08, 0.1); noise(t, 0.05, 0.05, 'bandpass', 900, 1400, 3); },
+    pot_hp: t => { [523, 659, 784].forEach((f, i) => osc('sine', f, f * 1.01, t + i * 0.06, 0.35, 0.08, sfxBus, { atk: 0.02 })); osc('triangle', 262, 262, t, 0.4, 0.08); },
+    pot_mp: t => { [1047, 1319, 1568, 2093].forEach((f, i) => osc('sine', f, f, t + i * 0.05, 0.25, 0.06, sfxBus, { atk: 0.01 })); noise(t, 0.3, 0.04, 'highpass', 5000, 8000, 1); },
+    pot_del: t => { [880, 1109, 1319, 1760].forEach((f, i) => osc('square', f, f, t + i * 0.035, 0.06, 0.04, sfxBus, { lp: 5000 })); },
+    pot_crit: t => { osc('sine', 2637, 2637, t, 0.35, 0.08); osc('sine', 3951, 3951, t + 0.02, 0.25, 0.04); noise(t, 0.08, 0.15, 'highpass', 6000, 9000, 1); },
+    pot_arm: t => { osc('triangle', 196, 196, t, 0.5, 0.12, sfxBus, { atk: 0.05 }); osc('sine', 784, 523, t + 0.3, 0.3, 0.07); noise(t + 0.3, 0.06, 0.12, 'bandpass', 2500, 1500, 3); },
+    pot_pow: t => { osc('sine', 110, 55, t, 0.3, 0.3); noise(t, 0.4, 0.15, 'bandpass', 400, 2000, 1); osc('sawtooth', 110, 220, t + 0.05, 0.35, 0.04, sfxBus, { lp: 900, atk: 0.2 }); },
+    pot_spd: t => { noise(t, 0.3, 0.14, 'bandpass', 800, 4000, 1.2); osc('sine', 600, 1400, t, 0.2, 0.04); },
+    pot_cdr: t => { for (let i = 0; i < 4; i++) osc('square', i % 2 ? 1800 : 2400, i % 2 ? 1800 : 2400, t + i * 0.12, 0.02, 0.04, sfxBus, { lp: 6000 }); osc('sine', 1568, 1568, t + 0.5, 0.4, 0.07); osc('sine', 2093, 2093, t + 0.55, 0.4, 0.05); },
+    pot_xp: t => { [784, 880, 1047, 1175, 1319, 1568].forEach((f, i) => osc('triangle', f, f, t + i * 0.05, 0.14, 0.08)); },
+    pot_wave: t => { osc('sawtooth', 196, 196, t, 0.35, 0.05, sfxBus, { lp: 1200, atk: 0.05 }); osc('sawtooth', 294, 294, t + 0.3, 0.5, 0.05, sfxBus, { lp: 1400, atk: 0.05 }); osc('triangle', 98, 98, t, 0.8, 0.08); },
+    pot_inv: t => { [1047, 1319, 1568, 2093].forEach(f => osc('sine', f, f, t, 1.0, 0.05, sfxBus, { atk: 0.005 })); osc('sine', 262, 262, t, 0.6, 0.1); noise(t, 0.6, 0.05, 'highpass', 6000, 9000, 1); },
+    pot_rev: t => { [523, 659, 784, 1047, 1319].forEach((f, i) => osc('sine', f, f, t + i * 0.08, 1.0, 0.06, sfxBus, { atk: 0.01 })); osc('triangle', 131, 262, t, 0.8, 0.12, sfxBus, { atk: 0.2 }); noise(t, 1.0, 0.04, 'highpass', 5000, 9000, 1); },
+    // v2.4 被敵塔鎖定的警示音（兩聲急促的高音）
+    alarm: t => { for (let i = 0; i < 2; i++) { osc('square', 1320, 1320, t + i * 0.13, 0.08, 0.07, sfxBus, { lp: 3000 }); osc('square', 990, 990, t + i * 0.13 + 0.04, 0.05, 0.05, sfxBus, { lp: 3000 }); } },
+    // v2.4 結算：數字跳動（越跳越高）、一組完成、評價蓋章、勝利／失敗的開場和弦
+    cnt: t => { const f = 1400 + Math.random() * 200; osc('square', f, f, t, 0.015, 0.025, sfxBus, { lp: 5000 }); },
+    cntDone: t => { osc('sine', 1568, 1568, t, 0.18, 0.08); osc('sine', 2349, 2349, t + 0.03, 0.2, 0.05); noise(t, 0.04, 0.1, 'bandpass', 3000, 2000, 2); },
+    rowIn: t => { noise(t, 0.08, 0.06, 'bandpass', 1500, 4000, 1.2); osc('triangle', 660, 880, t, 0.06, 0.05); },
+    stamp: t => { osc('sine', 120, 40, t, 0.4, 0.5); noise(t, 0.3, 0.4, 'lowpass', 1500, 100); noise(t, 0.05, 0.25, 'bandpass', 3000, 1500, 1); [1047, 1319, 1568, 2093].forEach((f, i) => osc('pulse', f, f, t + 0.12 + i * 0.06, 0.3, 0.07, sfxBus, { lp: 5000 })); },
+    endWin: t => { [392, 523, 659, 784].forEach((f, i) => osc('pulse', f, f, t + i * 0.09, 0.3, 0.09, sfxBus, { lp: 4000 })); [523, 659, 784, 1047].forEach(f => osc('triangle', f, f, t + 0.4, 1.4, 0.07, sfxBus, { atk: 0.02 })); osc('triangle', 131, 131, t + 0.4, 1.4, 0.12); noise(t + 0.4, 1.0, 0.05, 'highpass', 6000, 9000, 1); },
+    endLose: t => { [330, 311, 294].forEach((f, i) => osc('triangle', f, f * 0.99, t + i * 0.3, 0.5, 0.12)); [220, 262, 330].forEach(f => osc('triangle', f, f, t + 0.9, 1.4, 0.06, sfxBus, { atk: 0.05 })); osc('sine', 110, 82, t + 0.9, 1.4, 0.12); },
     rage: t => { osc('sawtooth', 110, 70, t, 0.5, 0.1, sfxBus, { lp: 700 }); noise(t, 0.4, 0.2, 'lowpass', 800, 200); }
   };
 

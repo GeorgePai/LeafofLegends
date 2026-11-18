@@ -134,6 +134,7 @@ G.Combat = {
   // ---------- 傷害與狀態 ----------
   damage(src, t, power, o = {}) {
     if (!t.alive) return;
+    if (t.inv > 0) { if (Math.random() < 0.35) G.FX.ring(this, t.x, t.y, t.r + 6, t.r + 9, 0.2, 13, 1); return; }   // 無敵藥水
     if (t.protectors && this.isProtected && this.isProtected(t)) { if (Math.random() < 0.3) G.FX.ring(this, t.x, t.y, t.r + 8, t.r + 10, 0.25, 12, 1); return; }
     const h = this.hero;
     if (h && h.alive && h.aura && src.side === h.side && src !== h && G.d2(src.x, src.y, h.x, h.y) < 160 * 160) power += h.aura.pow || 0;
@@ -270,9 +271,21 @@ G.Combat = {
     return true;
   }
 };
+// 技能的作用範圍形狀（v2.4：瞄準、施法預告共用）
+// k：self＝以自己為中心（r 半徑）／area＝指定地點範圍（cast 施放距離、r 半徑）／line＝直線穿透（len 長度、w 寬）／unit＝指定目標／buff＝自身增益
+G.skillShape = sd => {
+  const w = G.WEAPONS_BY_ID[sd.weapon_id] || {}, v2 = sd.value_2 || 0, cast = sd.range || 180;
+  if (sd.type === 'buff') return { k: 'buff', r: sd.attribute === 'weapon' ? cast : 0, cast: 0 };
+  if (w.type === 'effect' && w.attack_type === 'round') return { k: 'self', r: cast, cast: 0 };
+  if (w.type === '2d_drop') return { k: 'area', r: v2 || 60, cast };
+  if (w.type === 'effect' && w.attack_type === 'splash') return { k: 'area', r: v2 || 50, cast };
+  if ((w.type === '2d_bullet' || w.type === '2d_bullet_effect' || w.type === 'effect_bullet') && w.attack_type === 'splash') return { k: 'area', r: v2 || 40, cast };
+  if (w.attack_type === 'piercing') return { k: 'line', len: cast + 80, w: 18, cast };
+  return { k: 'unit', cast, r: 0 };
+};
 // 英雄技能欄位
 G.skillSlot = id => {
   const sd = G.ORIG.skills[id], w = G.WEAPONS_BY_ID[sd.weapon_id] || {};
   const needT = sd.type !== 'buff' && !(w.type === 'effect' && w.attack_type === 'round');
-  return { id, s: sd, icon: G.skillIcon(sd), cd: 0, cdMax: sd.delay, mp: sd.mp, range: sd.range || 180, ready: 0, needT, lv: 0 };
+  return { id, s: sd, icon: G.skillIcon(sd), cd: 0, cdMax: sd.delay, mp: sd.mp, range: sd.range || 180, ready: 0, needT, lv: 0, shape: G.skillShape(sd) };
 };

@@ -58,3 +58,7 @@ G.RAGE = { pow: [2, 2.25, 2.5], arm: [0.5, 0.65, 0.8], spd: [50, 65, 80] };
 G.rageOf = (lv) => { const i = G.clamp((lv || 1) - 1, 0, 2); return { pow: G.RAGE.pow[i], arm: G.RAGE.arm[i], spd: G.RAGE.spd[i] }; };
 for (const id in G.BAL.skills) Object.assign(G.ORIG.skills[id], G.BAL.skills[id]);
 for (const n in G.BAL.units) Object.assign(G.ORIG.units[n], G.BAL.units[n]);
+// v2.4 塔射程：原本 165，火炮力夫（170）站在塔外就能無損消耗 → 外／中／內塔 190、主塔 210（雙方相同）
+// 規則：任何英雄的普攻距離都必須小於塔的射程（最長的火炮力夫 170，塔打得到 206，多 16 的緩衝）
+G.BAL.towers = { player_tower: 190, enemy_tower: 190, enemy_tower2: 190, enemy_tower3: 190 };
+for (const n in G.BAL.towers) G.ORIG.towers[n].range = G.BAL.towers[n];

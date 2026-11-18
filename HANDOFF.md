@@ -2,7 +2,7 @@
 
 > 新 session 只要讀這份。**做任何新設計前，先對照第 8 節「設計守則」**。
 > 各版完成內容在 `CHANGELOG.md`、暫定數值在 `VALUES.md`，需要時用 grep 找到段落再讀，不要整份讀。
-> 最後更新：2026-11-18，版本 **v2.3**
+> 最後更新：2026-11-18，版本 **v2.4**
 
 ## 1. 專案是什麼
 - Pai 的 HTML5 瀏覽器遊戲，仿 Gamevil《Plants War》（三路推塔＋英雄操作＋小兵兵線）
@@ -68,20 +68,23 @@
 - v2.0～v2.1.3：中文字對齊像素格、mp3 BGM（−18 LUFS）、「點一下開始」、iPhone 加入主畫面提示、備份提醒、首頁曲預載修正（**v2.1.3 待 Pai 在 iPhone 確認**）
 - v2.2：技能平衡層 `02c_balance.js`、升級廣播、敵方成長加強
 - v2.3：立體按鈕／數值條、音量設定、首頁轉場、寶箱與開箱演出、免費賭徒寶箱、紅色敵人、地面層次、攻擊動作、技能前搖、特效延長
+- v2.4：敵塔範圍＋鎖定警示、道路 ×1.5、結算放慢＋鎖值＋音效、新藥水 5 種＋全部藥水特效、DEV 密碼、技能範圍顯示＋指定施放（拖曳／取消）、LOGO 改版、塔射程 190/210
 
 ## 6. 待 Pai 決定
 - 畫質再提升：A＝高解析文字（像素角色＋平滑字體），B＝提高像素解析度（480×270，整套美術重畫）。尚未選擇
 - 圖鑑動畫重畫：Pai 說「有些動畫可以描繪得更好」，等他指定哪幾隻
-- 暫定數值全部在 `VALUES.md`（最新：v2.3 段、v2.2 技能平衡段）
+- 暫定數值全部在 `VALUES.md`（最新：6g v2.4 段）
+- DEV 密碼只有 Pai 知道（程式內只有雜湊）；要改密碼請 Pai 提供新密碼，重算 `DEV_H`
 
 ## 7. 工作規則
 **每次更新流程**：改 src → build → `bash /home/claude/tools/tc_all.sh`（背景跑，0 筆才可交付）→ 只截有改到的畫面，用 `sheet.py` 拼成一張看 → 發佈 artifact（先 `get_artifact` 取 version，再 `publish_files`，index.html＝dist/index.html）→ 推 GitHub main（遊戲）＋ source（原始碼）→ 備份 Mac（`LeafofLegends.html`、`versions/LeafofLegends_v版本.zip`、有改到的 `source/` 檔案）→ 升版號
-- 版本號在 `src/11_menus.js`（`'V2.3'`）
+- 版本號在 `src/11_menus.js`（`'V2.4'`）
 - 推 main：clone 到 `/home/claude/leafoflegends` → 複製 `dist/index.html` 成根目錄 `index.html`（保留 `.nojekyll`；音樂有改才更新 `audio/`）→ commit → `git -c push.negotiate=true push origin HEAD:main`，約 1～2 分鐘生效。備援：Pai 在 Mac Terminal 執行 `bash ~/Desktop/Claude/LeafofLegends/deploy_github.sh`
 - 推 source：在 `/home/claude/leafwar` commit（dist/ 已在 .gitignore）→ `git -c push.negotiate=true push origin HEAD:source`
 - 長時間指令（文字檢查等）一律用 Bash 的 `run_in_background`，不要用 nohup／`&` 丟著（回合結束會被砍掉），也不要用長 sleep 輪詢；文字檢查（4 支 Chrome 平行）跑的時候不要同時截圖，會逾時
 - 測試：Playwright＋`/usr/bin/google-chrome`；裝置 n（360 寬手機）、m（390 手機）、L（手機橫屏）、d（1280×720）、w/u/t（大視窗／超寬／偏方）。可直接 `G.UI.screen='team'/'book'/'guide'`、`G.UI.start()` 進各畫面；`localStorage.clear()` 模擬新玩家；新增畫面時把場景加進 `tc_scenes.py`
-- 測試輔助：`G.Menus._guideGo(分類, 頁)`、`G.Menus.menuWheel.go(i)`、`G.Menus._mt(秒)`、`G.Intro.t=秒數`、`G.Dom.el('name'|'code'|'load')`、`G.SaveUI.forceIos=true`
+- 快速驗證：`python3 /home/claude/tools/probe.py "JS"`（在遊戲裡執行並印出結果，比截圖省很多）
+- 測試輔助：`G.Menus.devAsk(true)`、`G.UI.aim={...}`、`G.Menus._guideGo(分類, 頁)`、`G.Menus.menuWheel.go(i)`、`G.Menus._mt(秒)`、`G.Intro.t=秒數`、`G.Dom.el('name'|'code'|'load')`、`G.SaveUI.forceIos=true`
 - 技能特效總覽：`python3 /home/claude/tools/vfxsheet.py "技能id,...|b=普攻" "時間點,..." out.png [角色名]`
 - 角色介紹與技能說明在 `02b_text.js` 的 `G.TXT.uinfo / sinfo`（JSON，用 Python 讀寫最安全）
 - 修改大檔用精準字串替換；**不要**用空字串當替換目標（曾把檔案炸成 18 萬行）

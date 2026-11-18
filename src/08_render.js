@@ -70,6 +70,13 @@ G.Render = (() => {
     c.y = G.clamp(c.y, Math.min(hh - py, W.M.wh / 2), Math.max(W.M.wh - hh + py, W.M.wh / 2));
     W.cam = c;
   };
+  // 直線範圍（穿透技）：從 (x0,y0) 往 (x1,y1) 方向、長 len、寬 w 的長方形
+  G.drawLineZone = (b, ox, oy, x0, y0, x1, y1, len, w, col, a, rt) => {
+    const dx = x1 - x0, dy = y1 - y0, l = Math.hypot(dx, dy) || 1, ux = dx / l, uy = dy / l, nx = -uy * w, ny = ux * w;
+    const P2 = [[x0 + nx, y0 + ny], [x0 + ux * len + nx, y0 + uy * len + ny], [x0 + ux * len - nx, y0 + uy * len - ny], [x0 - nx, y0 - ny]].map(([x, y]) => [x * G.AX - ox, y * G.AY - oy]);
+    b.globalAlpha = a; b.fillStyle = G.PAL[col]; b.beginPath(); P2.forEach(([x, y], i) => i ? b.lineTo(x, y) : b.moveTo(x, y)); b.closePath(); b.fill(); b.globalAlpha = 1;
+    b.fillStyle = G.PAL[col]; for (let i = 0; i < 4; i++) G.pxLine(b, P2[i][0], P2[i][1], P2[(i + 1) % 4][0], P2[(i + 1) % 4][1], 1);
+  };
   R.screenToWorld = (sx, sy) => {
     const ax = R.ox + R.fx + sx / R.scale, ay = R.oy + R.fy + sy / R.scale;
     return [ax / G.AX, ay / G.AY];
@@ -132,9 +139,42 @@ G.Render = (() => {
       const drop = t < 0.18 ? (1 - t / 0.18) * 26 : 0, bounce = t < 0.18 ? 0 : Math.abs(Math.sin((t - 0.18) * 7)) * 3;
       mk.ax = Math.round(gx); mk.ay = Math.round(gy - 8 - drop - bounce); mk.fade = fade;
     }
-    // 英雄攻擊射程（接近敵人時自動淡入）
-    const h0 = W.hero;
-    if (h0 && h0.alive && h0.rangeA > 0.02 && !W.attract) {
+    // v2.4 敵塔攻擊範圍：英雄靠近時淡入（淡粉紅填滿）；被鎖定時變紅、呼吸
+    const h0 = W.hero, P0 = G.PAL;
+    const zone = (x, y, r, col, fa, oa, dash) => {           // 地面範圍：半透明填滿＋外框（世界座標、半徑）
+      const gx = x * G.AX - ox, gy = y * G.AY - oy;
+      if (fa > 0) { b.globalAlpha = fa; b.fillStyle = P0[col]; b.beginPath(); b.ellipse(Math.round(gx), Math.round(gy), r * G.AX, r * G.AY, 0, 0, 6.2832); b.fill(); b.globalAlpha = 1; }
+      if (oa > 0) { b.globalAlpha = oa; G.pxEllipse(b, gx, gy, r * G.AX, r * G.AY, col, dash || 0, rt * 6); b.globalAlpha = 1; }
+    };
+    if (h0 && h0.alive && !W.attract) for (const t of W.units) {
+      if (!t.alive || t.kind !== 'tower' || t.side === h0.side) continue;
+      const reach = t.st.range + t.r * 0.4 + h0.r, d = Math.hypot(h0.x - t.x, h0.y - t.y), lk = t.target === h0;
+      t.zoneA = G.clamp((t.zoneA || 0) + (d < reach + 50 ? 3 : -3) * R.dtF, 0, 1);
+      if (t.zoneA > 0.01) { const pu = lk ? 0.5 + 0.5 * Math.sin(rt * 9) : 0; zone(t.x, t.y, reach, lk ? 10 : 19, t.zoneA * (lk ? 0.13 + 0.07 * pu : 0.12), t.zoneA * (lk ? 0.9 : 0.55), lk ? 0 : 4); }
+    }
+    // 技能預告：蓄力中顯示真正的作用範圍（我方黃、敵方紅）
+    for (const u of W.units) {
+      const c0 = u.chg; if (!c0 || !u.alive || !W.seen(0, u)) continue;
+      const sp = G.skillShape(c0.sd), col = u.side === 0 ? 13 : 10, k = Math.min(1, c0.T / c0.dur), a = 0.1 + 0.12 * k;
+      if (sp.k === 'self' || (sp.k === 'buff' && sp.r)) zone(u.x, u.y, sp.r, col, a, 0.9);
+      else if (sp.k === 'area' && c0.t) { zone(c0.t.x, c0.t.y, sp.r, col, a, 0.9); zone(c0.t.x, c0.t.y, sp.r * k, col, 0.12, 0); }
+      else if (sp.k === 'line' && c0.t) G.drawLineZone(b, ox, oy, u.x, u.y, c0.t.x, c0.t.y, sp.len, sp.w, col, a, rt);
+      else if (sp.k === 'unit' && c0.t && c0.t.alive !== false) zone(c0.t.x, c0.t.y, (c0.t.r || 8) + 6, col, 0, 0.9, 3);
+    }
+    // 技能瞄準（拖曳技能鈕／按住快捷鍵）：施放距離＋落點範圍
+    const AM = G.UI.aim;
+    if (h0 && h0.alive && AM && (AM.on || (AM.pre && !(G.UI.hold && G.UI.hold.fired))) && !W.attract) {   // 按著技能鈕（還沒拖）也先顯示範圍
+      const sp = AM.s.shape, col = AM.cancel ? 10 : 13;
+      if (sp.cast) zone(h0.x, h0.y, sp.cast, col, 0.06, 0.8, 4);
+      if (sp.k === 'self' || sp.k === 'buff') zone(h0.x, h0.y, sp.r, col, 0.16, 1);
+      else if (!AM.on) { }
+      else if (sp.k === 'area') zone(AM.x, AM.y, sp.r, col, 0.22, 1);
+      else if (sp.k === 'line') G.drawLineZone(b, ox, oy, h0.x, h0.y, AM.x, AM.y, sp.len, sp.w, col, 0.2, rt);
+      else { const t = AM.t; if (t) { zone(t.x, t.y, t.r + 8, col, 0.2, 1); b.fillStyle = P0[col]; b.globalAlpha = 0.6; G.pxLine(b, h0.x * G.AX - ox, h0.y * G.AY - oy, t.x * G.AX - ox, t.y * G.AY - oy, 1); b.globalAlpha = 1; } else zone(AM.x, AM.y, 6, col, 0, 0.8, 2); }
+    }
+    // 英雄攻擊射程（接近敵人時自動淡入；按住或瞄準技能、蓄力時隱藏，避免和技能範圍混淆）
+    const skFocus = (AM && (AM.on || AM.pre)) || (h0 && h0.chg);
+    if (h0 && h0.alive && h0.rangeA > 0.02 && !W.attract && !skFocus) {
       const x = G.lerp(h0.px, h0.x, alpha), y = G.lerp(h0.py, h0.y, alpha), rr = h0.st.range + h0.r * 0.4 + 8, a = h0.rangeA;
       const hot = h0.nearD <= h0.st.range;                 // 有敵人在射程內
       const gx = x * G.AX - ox, gy = y * G.AY - oy;

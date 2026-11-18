@@ -4,6 +4,7 @@ up=lambda i:f"G.UI.btns.find(b=>b.id==='{i}')&&G.UI.btns.find(b=>b.id==='{i}').u
 S=[]
 S.append(['menu',F+"G.UI.goTitle(); G.Menus.resetIntro&&G.Menus.resetIntro();",2500])
 S.append(['settings',"G.Menus._set(true)",300]); S.append(['settings-x',"G.Menus._set(false)",100])
+S.append(['devpad',"G.Menus.devAsk(true)",300]); S.append(['devpad-x',"G.Menus.devAsk(false)",100])   # v2.4 開發者密碼
 S.append(['reset',up('rst'),300]); S.append(['reset-close',up('rsNo'),200])
 # v1.7：開場動畫、首頁滾輪、問候、成就、存檔
 S.append(['tap',"G.UI.screen='tap';G.Intro.tapT=2",150])
@@ -79,9 +80,14 @@ S.append(['charge',"G.UI.hold=null; G.UI.screen='battle'; G.newWorld({hero:0}); 
 for hi in range(10):
   S.append([f'skup-h{hi}',f"G.UI.hold=null; G.UI.screen='battle'; G.newWorld({{hero:{hi}}}); var W=G.W,h=W.hero; h.level=12; var A=[...h.skills,...h.pskills]; A.forEach(s=>s.lv=1); h.sp=9; W.notices=[]; A.forEach(s=>W.levelSkill(s)); W.notices.forEach(n=>n.age=1);",400])
 S.append(['end',"Object.assign(G.W.stats,{kills:134,deaths:0,assists:112,towers:16,camps:17,gold:123456,dmg:1234567,taken:234567,bosses:13,time:3812});G.W.keysGot=13;G.Ach.recent=['games1','win1','speed','tame','comeback','gamble5'];G.W.over={win:true,t:3}",3200])
+S.append(['end-full',"G.UI.endT=9",400])
 S.append(['end-lose',"G.UI.start();G.Ach.recent=[];G.W.over={win:false,t:3}",3200])
+S.append(['end-lose-full',"G.UI.endT=9",400])
+# v2.4 技能瞄準＋取消區、被塔鎖定
+S.append(['aim',"G.UI.start();var h=G.W.hero;h.skills.forEach(s=>s.lv=1);h.mp=999;G.UI.aim={i:2,s:h.skills[2],on:true,pre:false,bx:G.Render.uw-20,by:G.Render.uh-20,dx:-40,dy:-24,ux:G.Render.uw-60,uy:G.Render.uh-44};",400])
+S.append(['aim-cancel',"var A=G.UI.aim,b=G.UI.cancelBtn;if(A&&b){A.ux=b.x;A.uy=b.y;G.UI.aimUpdate();}",200]); S.append(['aim-x',"G.UI.aim=null",100])
 S.append(['guide',"G.UI.screen='guide'",300])
-for k in range(66):
+for k in range(62):
   S.append([f'guide{k}',"G.Menus.guideTurn(1)",120])
   S.append([f'guide{k}b',"G.Menus._gt(1.9)",60]); S.append([f'guide{k}c',"G.Menus._gt(3.0)",60])
 json.dump(S,open('/tmp/tc.json','w'))

@@ -23,7 +23,13 @@ G.SHOP = [
   { id: 'crit', n: '爆擊藥水', e: '+爆擊', ic: 'p_crit', cost: 150, k: 'crit', v: 15, t: 60, d: '爆擊率 +15%，60 秒' },
   { id: 'arm', n: '防禦藥水', e: '+防禦', ic: 'p_arm', cost: 150, k: 'arm', v: 6, t: 60, d: '防禦 +6，60 秒' },
   { id: 'pow', n: '攻擊藥水', e: '+攻擊', ic: 'p_pow', cost: 180, k: 'pow', v: 25, t: 60, d: '攻擊力 +25%，60 秒' },
-  { id: 'move', n: '跑速藥水', e: '+跑速', ic: 'p_move', cost: 100, k: 'spd', v: 25, t: 60, d: '跑速 +25%，60 秒' }
+  { id: 'move', n: '跑速藥水', e: '+跑速', ic: 'p_move', cost: 100, k: 'spd', v: 25, t: 60, d: '跑速 +25%，60 秒' },
+  // v2.4 新藥水（暫定數值）
+  { id: 'cdr', n: '冷卻藥水', e: '−冷卻', ic: 'p_cdr', cost: 160, k: 'cdr', v: 20, t: 60, d: '技能冷卻 −20%，60 秒' },
+  { id: 'xp', n: '經驗藥水', e: '+經驗', ic: 'p_xp', cost: 120, k: 'xp', v: 50, t: 60, d: '獲得經驗 +50%，60 秒' },
+  { id: 'wave', n: '小兵藥水', e: '+出兵', ic: 'p_wave', cost: 200, k: 'wave', v: 50, t: 60, d: '我方出兵速度 +50%，60 秒' },
+  { id: 'inv', n: '無敵藥水', e: '無敵', ic: 'p_inv', cost: 280, k: 'inv', v: 0, t: 2.5, d: '無敵 2.5 秒：不受傷害與控制' },
+  { id: 'rev', n: '復活藥水', e: '復活', ic: 'p_rev', cost: 350, k: 'rev', v: 50, t: 0, d: '陣亡時自動使用，原地復活並回復 50% HP' }
 ];
 G.SHOP_BY = Object.fromEntries(G.SHOP.map(s => [s.id, s]));
 G.TUNE.gold = { start: 150, perSec: 2, last: 16, near: 5, boss: 120, tower: 150, camp: 60, wild: 250 };
@@ -48,7 +54,7 @@ G.HUNTER_INFO = '・開場 90 秒出動，倒下 75 秒後再來\n・清野怪�
 // ---------- 鑰匙掉落（%：英雄親手擊倒；友軍擊倒減半）----------
 G.KEY_RATE = { creep: 2, camp: 8, boss: 15, hunter: 25, towerOut: 30, wboss: 35, towerMid: 40, towerIn: 50, towerMain: 60, holy: 100 };
 // 主塔數值（原著要塞太強，改成合理值；雙方共用）
-Object.assign(G.ORIG.towers.enemy_tower4, { hp: 1800, power: 55, armor: 8, range: 190, delay: 1500 });
+Object.assign(G.ORIG.towers.enemy_tower4, { hp: 1800, power: 55, armor: 8, range: 210, delay: 1500 });   // v2.4 射程 190 → 210
 G.keyCat = u => u.kind === 'holy' ? 'holy' : u.static ? ['towerOut', 'towerMid', 'towerIn'][u.tier] || 'towerMain' : u.wild ? (u.wild.kind === 'wboss' ? 'wboss' : 'camp') : u.kind === 'jungler' ? 'hunter' : u.kind === 'boss' ? 'boss' : 'creep';
 // 圖鑑用：依分頁決定類別
 G.keyRateOf = (name, tab) => {
@@ -290,16 +296,24 @@ Object.assign(G.World.prototype, {
   useItem(id) {
     const h = this.hero, slot = this.bag.find(b => b.id === id), it = G.SHOP_BY[id];
     if (!h || !h.alive || !slot || !it) return false;
-    if (it.k === 'hp') { if (h.hp >= h.st.hp) return false; h.hp = Math.min(h.st.hp, h.hp + it.v); }
-    else if (it.k === 'mp') { if (h.mp >= h.st.mp) return false; h.mp = Math.min(h.st.mp, h.mp + it.v); }
+    if (it.k === 'rev') return 'rev';                    // 復活藥水：陣亡時自動使用
+    if (it.k === 'hp') { if (h.hp >= h.st.hp) return false; h.hot = { k: 'hp', left: it.v, rate: it.v / 0.6 }; }   // v2.4 0.6 秒內補滿（看得到血條往上長）
+    else if (it.k === 'mp') { if (h.mp >= h.st.mp) return false; h.hot = { k: 'mp', left: it.v, rate: it.v / 0.6 }; }
+    else if (it.k === 'inv') { if (h.inv > 0) return false; h.inv = it.t; h.stun = 0; h.slow = 0; this.addBuff(h, 'i_' + id, {}, it.t, it.ic, null); }
     else this.addBuff(h, 'i_' + id, { [it.k]: it.v }, it.t, it.ic, null);
     if (--slot.n <= 0) this.bag.splice(this.bag.indexOf(slot), 1);
-    const col = { hp: 10, mp: 11, del: 13, crit: 14, arm: 12, pow: 17, spd: 8 }[it.k];
-    for (let k = 0; k < 18; k++) this.parts.add(h.x + G.rr(-10, 10), h.y + G.rr(-4, 4), G.rr(0, 20), 0, 0, G.rr(30, 70), G.rr(0.5, 0.9), col, 4, 1, -10, 1);
-    G.FX.ring(this, h.x, h.y, 4, 26, 0.35, col);
-    this.stats.potions++; this.sfx('potion'); return true;
+    G.VFX.potion(this, h, it);
+    this.stats.potions++; return true;
   },
 
+  // 復活藥水（v2.4）：英雄陣亡瞬間自動使用 → 原地復活、回復 50% HP/MP、無敵 1.5 秒
+  tryRevive(h) {
+    const slot = this.bag.find(b => b.id === 'rev'); if (!slot || this.over || this.attract) return false;
+    if (--slot.n <= 0) this.bag.splice(this.bag.indexOf(slot), 1);
+    const it = G.SHOP_BY.rev; h.alive = true; h.hp = Math.round(h.st.hp * it.v / 100); h.mp = Math.max(h.mp, Math.round(h.st.mp * it.v / 100)); h.inv = 1.5; h.stun = 0; h.slow = 0; h.poison = null;
+    G.VFX.potion(this, h, it); this.say({ s: '復活藥水生效！', ic: 'p_rev', col: 19, t: 2.2 }); this.stats.potions++;
+    return true;
+  },
   // ----- 計時增益（藥水、野怪 buff）-----
   // fx：pow(%) del(攻速%) crit(%) arm(+) spd(移速%) mpReg(+/秒) cdr(冷卻%)
   addBuff(u, key, fx, t, ic, col) {
@@ -308,9 +322,9 @@ Object.assign(G.World.prototype, {
     this.applyBuffs(u);
   },
   applyBuffs(u) {
-    const a = { pow: 0, del: 0, crit: 0, arm: 0, spd: 0, mpReg: 0, cdr: 0 };
+    const a = { pow: 0, del: 0, crit: 0, arm: 0, spd: 0, mpReg: 0, cdr: 0, xp: 0, wave: 0 };
     for (const k in u.tb || {}) for (const f in u.tb[k].fx) a[f] += u.tb[k].fx[f];
-    u.iPow = 1 + a.pow / 100; u.iDel = 1 / (1 + a.del / 100); u.iCrit = a.crit; u.iArm = a.arm; u.iSpd = 1 + a.spd / 100; u.iMp = a.mpReg; u.iCdr = a.cdr;
+    u.iPow = 1 + a.pow / 100; u.iDel = 1 / (1 + a.del / 100); u.iCrit = a.crit; u.iArm = a.arm; u.iSpd = 1 + a.spd / 100; u.iMp = a.mpReg; u.iCdr = a.cdr; u.iXp = a.xp; u.iWave = a.wave;
   },
   tickBuffs(u, dt) {
     let ch = false;

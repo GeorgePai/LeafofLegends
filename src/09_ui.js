@@ -137,7 +137,11 @@ G.UI = (() => {
     // 技能等級（左上三格）
     const lx = Math.round(x + w / 2 - 5);                // 技能等級（上方置中三格）
     for (let k = 0; k < G.SKILL_MAX; k++) { c.fillStyle = P[0]; c.fillRect(lx + k * 3, y + 2 + o, 4, 3); c.fillStyle = P[k < s.lv ? 13 : 3]; c.fillRect(lx + 1 + k * 3, y + 3 + o, 2, 1); }
-    btn(id, x, y, w, w, () => { U.hold = { id, t: 0, s, fired: false, x, y, w }; }, () => {
+    const bcx = x + w / 2, bcy = y + w / 2;
+    U.btns.push({ id, x, y, w, h: w, down: () => { U.hold = { id, t: 0, s, fired: false, x, y, w }; if (!s.passive && s.lv) U.aim = { i, s, pre: true, on: false, bx: bcx, by: bcy, dx: 0, dy: 0 }; },
+      drag: s.passive ? null : (ux, uy) => U.aimDrag(ux, uy), up: () => {
+      if (U.aim && U.aim.on) { U.aimRelease(); return; }
+      U.aim = null;
       if (U.hold && U.hold.fired) return;
       if (s.passive) { U.press[id] = 0.12; U.toastMsg('長按查看說明', 7); G.Audio.play('tick'); return; }
       const r = W.trySkill(i); U.press[id] = 0.12;
@@ -147,7 +151,7 @@ G.UI = (() => {
         if (r === 'none' && h.alive && s.needT) G.FX.ring(W, h.x, h.y, s.range, s.range + 4, 0.45, 7, 1);
         if (r === 'mp') U.toastMsg('MP不足', 11); if (r === 'lock') U.toastMsg('尚未學習', 7);
       }
-    });
+    } });
     // 可升級：黃色 ＋（在按鈕正上方置中）
     if (W.canLevel(s)) {
       const bx = Math.round(x + w / 2 - 5), by = Math.round(y - 14 + Math.sin(U.t * 6) * 1), uid = 'up' + id;
@@ -160,6 +164,48 @@ G.UI = (() => {
     }
   }
   U.toastMsg = (s, col = 9) => { U.toast = { s, t: 0.9, col }; };
+  // ---------- v2.4 技能瞄準（仿傳說對決：點一下＝快速施放；按住拖曳＝自己選落點；拖到「取消」放開＝取消）----------
+  // 電腦：按住 Q/E/R 跟著滑鼠瞄準、放開施放；Esc 或右鍵取消
+  const AIM_DEAD = 7, AIM_R = 36;                          // 拖曳多遠才進入瞄準、搖桿半徑（UI px）
+  U.aimDrag = (ux, uy) => {
+    const A = U.aim; if (!A) return;
+    A.dx = ux - A.bx; A.dy = uy - A.by; A.ux = ux; A.uy = uy;
+    if (!A.on && Math.hypot(A.dx, A.dy) > AIM_DEAD && !(U.hold && U.hold.fired)) { A.on = true; A.pre = false; U.hold = null; G.Audio.play('tick'); }
+    if (A.on) U.aimUpdate();
+  };
+  U.aimUpdate = () => {
+    const A = U.aim, h = W && W.hero; if (!A || !A.on || !h) return;
+    const sp = A.s.shape, cast = sp.cast || 0; let dx, dy, dist;
+    if (A.mouse) { if (!U.mouse) return; const [wx, wy] = R.screenToWorld(U.mouse[0], U.mouse[1]); dx = wx - h.x; dy = wy - h.y; dist = Math.min(Math.hypot(dx, dy), cast); }
+    else { const m = Math.hypot(A.dx, A.dy), k = G.clamp((m - AIM_DEAD) / AIM_R, 0, 1); dx = A.dx / G.AX; dy = A.dy / G.AY; dist = k * cast; A.auto = k < 0.12; }
+    const l = Math.hypot(dx, dy) || 1; if (!(dx || dy)) { dx = h.face; dy = 0; }
+    A.x = h.x + dx / l * (sp.k === 'line' ? Math.max(dist, 40) : dist); A.y = h.y + dy / l * (sp.k === 'line' ? Math.max(dist, 40) : dist);
+    if (sp.k === 'unit') {                                 // 指定目標：選離落點最近、在施放距離內的敵人
+      let best = null, bd = 1e9;
+      for (const e of W.units) { if (!W.valid(h, e) || W.dist(h, e) > A.s.range + 10) continue; const d = A.auto ? W.dist(h, e) : Math.hypot(e.x - A.x, e.y - A.y); if (d < bd) { bd = d; best = e; } }
+      A.t = best;
+    }
+    const cb = U.cancelBtn; A.cancel = !A.mouse && !!cb && A.ux != null && Math.hypot(A.ux - cb.x, A.uy - cb.y) <= cb.r + 5;
+  };
+  U.aimRelease = () => {
+    const A = U.aim; U.aim = null; if (!A || !A.on) return;
+    if (A.cancel) { G.Audio.play('click'); U.toastMsg('已取消施放', 7); return; }
+    let r = W.castAim(A.i, A);
+    if (r === 'none' && A.s.shape.k === 'unit') r = W.trySkill(A.i);     // 範圍內沒有目標：照一般點擊處理（追過去）
+    const id = 'sk' + A.i; U.press[id] = 0.12;
+    if (r === 'ok' || r === 'queued') G.Audio.play('click');
+    else { deny(id); if (r === 'mp') U.toastMsg('MP不足', 11); else if (r === 'none') U.toastMsg('範圍內沒有目標', 7); }
+  };
+  U.aimCancel = () => { if (U.aim && U.aim.on) { U.aim = null; G.Audio.play('click'); U.toastMsg('已取消施放', 7); return true; } U.aim = null; return false; };
+  // 取消區：瞄準時出現在技能列左上方（手指拖過去會變紅）
+  function aimCancelUI(c, x, y) {
+    const A = U.aim; if (!A || !A.on || A.mouse) { U.cancelBtn = null; return; }
+    const r = 11; U.cancelBtn = { x, y, r };
+    const hot = A.cancel; c.fillStyle = 'rgba(0,0,0,0.6)'; c.beginPath(); c.arc(x, y, r + 2, 0, 6.2832); c.fill();
+    c.fillStyle = P[hot ? 10 : 2]; c.beginPath(); c.arc(x, y, r, 0, 6.2832); c.fill();
+    c.fillStyle = P[hot ? 9 : 6]; for (let k = -4; k <= 4; k++) { c.fillRect(x + k, y + k, 1, 1); c.fillRect(x + k, y - k, 1, 1); c.fillRect(x + k + 1, y + k, 1, 1); c.fillRect(x + k + 1, y - k, 1, 1); }
+    G.cn(c, '取消', x, y + r + 3, hot ? 10 : 7, 0.5);
+  }
   U.cardTip = (s) => { U.card = { s, t: 1.6 }; };
   // 資訊卡：名稱、類型、等級、說明、數值（目前 → 下一級）
   // 數值列：標籤靠左、數值靠右（目前 → 下一級）；任何一列放不下時，整張表都改成「標籤一行、數值一行」，保持一致
@@ -430,7 +476,7 @@ G.UI = (() => {
         btn(id, x, y, ex > 0.5 ? w2 : 16, 16, () => { U.press[id] = 0.12; }, () => {
           if (U.bagEx < 0.5) { U.bagUse = U.t; G.Audio.play('open'); return; }          // 收起中：先展開
           U.bagUse = U.t;
-          if (Math.abs(bw.pos - k) < 0.5) { if (!W.useItem(it.id)) deny(id); } else { bw.go(k); G.Audio.play('tick'); }
+          if (Math.abs(bw.pos - k) < 0.5) { const r = W.useItem(it.id); if (r === 'rev') { U.toastMsg('陣亡時會自動使用', 19); G.Audio.play('tick'); } else if (!r) deny(id); } else { bw.go(k); G.Audio.play('tick'); }
         });
         if (ex > 0.5) tagWheel(bw);
       }
@@ -464,6 +510,9 @@ G.UI = (() => {
     let rx = Rt;
     for (let k = row.length - 1; k >= 0; k--) { rx -= SW; skillBtn(c, row[k], rx, B - SW, SW); rx -= gap; }
     rx += gap;
+    if (U.aim && (!h.alive || W.over)) U.aim = null;
+    if (U.aim && U.aim.on) U.aimUpdate();
+    aimCancelUI(c, Math.round(Rt - 13), Math.round(B - 92));   // 取消區：視角置中鈕正上方（拇指往上拖就到）
     for (const f of U.ups) f();
     if (h.sp > 0 && act.concat(h.pskills).some(s => W.canLevel(s))) { G.text(c, '+' + h.sp, rx - 3, B - 26, 13, 1, 0, 1); }
     // 長按資訊卡
@@ -539,7 +588,7 @@ G.UI = (() => {
   function shopPanel(c) {
     const uw = R.uw, uh = R.uh, I = R.ins, cols = 4, gap = 4, chh = 40, cw = Math.min(38, Math.floor((uw - I.l - I.r - 8 - 12 - gap * 3) / 4));
     const pw = cols * cw + (cols - 1) * gap + 12, rowsN = Math.ceil(G.SHOP.length / cols);
-    const it = G.SHOP_BY[U.shopSel] || G.SHOP[0], bw = 40, dl = G.cnWrap(it.d.replace('，', '\n'), pw - 12 - bw - 8).slice(0, 3), dh = Math.max(34, 17 + dl.length * 13 + 4);
+    const it = G.SHOP_BY[U.shopSel] || G.SHOP[0], bw = 40, dl = G.cnWrap(it.d.replace('，', '\n'), pw - 12 - bw - 8), dh = Math.max(34, 17 + dl.length * 13 + 4);
     const ph = 22 + rowsN * (chh + gap) + dh;
     const px = Math.round(uw / 2 - pw / 2), py = Math.round(G.clamp(uh / 2 - ph / 2 - 8, I.t + 2, uh - I.b - ph - 30));
     btn('shopBg', 0, 0, uw, uh, null, () => { U.shop = false; });
@@ -604,9 +653,12 @@ G.UI = (() => {
   // 本場亮點（最多 2 個）
   const highlights = st => [[st.deaths === 0 && st.time > 300, '不死之身', 11], [st.towers >= 5, '推塔王', 14], [st.kills >= 30, '收割者', 10], [st.assists >= 15, '神助攻', 18], [st.camps >= 8, '野區霸主', 13], [(st.bosses || 0) >= 3, '首領剋星', 12], [st.gold >= 3000, '小富翁', 13]].filter(q => q[0]).slice(0, 2);
   function end(c) {
-    const uw = R.uw, uh = R.uh, I = R.ins, win = W.over.win, st = W.stats, h = W.hero;
-    if (U.endW !== W) { U.endW = W; U.endT = 0; U.endParts = []; U.endSnd = {}; U.endGr = U.grade(st, win); }
-    const t = (U.endT += M_DT), a = G.clamp(t * 2.5, 0, 1), gr = U.endGr, snd = k => { if (!U.endSnd[k]) { U.endSnd[k] = 1; return true; } return false; };
+    // v2.4：數值用遊戲結束那一刻的快照（W.overSt），背景戰鬥繼續也不會再變；節奏放慢、一組一組出現；點畫面可跳到最後
+    const uw = R.uw, uh = R.uh, I = R.ins, win = W.over.win, st = W.overSt || W.stats, h = W.hero;
+    if (U.endW !== W) { U.endW = W; U.endT = 0; U.endParts = []; U.endSnd = {}; U.endGr = U.grade(st, win); U.endQuiet = false; U.endCnt = {}; }
+    const TK = { sub: 0.7, hero: 1.1, kda: 1.7, rows: 2.9, row: 0.45, grade: 6.0, rw: 6.8, btn: 7.4 };
+    const t = (U.endT += M_DT), a = G.clamp(t * 2.5, 0, 1), gr = U.endGr, snd = k => { if (!U.endSnd[k]) { U.endSnd[k] = 1; return !U.endQuiet; } return false; };
+    if (t < TK.btn) btn('endSkip', 0, 0, uw, uh, null, () => { U.endT = TK.btn; U.endQuiet = true; G.Audio.play('cntDone'); });   // 點一下跳到最後
     dim(c, a * 0.82);
     // 勝利：落葉彩帶
     if (win && U.endParts.length < 60 && t < 5) U.endParts.push({ x: Math.random() * uw, y: -4, vy: G.rr(20, 45), vx: G.rr(-8, 8), r: Math.random() * 6, c: G.pick([11, 13, 16, 9, 14]) });
@@ -621,15 +673,17 @@ G.UI = (() => {
     c.fillStyle = P[rb]; c.fillRect(rbx, by0 + drop, rbw, rbh); c.fillStyle = P[win ? 14 : 1]; c.fillRect(rbx, by0 + drop + rbh - 2, rbw, 2);
     for (let k = 0; k < 4; k++) { c.fillStyle = P[0]; c.fillRect(rbx + k, by0 + drop + 4 + k, 1, rbh - 8 - k * 2); c.fillRect(rbx + rbw - 1 - k, by0 + drop + 4 + k, 1, rbh - 8 - k * 2); }   // 緞帶尾端缺口
     G.text(c, word, uw / 2 + 1, by0 + drop + 5, 0, sc, null, 0.5); G.text(c, word, uw / 2, by0 + drop + 4, win ? 0 : 9, sc, null, 0.5);
-    if (k0 >= 1 && snd('ban')) G.Audio.play('snap');
+    if (k0 >= 1 && snd('ban')) { G.Audio.play('snap'); G.Audio.play(win ? 'endWin' : 'endLose'); }
     let y = by0 + rbh + 4;
     const sub = win ? '敵方聖所已摧毀！' : '我方聖樹倒下了……';
-    G.cnWrap(sub, PW).forEach(l => { G.cn(c, l, uw / 2, y, win ? 13 : 7, 0.5); y += 13; }); y += 3;
+    c.globalAlpha = G.clamp((t - TK.sub) / 0.3, 0, 1); G.cnWrap(sub, PW).forEach(l => { G.cn(c, l, uw / 2, y, win ? 13 : 7, 0.5); y += 13; }); c.globalAlpha = 1; y += 3;
+    if (t < TK.sub) return;
     // 兩欄（橫屏）或單欄（直屏）
     const colL = LD ? Math.round(PW * 0.34) : PW, lx = px, rx = LD ? px + colL + 8 : px, rw = LD ? PW - colL - 8 : PW;
     let yl = y, yr = y;
     // ── 英雄＋評價
-    {
+    if (t >= TK.hero) {
+      if (snd('hero')) G.Audio.play('rowIn');
       const fr = G.SPR[G.VIS[h.name].spr], f = fr[win ? ((t * 6) | 0) % fr.length : 0], img = G.scaled(f.n, 2), hx = lx + 4, hy = yl + 34;
       const jy = win ? -Math.round(Math.abs(Math.sin(t * 5)) * 3) : 0;
       G.pxDisc(c, hx + img.width / 2, hy, img.width * 0.35, 3, 0, 0.6);
@@ -637,43 +691,46 @@ G.UI = (() => {
       if (!win) { c.globalAlpha = 0.55; c.drawImage(G.scaled(G.glowOf(f.n, 0, 1, 2).tint, 2), hx, hy - img.height); c.globalAlpha = 1; }
       const nx = hx + img.width + 6, tt = st.time | 0;
       G.cn(c, G.cnWrap(G.nameOf(h.name), colL - (nx - lx) - 30)[0], nx, yl + 4, 9);
-      G.text(c, 'LV' + h.level, nx, yl + 18, 13); icon(c, 'i_clock', nx + 3, yl + 30); G.text(c, String((tt / 60) | 0) + ':' + String(tt % 60).padStart(2, '0'), nx + 9, yl + 28, 7);
-      // 評價章（蓋章）
-      const gk = G.clamp((t - 1.5) / 0.18, 0, 1);
+      G.text(c, 'LV' + (st.lv || h.level), nx, yl + 18, 13); icon(c, 'i_clock', nx + 3, yl + 30); G.text(c, String((tt / 60) | 0) + ':' + String(tt % 60).padStart(2, '0'), nx + 9, yl + 28, 7);
+      // 評價章（所有數據跳完後才蓋章）
+      const gk = G.clamp((t - TK.grade) / 0.18, 0, 1);
       if (gk > 0) {
-        if (snd('gr')) { G.Audio.play('level'); U.endShake = 0.25; }
+        if (snd('gr')) { G.Audio.play('stamp'); U.endShake = 0.35; }
         const gs = Math.round(3 + (1 - gk) * 3), gx = lx + colL - 13, gy2 = yl + 18, rr = 12 + Math.round((1 - gk) * 6);
         c.fillStyle = P[0]; c.fillRect(gx - rr - 1, gy2 - rr - 1, rr * 2 + 2, rr * 2 + 2);
         c.fillStyle = P[gr.col]; c.fillRect(gx - rr, gy2 - rr, rr * 2, rr * 2); c.fillStyle = P[1]; c.fillRect(gx - rr + 2, gy2 - rr + 2, rr * 2 - 4, rr * 2 - 4);
         G.text(c, gr.g, gx + 1, gy2 - Math.round(gs * 2.5) + 1, 0, gs, null, 0.5); G.text(c, gr.g, gx, gy2 - Math.round(gs * 2.5), gr.col, gs, null, 0.5);
         if (gk >= 1) G.cn(c, '評價', gx, gy2 + rr + 1, 6, 0.5);
       }
-      yl += 50;
     }
+    yl += 50;
     if (!LD) yr = yl;
-    // ── K / D / A
-    const cnt = (v, t0) => Math.round(v * (1 - Math.pow(1 - G.clamp((t - t0) / 0.5, 0, 1), 3)));
-    { const kw = Math.floor((rw - 8) / 3);
+    // ── 數字跳動：跳的過程有細碎的刻度聲，跳完「叮」一聲
+    const cnt = (v, t0, key, D = 0.8) => { const k = G.clamp((t - t0) / D, 0, 1), n = Math.round(v * (1 - Math.pow(1 - k, 3))); if (!U.endQuiet && v > 0 && k < 1 && U.endCnt[key] !== n) G.Audio.play('cnt'); U.endCnt[key] = n; if (k >= 1 && snd('d' + key)) G.Audio.play('cntDone'); return n; };
+    // ── K / D / A（一組一起出現）
+    if (t >= TK.kda) { const kw = Math.floor((rw - 8) / 3);
+      if (snd('kda')) G.Audio.play('rowIn');
       [['擊殺', st.kills, 13], ['陣亡', st.deaths, 10], ['助攻', st.assists, 18]].forEach(([lab, v, col], i) => {
-        const t0 = 0.6 + i * 0.1; if (t < t0) return; if (snd('k' + i)) G.Audio.play('tick');
+        const t0 = TK.kda + 0.15;
         const bx = rx + i * (kw + 4); box(c, bx, yr, kw, 28, 0, 4, false);
-        G.text(c, cnt(v, t0), bx + kw / 2, yr + 4, col, 2, null, 0.5); G.cn(c, lab, bx + kw / 2, yr + 14, 6, 0.5);
-      }); yr += 32; }
+        G.text(c, cnt(v, t0, 'k' + i), bx + kw / 2, yr + 4, col, 2, null, 0.5); G.cn(c, lab, bx + kw / 2, yr + 14, 6, 0.5);
+      }); }
+    yr += 32;
     // ── 其他數據（兩欄，數字跳動）
     { const vals = [st.towers, st.bosses || 0, st.camps, Math.floor(st.gold), Math.round(st.dmg), Math.round(st.taken)], vw = Math.max(...vals.map(v => G.cnW(String(v))));
       const long = ['推倒敵塔', '擊倒首領', '清野怪營', '累積金幣', '造成傷害', '承受傷害'], short = ['推塔', '首領', '野怪', '金幣', '輸出', '承傷'];
       const labs = LD && Math.floor((rw - 6) / 2) < 52 + vw + 4 ? short : long, rows = labs.map((l, i) => [l, vals[i]]);   // 橫屏放不下兩欄 → 用短標籤
       const need = Math.max(...rows.map(q => G.cnW(q[0]))) + Math.max(...rows.map(q => G.cnW(String(q[1])))) + 4, cols = Math.floor((rw - 6) / 2) >= need ? 2 : 1, nr = Math.ceil(rows.length / cols), cw = Math.floor((rw - (cols - 1) * 6) / cols);   // 兩欄放不下就改一欄
       rows.forEach(([lab, v], i) => {
-        const t0 = 0.9 + i * 0.1; if (t < t0) return; if (snd('r' + i)) G.Audio.play('tick');
+        const t0 = TK.rows + i * TK.row; if (t < t0) return; if (snd('r' + i)) G.Audio.play('rowIn');
         const col = (i / nr) | 0, r = i % nr, xx = rx + col * (cw + 6), yy = yr + r * 13;
         if (r % 2 === 0) { c.fillStyle = P[1]; c.fillRect(xx - 2, yy - 1, cw + 4, 13); }
-        G.cn(c, lab, xx, yy, 6); G.cn(c, String(cnt(v, t0)), xx + cw, yy, 9, 1);
+        c.globalAlpha = G.clamp((t - t0) / 0.2, 0, 1); G.cn(c, lab, xx, yy, 6); G.cn(c, String(cnt(v, t0 + 0.1, 'r' + i, 0.5)), xx + cw, yy, 9, 1); c.globalAlpha = 1;
       }); yr += nr * 13 + 4; }
     if (!LD) yl = yr;
     // ── 獎勵：鑰匙、成就、亮點
-    if (t > 1.8) {
-      const kg = W.keysGot || 0, ach = (G.Ach && G.Ach.recent) || [];
+    if (t > TK.rw) {
+      const kg = st.keys != null ? st.keys : (W.keysGot || 0), ach = (G.Ach && G.Ach.recent) || [];
       if (snd('rw')) G.Audio.play(kg ? 'keyGet' : 'tick');
       icon(c, 'i_key', lx + 6, yl + 6); G.cn(c, '鑰匙 +' + kg, lx + 14, yl, kg ? 13 : 6);
       const hl = highlights(st); let hx2 = lx + 14 + G.cnW('鑰匙 +' + kg) + 8;
@@ -689,7 +746,7 @@ G.UI = (() => {
       } else if (G.Team.dev) { G.cn(c, '開發者模式不記錄成就', lx + 2, yl, 6); yl += 14; }
     }
     // ── 按鈕（文字＋圖示）
-    if (t > 2.0) {
+    if (t >= TK.btn) {
       const bh = 18, by = LD ? uh - I.b - bh - 2 : Math.min(uh - I.b - bh - 2, Math.max(yl, yr) + 8), bw = Math.floor((PW - 6) / 2);
       [['i_retry', '再來一局', () => U.start(U.hero), 13], ['i_tree', '回首頁', () => U.goTitle(), 7]].forEach(([ic, lab, fn, col], i) => {
         const x = px + i * (bw + 6), id = 'end' + i, o = U.press[id] > 0 ? 1 : 0;
@@ -809,6 +866,7 @@ G.UI = (() => {
       if (U.screen === 'guide') { p.mode = 'swipe'; return; }
       if (U.screen === 'team' || U.screen === 'book' || U.screen === 'ach') { p.mode = 'mdrag'; if (G.Menus.scrollHold) G.Menus.scrollHold(); return; }
       if (U.screen !== 'battle' || U.paused || (W.over)) return;
+      if (e.pointerType === 'mouse' && e.button === 2 && U.aim && U.aim.on) { U.aimCancel(); p.mode = 'none'; return; }   // 右鍵取消瞄準
       if (e.pointerType === 'mouse' && e.button !== 0) { p.mode = 'pan'; R.cam.follow = false; return; }
       const others = [...ptrs.values()].filter(q => q !== p && q.mode !== 'ui');
       if (others.length) {
@@ -821,6 +879,7 @@ G.UI = (() => {
       p.mode = 'wait'; p.t0 = performance.now();
     });
     cv.addEventListener('pointermove', e => {
+      if (e.pointerType === 'mouse') U.mouse = evXY(e);
       const p = ptrs.get(e.pointerId); if (!p) return;
       const [x, y] = evXY(e), dx = x - p.x, dy = y - p.y; p.x = x; p.y = y;
       if (p.mode === 'ui' && p.btn && p.btn.drag) { const [ux, uy] = toUI(x, y); p.btn.drag(ux, uy); return; }
@@ -877,11 +936,13 @@ G.UI = (() => {
       G.Audio.init();
       const k = e.key.toLowerCase(); if (keys[k]) return; keys[k] = true;
       if (U.screen !== 'battle') { if (G.Menus && G.Menus.key) G.Menus.key(k); return; }
+      if (k === 'escape' && U.aim && U.aim.on) { U.aimCancel(); return; }
       if (k === 'escape' && U.shop) { U.shop = false; return; }
       if (k === 'escape' || k === 'p') { U.paused = !U.paused; return; }
       if (U.paused || !W || W.over) return;
       const sk = { q: 0, e: 1, r: 2, '1': 0, '2': 1, '3': 2 }[k];
-      if (sk != null) { const r = W.trySkill(sk); U.press['sk' + sk] = 0.12; if (r !== 'ok' && r !== 'queued') { deny('sk' + sk); if (r === 'mp') U.toastMsg('MP不足', 11); if (r === 'lock') U.toastMsg('尚未學習', 7); } }
+      if (sk != null && U.mouse && W.hero && W.hero.alive && W.hero.skills[sk] && W.hero.skills[sk].lv && !W.hero.chg) { U.aim = { i: sk, s: W.hero.skills[sk], on: true, mouse: true, key: k }; U.aimUpdate(); }
+      else if (sk != null) { const r = W.trySkill(sk); U.press['sk' + sk] = 0.12; if (r !== 'ok' && r !== 'queued') { deny('sk' + sk); if (r === 'mp') U.toastMsg('MP不足', 11); if (r === 'lock') U.toastMsg('尚未學習', 7); } }
       if (k === 'c') R.cam.follow = true;
       if (k === 'z') W.usePotion(0); if (k === 'x') W.usePotion(1);
       if (k === 'b') { U.shop = !U.shop; U.shopSel = U.shopSel || 'hp'; G.Audio.play('open'); }
@@ -889,7 +950,7 @@ G.UI = (() => {
       if (k === 'm') G.Audio.toggleMute();
       if (k === 'f') U.showFps = !U.showFps;
     });
-    addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+    addEventListener('keyup', e => { const k = e.key.toLowerCase(); keys[k] = false; if (U.aim && U.aim.mouse && U.aim.key === k) U.aimRelease(); });
     addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
     U.keyDir = () => {
       let x = 0, y = 0;

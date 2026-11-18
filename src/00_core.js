@@ -81,7 +81,7 @@ G.sprite = function (rows, opt = {}) {
   for (let y = 0; y < h; y++) for (let x = 0; x < rows[y].length; x++) {
     const ch = rows[y][x];
     if (ch >= '0' && ch <= '9') grid[y * w + x] = ch.charCodeAt(0) - 48;
-    else if (ch >= 'a' && ch <= 'h') grid[y * w + x] = ch.charCodeAt(0) - 87;   // a=10 … g=16
+    else if (ch >= 'a' && ch <= 'l') grid[y * w + x] = ch.charCodeAt(0) - 87;   // a=10 … h=17、i=18 青、j=19 粉、k=20 黃綠、l=21 米
   }
   return G.spriteFromGrid(grid, w, h, opt);
 };

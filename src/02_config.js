@@ -149,7 +149,8 @@ G.MAPS.lanes5 = (() => {
   const top = sc([[8.75, 51.25], [8.12, 41.25], [8.12, 17.5], [11.25, 10], [20, 8.12], [60, 8.12], [71.25, 8.75]]);
   const mid = sc([[8.75, 51.25], [17.5, 44.4], [30, 36.9], [40, 30], [50, 23.1], [62.5, 15.6], [71.25, 8.75]]);
   const bot = mp(top).reverse();
-  const lanes = [{ r: 2.2, pts: top }, { r: 2.4, pts: mid }, { r: 2.2, pts: bot }];
+  const LW = 1.5;                                    // v2.4 道路加寬 1.5 倍
+  const lanes = [{ r: 2.2 * LW, pts: top }, { r: 2.4 * LW, pts: mid }, { r: 2.2 * LW, pts: bot }];
   // 我方野區小徑（敵方點對稱）
   const jp = [
     [[10.6, 44], [22, 44], [30, 53]],                 // 西野區：上路 → 中路
@@ -157,7 +158,7 @@ G.MAPS.lanes5 = (() => {
     [[44.5, 44.4], [48, 57], [62, 57], [70, 48.6]],   // 南野區：中路 → 下路側 → 河道
     [[55, 57], [55, 67.4]]                            // 南野區 → 下路
   ];
-  const paths = []; for (const a of jp) { paths.push({ r: 1.5, pts: a }); paths.push({ r: 1.5, pts: mp(a) }); }
+  const paths = []; for (const a of jp) { paths.push({ r: 1.5 * LW, pts: a }); paths.push({ r: 1.5 * LW, pts: mp(a) }); }
   // 凹槽營地：營地中心 + 一條窄入口（接到小徑或河道）
   const pockets = [
     { k: 'red', c: [18, 51.5], r: 3.1, e: [18, 44] },

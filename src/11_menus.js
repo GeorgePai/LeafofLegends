@@ -304,7 +304,21 @@ G.Menus = (() => {
   const mw = G.UI.wheel();                                 // 首頁滾輪
   M.menuWheel = mw;
   function go(s) { U().screen = s; sbKey = ''; skillSel = -1; picker = null; info = null; demo = null; if (s === 'save' && G.SaveUI) G.SaveUI.reset(); if (s === 'ach' && G.AchUI) G.AchUI.reset(); }
-  let menuT = 0, resetAsk = false, setOpen = false; const leaves = [];
+  let menuT = 0, resetAsk = false, setOpen = false, devAsk = null; const leaves = [];
+  // v2.4 開發者模式密碼鎖：只存雜湊值（FNV-1a），原文不寫在程式裡
+  const devHash = s => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h; };
+  const DEV_LEN = 8, DEV_H = 3224873579;
+  const devInput = d => {
+    if (!devAsk) return;
+    if (d === 'del') { devAsk.s = devAsk.s.slice(0, -1); G.Audio.play('tick'); return; }
+    if (devAsk.s.length >= DEV_LEN) return;
+    devAsk.s += d; G.Audio.play('tick');
+    if (devAsk.s.length === DEV_LEN) {
+      if (devHash(devAsk.s) === DEV_H) { devAsk = null; G.Team.setDev(true); G.Audio.play('level'); }
+      else { devAsk.err = 0.45; devAsk.s = ''; G.Audio.play('deny'); }
+    }
+  };
+  M.devAsk = on => { devAsk = on ? { s: '', err: 0 } : null; };   // 測試用
   M.resetIntro = () => { menuT = 0; };
   M._mt = v => { menuT = v; };   // 測試用
   M._set = v => { setOpen = v; };   // 測試用
@@ -319,7 +333,7 @@ G.Menus = (() => {
     D: ['####.', '#...#', '#...#', '#...#', '#...#', '#...#', '####.'], S: ['.####', '#....', '#....', '.###.', '....#', '....#', '####.'],
     O: ['.###.', '#...#', '#...#', '#...#', '#...#', '#...#', '.###.']
   };
-  const GRAD = { gold: f => f < 0.08 ? 9 : f < 0.55 ? 13 : 14, silver: f => f < 0.5 ? 9 : f < 0.8 ? 8 : 7, white: () => 9 };
+  const GRAD = { gold: f => f < 0.08 ? 9 : f < 0.55 ? 13 : 14, silver: f => f < 0.5 ? 9 : f < 0.8 ? 8 : 7, leaf: f => f < 0.1 ? 20 : f < 0.62 ? 11 : 16, white: () => 9 };
   const titleCache = {};
   function titleLetter(ch, s, style) {
     const key = ch + s + style; if (titleCache[key]) return titleCache[key];
@@ -384,12 +398,19 @@ G.Menus = (() => {
     const soft = (x, y, rx, ry, rgb, a) => { c.save(); c.translate(x, y); c.scale(1, ry / rx); const g = c.createRadialGradient(0, 0, 0, 0, 0, rx); g.addColorStop(0, 'rgba(' + rgb + ',' + a + ')'); g.addColorStop(1, 'rgba(' + rgb + ',0)'); c.fillStyle = g; c.fillRect(-rx, -rx, rx * 2, rx * 2); c.restore(); };   // 柔和橢圓（漸層，不用顆粒）
     soft(gcx, (yA + gcy) / 2, gW * 0.72, (gcy - yA) + 10 * s2, '10,10,10', 0.55);
     if (rk > 0) {
-      const R0 = gW * 0.75 * rk, rot = t * 0.12;
-      c.fillStyle = P[13];
-      for (let i = 0; i < 14; i++) { const a = rot + i * Math.PI * 2 / 14, hw = 0.07; c.globalAlpha = (i % 2 ? 0.035 : 0.06) * rk; c.beginPath(); c.moveTo(gcx, gcy); c.lineTo(gcx + Math.cos(a - hw) * R0, gcy + Math.sin(a - hw) * R0 * 0.55); c.lineTo(gcx + Math.cos(a + hw) * R0, gcy + Math.sin(a + hw) * R0 * 0.55); c.closePath(); c.fill(); }
-      const pulse = 0.5 + Math.sin(t * 2.4) * 0.5;
-      c.globalAlpha = rk; soft(gcx, gcy, gW * 0.62, 7 * s2 * 1.3, '247,210,60', 0.16 + pulse * 0.08);
+      // v2.4 取代一條條的放射光芒：落地時一圈柔光衝擊波 → 待機是「柔光暈＋橫向光帶（鏡頭光暈）＋字上偶爾閃過的星芒」
+      const pulse = 0.5 + Math.sin(t * 2.4) * 0.5, rw0 = G.clamp((t - land) / 0.7, 0, 1);
+      if (rw0 > 0 && rw0 < 1) { c.globalAlpha = (1 - rw0) * 0.5; c.strokeStyle = 'rgb(255,236,150)'; c.lineWidth = Math.max(1, s2 * (1 - rw0)); c.beginPath(); c.ellipse(gcx, gcy, gW * (0.3 + 0.7 * rw0), 7 * s2 * (0.5 + 1.2 * rw0), 0, 0, 6.2832); c.stroke(); c.globalAlpha = 1; }
+      c.globalAlpha = rk; soft(gcx, gcy, gW * 0.7, 7 * s2 * 1.5, '247,190,50', 0.13 + pulse * 0.06); soft(gcx, gcy, gW * 0.38, 7 * s2 * 0.8, '255,240,170', 0.1 + pulse * 0.05);
+      { const lw = gW * (0.95 + 0.08 * pulse), ly = Math.round(gcy), lg = c.createLinearGradient(gcx - lw, 0, gcx + lw, 0);
+        lg.addColorStop(0, 'rgba(255,230,140,0)'); lg.addColorStop(0.5, 'rgba(255,245,200,' + (0.55 + 0.25 * pulse).toFixed(2) + ')'); lg.addColorStop(1, 'rgba(255,230,140,0)');
+        c.fillStyle = lg; c.fillRect(Math.round(gcx - lw), ly, Math.round(lw * 2), 1);
+        const lg2 = c.createLinearGradient(gcx - lw * 0.6, 0, gcx + lw * 0.6, 0); lg2.addColorStop(0, 'rgba(255,220,120,0)'); lg2.addColorStop(0.5, 'rgba(255,220,120,0.22)'); lg2.addColorStop(1, 'rgba(255,220,120,0)');
+        c.fillStyle = lg2; c.fillRect(Math.round(gcx - lw * 0.6), ly - Math.max(1, s2 >> 1), Math.round(lw * 1.2), Math.max(1, s2 >> 1) * 2 + 1); }
       c.globalAlpha = 1;
+      // 星芒：每 0.7 秒在 LEGENDS 某處閃一下（四角星＋柔光）
+      if (t > land + 0.4) { const ph = (t - land) / 0.7, n = ph | 0, f = ph - n; if (f < 0.5) { const sxp = Math.round(gcx + (G.hash(n, 3) - 0.5) * gW * 0.9), syp = Math.round(yG + G.hash(n, 7) * 7 * s2), k = Math.sin(f / 0.5 * Math.PI), L = Math.round((2 + s2) * k);
+        soft(sxp, syp, L * 2 + 2, L * 2 + 2, '255,250,220', 0.5 * k); c.fillStyle = P[9]; c.fillRect(sxp - L, syp, L * 2 + 1, 1); c.fillRect(sxp, syp - L, 1, L * 2 + 1); } }
     }
     // 火星：從 LEGENDS 下方往上飄
     if (t > land && logoParts.length < 26 && Math.random() < 0.35) logoParts.push({ x: gcx + (Math.random() - 0.5) * gW, y: yG + 7 * s2, vy: -G.rr(8, 22), l: G.rr(1.2, 2.4), l0: 0, c: G.pick([13, 14, 9, 14]) });
@@ -410,7 +431,7 @@ G.Menus = (() => {
     const ka = G.clamp((t - land - 0.05) / 0.3, 0, 1);
     if (ka > 0) {
       const dy = Math.round((1 - ka) * (1 - ka) * -24 + Math.sin(ka * Math.PI) * 3 * (1 - ka));
-      const [ax0] = drawWord(c, 'LEAF', cx, yA, sA, 'silver', () => ({ a: ka, m: 1, dy }));
+      const [ax0] = drawWord(c, 'LEAF', cx, yA, sA, 'leaf', () => ({ a: ka, m: 1, dy }));
       // 吉祥物力夫：在 LEAF 上方來回走，時不時停下來揮擊
       if (t > land + 0.45) mascot(c, ax0, 23 * sA, Math.round(yA - Math.max(1, sA >> 1)));
     }
@@ -493,13 +514,13 @@ G.Menus = (() => {
       arrow('mwU', top - 6, -1, mw.tgt > 0); arrow('mwD', bot + 2, 1, mw.tgt < ITEMS.length - 1);
       c.globalAlpha = 1;
     }
-    G.text(c, 'V2.3', uw - I.r - 2, uh - I.b - 6, 3, 1, null, 1);
+    G.text(c, 'V2.4', uw - I.r - 2, uh - I.b - 6, 3, 1, null, 1);
     // 右上：鑰匙數；左下：開發者模式開關
     const kt = G.Team.dev ? '∞' : String(G.Team.keys()), kw = 22 + G.cnW(kt);
     H().box(c, uw - I.r - kw, I.t, kw, 14, 0, 13); H().icon(c, 'i_key', uw - I.r - kw + 9, I.t + 7); G.cn(c, kt, uw - I.r - 4, I.t + 1, 13, 1);
     const dv = G.Team.dev, dvw = dv ? 40 : 24, dvx = I.l + 2, dvy = uh - I.b - 13, dvo = pr('dev') ? 1 : 0;
     H().key(c, dvx, dvy + dvo, dvw, 12, dvo, dv ? 14 : 4, dv ? 13 : 1); G.text(c, dv ? 'DEV ON' : 'DEV', dvx + dvw / 2, dvy + 4 + dvo, dv ? 0 : 5, 1, null, 0.5);
-    tap('dev', dvx, dvy, dvw, 12, () => { G.Team.setDev(!G.Team.dev); G.Audio.play(G.Team.dev ? 'level' : 'click'); });
+    tap('dev', dvx, dvy, dvw, 12, () => { if (G.Team.dev) { G.Team.setDev(false); G.Audio.play('click'); } else { devAsk = { s: '', err: 0 }; G.Audio.play('open'); } });   // 開啟要密碼、關閉不用
     // 資料重置（測試用）：先跳確認
     const rsx = dvx + dvw + 4, rso = pr('rst') ? 1 : 0;
     H().key(c, rsx, dvy + rso, 32, 12, rso, 10); G.text(c, 'RESET', rsx + 16, dvy + 4 + rso, 10, 1, null, 0.5);
@@ -519,6 +540,21 @@ G.Menus = (() => {
       btnSecondary(c, 'rsNo', Math.round(x + w / 2 - bw - 4), by, bw, 16, '取消', () => { resetAsk = false; });
       const ox = Math.round(x + w / 2 + 4), oo = pr('rsYes') ? 1 : 0; H().key(c, ox, by + oo, bw, 16, oo, 15, 10); G.cn(c, '清除', ox + bw / 2, by + 2 + oo, 9, 0.5);
       tap('rsYes', ox, by, bw, 16, () => { try { localStorage.removeItem('leafwar_team'); localStorage.removeItem('leafwar_dev'); } catch (e) { } G.Team.v = null; G.Team.dev = false; G.Team.get(); cars.team.inited = false; resetAsk = false; G.Audio.play('level'); });
+    }
+    if (devAsk) {                                        // 開發者密碼：數字鍵盤（也可以直接用鍵盤輸入）
+      H().btn('dvBg', 0, 0, uw, uh, null, () => { devAsk = null; });
+      H().dim(c, 0.7);
+      devAsk.err = Math.max(0, devAsk.err - M.dt);
+      const kw = 30, kh = 17, g = 3, w = kw * 3 + g * 2 + 16, h = 8 + 13 + 14 + kh * 4 + g * 3 + 8, x = Math.round(uw / 2 - w / 2), y = Math.round(uh / 2 - h / 2), sx = devAsk.err > 0 ? Math.round(Math.sin(devAsk.err * 60) * 3) : 0;
+      H().box(c, x + sx, y, w, h, 1, devAsk.err > 0 ? 10 : 7); H().btn('dvIn', x, y, w, h, null, null);
+      G.cn(c, devAsk.err > 0 ? '密碼錯誤' : '輸入開發者密碼', x + w / 2 + sx, y + 6, devAsk.err > 0 ? 10 : 9, 0.5);
+      const dw = 8, dx0 = Math.round(x + w / 2 - (DEV_LEN * dw - 3) / 2) + sx;
+      for (let i = 0; i < DEV_LEN; i++) { c.fillStyle = P[i < devAsk.s.length ? 13 : 3]; c.fillRect(dx0 + i * dw, y + 22, 5, 5); }
+      const ky = y + 8 + 13 + 14;
+      ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'x', '0', 'del'].forEach((d, i) => {
+        const bx = x + 8 + (i % 3) * (kw + g), by = ky + ((i / 3) | 0) * (kh + g), lab = d === 'x' ? '取消' : d === 'del' ? '刪除' : d;
+        btnSecondary(c, 'dv_' + d, bx, by, kw, kh, lab, () => { if (d === 'x') { devAsk = null; G.Audio.play('click'); } else devInput(d); });
+      });
     }
     if (setOpen) {                                       // 設定：音樂／音效音量
       H().btn('stBg', 0, 0, uw, uh, null, () => { setOpen = false; });
@@ -1203,6 +1239,57 @@ G.Menus = (() => {
             G.cn(c, ch ? '蓄力中…' : '放招！', x + w / 2, y + 4, ch ? 6 : 13, 0.5);
           }
         },
+        // v2.4 技能瞄準／取消施放／塔的警戒／特殊藥水
+        {
+          t: '技能瞄準', m: '按住技能往外拖，可以自己選落點，地上會畫出作用範圍；放開就施放。點一下則自動瞄準',
+          draw(c, x, y, w, h, t, dk) {
+            const T = t % 3.6, gy = Math.round(y + h * 0.6), hx = Math.round(x + w * 0.22), bx = Math.round(x + w - 26), by = Math.round(y + h - 24);
+            const k = ss(seg(T, 0.5, 1.7)), ax = Math.round(lerp(hx + 14, x + w * 0.66, k)), ay = Math.round(lerp(gy, gy - 4, k)), aiming = T > 0.5 && T < 1.9, boom = T >= 1.9 && T < 2.5;
+            if (aiming) { c.globalAlpha = 0.08; c.fillStyle = P[13]; c.beginPath(); c.ellipse(hx, gy, 62, 26, 0, 0, 6.2832); c.fill(); c.globalAlpha = 1; G.pxEllipse(c, hx, gy, 62, 26, 13, 4, t * 6); c.globalAlpha = 0.22; c.beginPath(); c.ellipse(ax, ay, 16, 7, 0, 0, 6.2832); c.fill(); c.globalAlpha = 1; G.pxEllipse(c, ax, ay, 16, 7, 13); }
+            unit(c, 'leafy', hx, gy, false);
+            [[0.62, -6], [0.72, 4], [0.66, 10]].forEach(([fx, dy], i) => unit(c, i ? 'babybear' : 'bear', Math.round(x + w * fx), gy + dy - 4, false, -1, boom));
+            if (boom) { const f = (T - 1.9) / 0.6; G.pxEllipse(c, ax, ay, 4 + f * 18, 2 + f * 8, f < 0.3 ? 9 : 14); G.pxDisc(c, ax, ay - 2, 10 * (1 - f) + 2, 5 * (1 - f) + 1, 14, 1 - f); }
+            H().key(c, bx, by, 20, 20, aiming, aiming ? 13 : 5); H().icon(c, 'i_fire', bx + 10, by + 10);
+            const hxp = aiming ? Math.round(bx + 10 + (ax - (hx + 14)) * 0.25) : bx + 10, hyp = aiming ? Math.round(by + 10 - k * 10) : by + 10;
+            if (T < 2.2) ptr(dk)(c, hxp, hyp, aiming);
+            G.cn(c, aiming ? '拖曳選落點' : boom ? '放開＝施放' : '按住技能', x + w / 2, y + 4, aiming ? 13 : 9, 0.5);
+          }
+        },
+        {
+          t: '取消施放', m: '瞄準時把手指拖到上方的「取消」再放開，就不會施放。電腦版按 Esc 或滑鼠右鍵',
+          draw(c, x, y, w, h, t, dk) {
+            const T = t % 3.2, gy = Math.round(y + h * 0.58), hx = Math.round(x + w * 0.25), bx = Math.round(x + w - 26), by = Math.round(y + h - 24), cx0 = bx - 8, cy0 = by - 30;
+            const k = ss(seg(T, 0.9, 1.6)), on = T > 0.4 && T < 2.0, hot = T > 1.5 && T < 2.0;
+            if (on) { c.globalAlpha = 0.18; c.fillStyle = P[hot ? 10 : 13]; c.beginPath(); c.ellipse(hx + 40, gy, 16, 7, 0, 0, 6.2832); c.fill(); c.globalAlpha = 1; G.pxEllipse(c, hx + 40, gy, 16, 7, hot ? 10 : 13);
+              c.fillStyle = P[hot ? 10 : 2]; c.beginPath(); c.arc(cx0, cy0, 9, 0, 6.2832); c.fill(); c.fillStyle = P[9]; for (let q = -3; q <= 3; q++) { c.fillRect(cx0 + q, cy0 + q, 1, 1); c.fillRect(cx0 + q, cy0 - q, 1, 1); } G.cn(c, '取消', cx0, cy0 + 11, hot ? 10 : 7, 0.5); }
+            unit(c, 'leafy', hx, gy, false);
+            H().key(c, bx, by, 20, 20, on, 5); H().icon(c, 'i_fire', bx + 10, by + 10);
+            if (T < 2.3) ptr(dk)(c, Math.round(lerp(bx + 6, cx0, k)), Math.round(lerp(by + 6, cy0, k)), on);
+            G.cn(c, T >= 2.0 ? '已取消' : hot ? '放開＝取消' : '拖到「取消」', x + w / 2, y + 4, hot || T >= 2.0 ? 10 : 9, 0.5);
+          }
+        },
+        {
+          t: '塔的警戒', m: '走進敵塔範圍時，地上會出現粉紅色的圈。被塔鎖定時會響警示音，英雄頭上冒出紅色驚嘆號',
+          draw(c, x, y, w, h, t) {
+            const T = t % 3.6, gy = Math.round(y + h * 0.78), tx = Math.round(x + w * 0.74), hx = Math.round(lerp(x + 14, x + w * 0.42, ss(seg(T, 0, 1.2)))), lk = T > 1.2;
+            const rx = 58, ry = 24; c.globalAlpha = lk ? 0.18 : 0.12; c.fillStyle = P[lk ? 10 : 19]; c.beginPath(); c.ellipse(tx, gy - 4, rx, ry, 0, 0, 6.2832); c.fill(); c.globalAlpha = 1; G.pxEllipse(c, tx, gy - 4, rx, ry, lk ? 10 : 19, lk ? 0 : 4, t * 6);
+            tower(c, 'enemy_tower', tx, gy);
+            unit(c, 'leafy', hx, gy - 2, T < 1.2, 1, lk && ((T * 3) | 0) % 2 === 0);
+            if (lk) { const by = gy - 30 + Math.round(Math.abs(Math.sin(t * 7)) * -2); c.fillStyle = P[0]; c.fillRect(hx - 2, by - 1, 5, 11); c.fillStyle = P[10]; c.fillRect(hx - 1, by, 3, 6); c.fillRect(hx - 1, by + 7, 3, 2);
+              const f = ((T - 1.2) * 1.5) % 1; G.pxDisc(c, Math.round(lerp(tx - 4, hx, f)), Math.round(lerp(gy - 40, gy - 10, f)), 2, 2, 10, 1); }
+            G.cn(c, lk ? '被鎖定了！' : '進入塔的範圍', x + w / 2, y + 4, lk ? 10 : 19, 0.5);
+          }
+        },
+        {
+          t: '特殊藥水', m: '無敵藥水 2.5 秒內不受傷害；復活藥水放在背包，陣亡時會自動原地復活',
+          draw(c, x, y, w, h, t) {
+            const T = t % 4, gy = Math.round(y + h * 0.72), hx = Math.round(x + w * 0.4), inv = T < 2;
+            unit(c, 'leafy', hx, gy, false);
+            if (inv) { G.pxEllipse(c, hx, gy - 8, 10, 11, 13, 5, t * 14); const f = (T * 2) % 1; G.pxDisc(c, Math.round(lerp(x + w - 10, hx + 10, f)), gy - 10, 2, 2, 10, 1); if (f > 0.85) G.pxEllipse(c, hx + 9, gy - 10, 3, 3, 13); H().icon(c, 'p_inv', x + 14, y + 22); G.cn(c, '無敵藥水', x + 24, y + 16, 13); }
+            else { const f = (T - 2) / 2; H().icon(c, 'p_rev', x + 14, y + 22); G.cn(c, '復活藥水', x + 24, y + 16, 19); c.fillStyle = P[9]; c.globalAlpha = Math.max(0, 1 - f * 2); c.fillRect(hx - 1, y, 3, gy - y); c.globalAlpha = 1; G.pxEllipse(c, hx, gy, 6 + f * 26, 3 + f * 10, 19); }
+            G.cn(c, inv ? '不受傷害' : '原地復活！', x + w - 6, y + 4, inv ? 13 : 19, 1);
+          }
+        },
         {
           t: '戰鬥數據', m: '左上角鑰匙旁邊的 K/D/A 顯示擊殺／陣亡／助攻；點開可以看野怪、推塔、金幣、傷害等即時數據',
           draw(c, x, y, w, h, t, dk) {
@@ -1697,6 +1784,7 @@ G.Menus = (() => {
   M.key = k => {
     const s = U().screen;
     if ((k === 'escape' || k === 'backspace') && s === 'store' && G.Store.esc()) return;
+    if (s === 'menu' && devAsk) { if (/^[0-9]$/.test(k)) devInput(k); else if (k === 'backspace') devInput('del'); else if (k === 'escape') devAsk = null; return; }
     if (s === 'menu' && setOpen) { if (k === 'escape' || k === 'enter' || k === 'backspace') setOpen = false; return; }
     if (s === 'tap') { G.Intro.start(); return; }
     if (s === 'intro') { if (k === 'escape' || k === 'enter' || k === ' ') G.Intro.skip(); return; }
