@@ -113,6 +113,7 @@ G.Audio = (() => {
     opClash: t => { [523, 659, 784, 1047].forEach((f, i) => osc('sine', f, f, t + i * 0.025, 1.4, 0.06, sfxBus, { atk: 0.008 })); osc('sine', 110, 70, t, 0.5, 0.18, sfxBus, { atk: 0.01 }); noise(t, 1.0, 0.04, 'highpass', 5000, 9000, 1); },
     // v2.5 開場：戰鼓、首領咆哮、衝鋒
     opDrum: t => { osc('sine', 90, 50, t, 0.25, 0.22); noise(t, 0.12, 0.12, 'lowpass', 600, 150); osc('sine', 90, 50, t + 0.18, 0.18, 0.12); },
+    opStomp: t => { osc('sine', 120, 35, t, 0.35, 0.45); noise(t, 0.25, 0.3, 'lowpass', 1200, 80); noise(t, 0.04, 0.15, 'bandpass', 2500, 1500, 2); },
     opRoar: t => { noise(t, 0.7, 0.3, 'bandpass', 250, 120, 1.5); osc('sawtooth', 110, 60, t, 0.7, 0.08, sfxBus, { lp: 500, atk: 0.05 }); osc('sine', 55, 40, t, 0.7, 0.2); },
     opCharge: t => { noise(t, 0.45, 0.12, 'bandpass', 400, 3000, 1); osc('sawtooth', 110, 330, t, 0.45, 0.05, sfxBus, { lp: 1600, atk: 0.3 }); for (let i = 0; i < 6; i++) noise(t + i * 0.07, 0.05, 0.06, 'bandpass', 900, 600, 2); },
     swoosh: t => { noise(t, 0.32, 0.12, 'bandpass', 600, 3200, 1.2); noise(t + 0.05, 0.25, 0.05, 'highpass', 2500, 6000, 0.8); },
