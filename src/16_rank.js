@@ -114,6 +114,22 @@ G.Rank = (() => {
     if (pend && K.joined() && !G.Team.dev && Date.now() - lastSub > (G.RANK_GAP + 1) * 1000) { K.submit(); return; }
     K.poll();
   };
+  // ---- v2.8.1 管理（開發者模式）：隱藏／復原／永久刪除；密鑰存在這台裝置（leafwar_adm），不進存檔碼 ----
+  K.admKey = () => { try { return localStorage.getItem('leafwar_adm') || ''; } catch (e) { return ''; } };
+  K.adm = { list: null, busy: 0, err: '' };
+  K.admLoad = async key => {
+    const k = key || K.admKey(); if (!k || K.adm.busy) return false;
+    K.adm.busy = 1; K.adm.err = '';
+    let j; try { const r = await fetch(G.RANK_URL + '/admin/list?key=' + encodeURIComponent(k)); j = await r.json(); } catch (e) { j = { err: 'net' }; }
+    K.adm.busy = 0;
+    if (Array.isArray(j)) { K.adm.list = j; if (key) try { localStorage.setItem('leafwar_adm', key); } catch (e) { } return true; }
+    K.adm.err = j.err === 'auth' ? '密鑰不對' : '連不上伺服器'; if (j.err === 'auth' && !key) try { localStorage.removeItem('leafwar_adm'); } catch (e) { }
+    return false;
+  };
+  K.admAct = async (act, id, h) => {
+    const j = await req('/admin/' + act, { key: K.admKey(), id, h }); if (!j.ok) { K.adm.err = '操作失敗'; return; }
+    G.Audio.play(act === 'del' ? 'deny' : 'tick'); lastPoll = -1e12; await K.admLoad();
+  };
   K._mock = () => {                                                              // 測試用：假資料（20 人、含長名字）
     const nm = ['葉子王', '小派', '阿明', '超級無敵大豌豆', 'Leafy99', '風之子', 'ABCDEFGH', '豆豆', '阿珠', '小樹苗', '火焰射手', '冰霜', '雷神', '阿傑', 'Mia', 'Ken', '老王', '小美', '長名字測試八', '路人'];
     const base = { heroes: [11, 0.5], minions: [18, 0.5], games: [300, 7], wr: [92.5, 2.3], kda: [9.87, 0.3], keys: [500, 13], dmg: [9876543, 400000], time: [360000, 9000], ach: [60, 2] }, cats = {};
@@ -126,92 +142,129 @@ G.Rank = (() => {
 })();
 
 // ---------- 排行榜畫面 ----------
+// v2.8.1：分類改成首頁那種上下滾輪（中間是選到的分類）；名字太長用「…」，每列一樣高；開發者模式可以管理玩家
 G.RankUI = (() => {
   const S = {}, P = G.PAL, R = G.Render, H = () => G.UI.h, ui = () => G.Menus.ui, K = () => G.Rank;
-  let cat = 0, quitT = 0;
-  S.reset = () => { quitT = 0; K().poll(true); };
-  S.esc = () => false;
-  S.cat = i => { cat = i; };                                                     // 測試用
-  // 分類格：直屏 3×3、橫屏左側一欄（每格同寬同高）
-  function grid(c, x, y, w, cols) {
-    const n = G.RANK_CATS.length, rows = Math.ceil(n / cols), cw = Math.floor(w / cols), ch = 15, rk = K().joined() ? K().ranks() : {};
-    H().box(c, x, y, cw * cols, rows * ch, 0, 3, false);
-    G.RANK_CATS.forEach(([k, sn], i) => {
-      const xx = x + (i % cols) * cw, yy = y + Math.floor(i / cols) * ch, on = i === cat;
-      if (on) H().box(c, xx + 1, yy + 1, cw - 2, ch - 2, 3, 9, false);
-      G.cn(c, sn, xx + cw / 2, yy + 1, on ? 9 : 5, 0.5);
-      if (rk[k] >= 1 && rk[k] <= 3) { c.fillStyle = P[0]; c.fillRect(xx + cw - 7, yy + 1, 5, 5); c.fillStyle = P[13]; c.fillRect(xx + cw - 6, yy + 2, 3, 3); }   // 自己在前三：黃點
-      ui().tap('rkc' + i, xx, yy, cw, ch, () => { if (cat !== i) { cat = i; G.Audio.play('tick'); } });
-    });
-    return [cw * cols, rows * ch];
+  let quitT = 0, adm = false, askDel = null;
+  const cw = G.UI.wheel();
+  const cat = () => cw.idx();
+  S.reset = () => { quitT = 0; adm = false; askDel = null; K().poll(true); };
+  S.esc = () => { if (adm) { adm = false; return true; } return false; };
+  S.cat = i => { cw.go(i); cw.pos = cw.tgt = i; cw.settled = true; };                         // 測試用
+  S.adm = on => { adm = on; if (on) K().admLoad(); };                                         // 測試用
+  // 名字太長：截斷加「…」
+  const ell = (s, maxW) => { if (G.cnW(s) <= maxW) return s; const a = [...s]; while (a.length > 1 && G.cnW(a.join('') + '…') > maxW) a.pop(); return a.join('') + '…'; };
+  // 分類滾輪：中間一格是選到的分類（全名），上下各露出一格（短名）
+  function wheel(c, x, y, w, vis) {
+    const n = G.RANK_CATS.length, step = 14, bh = 13, top = y, bot = top + step * (vis * 2 + 1), cy = top + vis * step + Math.round(step / 2), rk = K().joined() ? K().ranks() : {}, gt = ui().gt();
+    cw.update(G.Menus.dt || 1 / 60, n);
+    H().wheelBtn(cw, x, top, w, bot - top);
+    c.save(); c.beginPath(); c.rect(x - 2, top, w + 4, bot - top); c.clip();
+    const order = G.RANK_CATS.map((q, i) => i).sort((a, b) => Math.abs(b - cw.pos) - Math.abs(a - cw.pos));
+    for (const i of order) {
+      const [k, sn, full] = G.RANK_CATS[i], d = i - cw.pos, ad = Math.abs(d); if (ad > vis + 0.6) continue;
+      const ctr = ad < 0.5, w2 = w - 18 - Math.round(Math.min(ad, 2) * 8), xx = Math.round(x + (w - w2) / 2), yy = Math.round(cy - bh / 2 + d * step - (ctr ? Math.round(cw.bump) : 0));
+      if (ctr && cw.settled) { c.fillStyle = P[(Math.sin(gt * 4) > 0) ? 13 : 14]; c.fillRect(xx - 1, yy - 1, w2 + 2, bh + 2); }
+      H().key(c, xx, yy, w2, bh, 0, ctr ? 13 : 5, ctr ? 2 : 1);
+      G.cn(c, ctr ? full : sn, xx + w2 / 2, yy + 1, ctr ? 9 : 7, 0.5);
+      if (rk[k] >= 1 && rk[k] <= 3) { c.fillStyle = P[0]; c.fillRect(xx + w2 - 7, yy + 1, 5, 5); c.fillStyle = P[13]; c.fillRect(xx + w2 - 6, yy + 2, 3, 3); }   // 自己在前三：黃點
+      if (!ctr) { c.fillStyle = 'rgba(12,12,12,' + Math.min(0.55, ad * 0.3).toFixed(3) + ')'; c.fillRect(xx, yy, w2 + 1, bh + 1); }
+      ui().tap('rkw' + i, xx, yy, w2, bh, () => { if (Math.abs(cw.pos - i) >= 0.5) cw.go(i); });
+      H().tagWheel(cw);
+    }
+    c.restore();
+    const ax = Math.round(Math.abs(Math.sin(gt * 4)) * 2); c.fillStyle = P[13];                // 左右黃色箭頭（和首頁一樣）
+    for (let q = 0; q < 4; q++) { c.fillRect(x + 2 - ax + q, cy - 3 + q, 1, 7 - q * 2); c.fillRect(x + w - 3 + ax - q, cy - 3 + q, 1, 7 - q * 2); }
+    return bot - top;
   }
   function badge(c, x, y, r) {
     if (r <= 3) { c.fillStyle = P[0]; c.fillRect(x, y, 13, 12); c.fillStyle = P[[13, 7, 14][r - 1]]; c.fillRect(x + 1, y + 1, 11, 10); G.text(c, String(r), x + 7, y + 4, 0, 0.5); }
     else G.cn(c, String(r), x + 6, y, 5, 0.5);
   }
+  // 底部列：文字 1～2 行（高度跟著行數），右邊一顆按鈕
+  function bar(c, x, B, W, lines, col, btn) {
+    const tw = W - (btn ? 70 : 10), ls = [].concat(...lines.filter(Boolean).map(l => G.cnWrap(l, tw))).slice(0, 2), h = ls.length > 1 ? 32 : 22, by = B - h;
+    H().box(c, x, by, W, h, 1, col, false);
+    ls.forEach((l, i) => G.cn(c, l, x + 5, by + (ls.length > 1 ? 3 + i * 13 : 5), i === 0 ? 9 : 6));
+    if (btn) { const bw = 56, bx = x + W - bw - 4, byy = by + Math.round((h - 15) / 2); (btn[3] ? ui().btnPrimary : ui().btnSecondary)(c, btn[0], bx, byy, bw, 15, btn[1], btn[2]); }
+    return h;
+  }
   S.draw = c => {
     const M = ui(); M.tick(); M.bg(c);
-    const y0 = M.header(c, '排行榜'), I = R.ins, L = I.l, Rr = R.uw - I.r, B = R.uh - I.b, LD = R.uw > R.uh * 1.15, Kk = K(), b = Kk.board(), st = Kk.state(), me = Kk.me();
-    if (b) G.cn(c, '共 ' + b.n + ' 人', Rr, I.t + 1, 6, 1);
-    const W = Math.min(Rr - L, 420), x = Math.round((L + Rr) / 2 - W / 2), [k, , full] = G.RANK_CATS[cat];
+    const y0 = M.header(c, adm ? '管理玩家' : '排行榜'), I = R.ins, L = I.l, Rr = R.uw - I.r, B = R.uh - I.b, LD = R.uw > R.uh * 1.15, Kk = K(), b = Kk.board(), st = Kk.state(), me = Kk.me();
+    const W = Math.min(Rr - L, 420), x = Math.round((L + Rr) / 2 - W / 2);
+    if (adm) return admin(c, M, x, y0, W, B);
+    // 標題列右邊：人數＋更新狀態
+    const age = Kk.age(), stTxt = !Kk.on() ? '' : st === 'quota' ? '額度用完' : st === 'err' ? '連不上' : st === 'load' ? '讀取中' : age >= 0 ? (age < 3 ? '剛剛更新' : age + ' 秒前') : '';
+    const hd = (b ? b.n + ' 人' : '') + (b && stTxt ? '・' : '') + stTxt; if (hd) G.cn(c, hd, Rr, I.t + 1, st === 'err' || st === 'quota' ? 10 : 6, 1);
+    const k = G.RANK_CATS[cat()][0];
     let lx = x, lw = W, y = y0;
-    if (LD) { const [gw] = grid(c, x, y, 96, 3); lx = x + gw + 6; lw = W - gw - 6; }
-    else { const [, gh] = grid(c, x, y, W, 3); y += gh + 4; }
-    // 清單標題：分類全名＋更新狀態
-    const age = Kk.age(), stTxt = !Kk.on() ? '' : st === 'quota' ? '額度用完' : st === 'err' ? '連不上' : st === 'load' ? '讀取中' : age >= 0 ? (age < 3 ? '剛剛更新' : age + ' 秒前更新') : '';
-    G.cn(c, full, lx, y, 13); if (stTxt) G.cn(c, stTxt, lx + lw - 6, y, st === 'ok' || st === 'idle' ? 5 : 10, 1);
-    y += 15;
-    const barH = 32, listH = B - barH - 3 - y;
-    // ---- 清單 ----
+    if (LD) { wheel(c, x, y + 4, 96, 2); lx = x + 102; lw = W - 102; }
+    else { y += wheel(c, x, y, W, 1) + 4; }
+    // ---- 底部：我的名次＋參加／退出 ----
+    let lines, btn = null, col = 3;
+    if (G.Team.dev) { lines = ['開發者模式', '不上傳排行']; if (Kk.on()) btn = ['rkAdm', '管理玩家', () => { adm = true; askDel = null; Kk.admLoad(); G.Audio.play('open'); }]; }
+    else if (!Kk.on()) lines = ['排行榜準備中'];
+    else if (!Kk.joined()) { lines = Kk.name() ? ['參加後就能上榜', Kk.name()] : ['先存檔取個名字', '就能參加排行']; btn = Kk.name() ? ['rkJoin', '參加排行', () => Kk.join(), 1] : ['rkSave', '前往存檔', () => M.go('save'), 1]; }
+    else {
+      col = 13; const r = Kk.ranks()[k] || 0, my = Kk.mine(k), g = Kk.stats().games;
+      if ((k === 'wr' || k === 'kda') && g < 10) lines = ['你：還沒上榜', '還差 ' + (10 - g) + ' 場才上榜'];
+      else if (!r) lines = ['你：還沒上榜', '目前 ' + Kk.fmt(k, my)];
+      else { const rt = '你：' + (r > 20 ? '20 名以外' : '第 ' + r + ' 名'), vt = Kk.fmt(k, my); lines = G.cnW(rt + '　' + vt) <= W - 70 ? [rt + '　' + vt] : [rt, '目前 ' + vt]; }
+      const ask = quitT && Date.now() - quitT < 3000;
+      btn = ['rkQuit', ask ? '確定退出' : '退出排行', () => { if (ask) { quitT = 0; Kk.leave(); } else quitT = Date.now(); G.Audio.play('tick'); }];
+    }
+    const bh = bar(c, x, B, W, lines, col, btn), listH = B - bh - 3 - y;
+    // ---- 清單（每列固定 15 高；名字放不下用「…」）----
     const rows = b && b.cats[k] || [];
     if (!b || !rows.length) {
       const msg = !Kk.on() ? '排行榜準備中，敬請期待' : st === 'quota' ? '今天的排行額度用完了，早上 8 點恢復' : st === 'err' ? '暫時連不上排行榜，稍後會自動再試' : !b ? '讀取中…' : (k === 'wr' || k === 'kda') ? '還沒有人打滿 10 場，快來搶第一！' : '還沒有人上榜，快來搶第一！';
       G.cnWrap(msg, lw - 12).forEach((l, i) => G.cn(c, l, lx + lw / 2 - 3, y + 16 + i * 13, 6, 0.5));
-    } else {
-      M.scrollDetail(c, lx, y, lw - 6, listH, 'rk' + k, yy => {
-        rows.forEach(([id, nm, v], i) => {
-          const w = lw - 6, mine = me && id === me.id, vs = Kk.fmt(k, v), vw = G.cnW(vs), avail = w - 21 - 5, two = G.cnW(nm) + vw + 8 > avail, hh = two ? 27 : 15;
-          if (yy + hh <= y || yy >= y + listH) { yy += hh + 1; return; }      // 捲出清單範圍的列不畫（不會疊到底部名次列）
-          H().box(c, lx, yy, w, hh - 1, 1, mine ? 13 : i < 3 ? [13, 7, 14][i] : 3, false);
-          badge(c, lx + 3, yy + 1, i + 1);
-          G.cnWrap(nm, avail).slice(0, 1).forEach(l => G.cn(c, l, lx + 19, yy + 1, mine ? 13 : 9));
-          G.cn(c, vs, lx + w - 4, yy + 1 + (two ? 12 : 0), mine ? 13 : i < 3 ? 9 : 7, 1);
-          yy += hh + 1;
-        });
-        return yy;
-      }, M.SM);
+      return;
     }
-    // ---- 底部：我的名次＋參加／退出 ----
-    const by = B - barH;
-    H().box(c, x, by, W, barH, 1, me && Kk.joined() ? 13 : 3, false);
-    const bw = 56, bx = x + W - bw - 4, tw = W - bw - 14;
-    let l1, l2 = '';
-    if (G.Team.dev) l1 = '開發者模式不上傳排行';
-    else if (!Kk.on()) l1 = '排行榜準備中';
-    else if (!Kk.joined()) { l1 = Kk.name() ? '參加後就能上榜' : '先存檔取個名字'; l2 = Kk.name() ? Kk.name() : '就能參加排行'; }
-    else {
-      const r = Kk.ranks()[k] || 0, my = Kk.mine(k);
-      if ((k === 'wr' || k === 'kda') && Kk.stats().games < 10) { l1 = '你：還沒上榜'; l2 = '還差 ' + (10 - Kk.stats().games) + ' 場才上榜'; }
-      else if (!r) { l1 = '你：還沒上榜'; l2 = '目前 ' + Kk.fmt(k, my); }
-      else {
-        const rt = '你：' + (r > 20 ? '20 名以外' : '第 ' + r + ' 名'), vt = Kk.fmt(k, my), up = r > 1 && r <= 21 && rows[r - 2] ? rows[r - 2][2] - my : 0;
-        const gt2 = up > 0 ? '差上一名 ' + Kk.fmt(k, k === 'wr' || k === 'kda' ? up : Math.ceil(up)) : r === 1 ? '你是第一名！' : '';
-        if (G.cnW(rt + '　' + vt) <= tw) { l1 = rt + '　' + vt; l2 = gt2; } else { l1 = rt; l2 = gt2 && G.cnW(gt2) <= tw ? gt2 : '目前 ' + vt; }   // 放不下就把數值換到第二行
-      }
-    }
-    const ls1 = G.cnWrap(l1, tw), ls2 = l2 ? G.cnWrap(l2, tw) : [], all = ls1.length + ls2.length <= 2 ? ls1.concat(ls2) : ls1.slice(0, 2);   // 最多兩行：放不下就只留第一句
-    all.forEach((l, i) => G.cn(c, l, x + 5, by + (all.length > 1 ? 3 + i * 13 : 10), i === 0 ? 9 : 6));
-    if (!G.Team.dev && Kk.on()) {
-      const byy = by + 8;
-      if (!Kk.joined()) {
-        if (Kk.name()) M.btnPrimary(c, 'rkJoin', bx, byy, bw, 15, '參加排行', () => Kk.join());
-        else M.btnPrimary(c, 'rkSave', bx, byy, bw, 15, '前往存檔', () => M.go('save'));
-      } else {
-        const ask = quitT && Date.now() - quitT < 3000;
-        M.btnSecondary(c, 'rkQuit', bx, byy, bw, 15, ask ? '確定退出' : '退出排行', () => { if (ask) { quitT = 0; Kk.leave(); G.Audio.play('tick'); } else { quitT = Date.now(); G.Audio.play('tick'); } });
-      }
-    }
+    M.scrollDetail(c, lx, y, lw - 6, listH, 'rk' + k, yy => {
+      rows.forEach(([id, nm, v], i) => {
+        if (yy + 15 <= y || yy >= y + listH) { yy += 16; return; }                          // 捲出清單範圍的列不畫
+        const w = lw - 6, mine = me && id === me.id, vs = Kk.fmt(k, v), vw = G.cnW(vs);
+        H().box(c, lx, yy, w, 14, 1, mine ? 13 : i < 3 ? [13, 7, 14][i] : 3, false);
+        badge(c, lx + 3, yy + 1, i + 1);
+        G.cn(c, ell(nm, w - 19 - vw - 10), lx + 19, yy + 1, mine ? 13 : 9);
+        G.cn(c, vs, lx + w - 4, yy + 1, mine ? 13 : i < 3 ? 9 : 7, 1);
+        yy += 16;
+      });
+      return yy;
+    }, M.SM);
   };
+  // ---- 管理玩家（開發者模式）：隱藏＝不出現在排行、可復原；刪除＝永久移除（要按兩下）----
+  function admin(c, M, x, y, W, B) {
+    const Kk = K(), A = Kk.adm, key = Kk.admKey();
+    const bh = bar(c, x, B, W, ['隱藏可以復原', '刪除無法復原'], 3, ['rkAdmBk', '返回', () => { adm = false; askDel = null; G.Audio.play('click'); }]);
+    if (!key || (!A.list && A.err === '密鑰不對')) {                                           // 第一次：貼上管理密鑰
+      G.cnWrap('第一次使用請貼上管理密鑰（只存在這台裝置）', W - 8).forEach((l, i) => G.cn(c, l, x + 4, y + i * 13, 7));
+      const iy = y + 30, e = G.Dom.place('adm', 'input', x + 4, iy, W - 72, 18, { ph: '管理密鑰', max: 64 });
+      M.btnPrimary(c, 'rkAdmOk', x + W - 62, iy + 1, 58, 16, '確定', async () => { const v = (e.value || '').trim(); if (v && await Kk.admLoad(v)) { e.value = ''; G.Audio.play('level'); } else G.Audio.play('deny'); });
+      if (A.err) G.cn(c, A.err, x + 4, iy + 24, 10);
+      return;
+    }
+    if (!A.list) { G.cn(c, A.busy ? '讀取中…' : A.err || '讀取中…', x + W / 2, y + 16, A.err ? 10 : 6, 0.5); if (!A.busy && !A.err) Kk.admLoad(); return; }
+    const hid = A.list.filter(p => p.hidden).length;
+    G.cn(c, A.err || '共 ' + A.list.length + ' 人' + (hid ? '・隱藏 ' + hid : ''), x, y, A.err ? 10 : 13);   // 錯誤訊息直接取代人數，不並排
+    const ly = y + 15, listH = B - bh - 3 - ly;
+    M.scrollDetail(c, x, ly, W - 6, listH, 'rkadm', yy => {
+      A.list.forEach(p => {
+        if (yy + 15 <= ly || yy >= ly + listH) { yy += 16; return; }
+        const w = W - 6, bw = 30, del = askDel && askDel.id === p.id && Date.now() - askDel.t < 3000, info = p.games + ' 場';
+        H().box(c, x, yy, w, 14, 1, p.hidden ? 2 : 3, false);
+        const iw = G.cnW(info), nx = x + 4, nmax = w - 4 - (bw * 2 + 6) - iw - 12;
+        G.cn(c, ell(p.name, nmax), nx, yy + 1, p.hidden ? 4 : 9);
+        G.cn(c, info, x + w - bw * 2 - 10, yy + 1, 5, 1);
+        M.btnSecondary(c, 'ah' + p.id, x + w - bw * 2 - 4, yy + 1, bw, 12, p.hidden ? '復原' : '隱藏', () => Kk.admAct('hide', p.id, p.hidden ? 0 : 1));
+        (del ? M.btnPrimary : M.btnSecondary)(c, 'ad' + p.id, x + w - bw - 2, yy + 1, bw, 12, del ? '確定' : '刪除', () => { if (del) { askDel = null; Kk.admAct('del', p.id); } else { askDel = { id: p.id, t: Date.now() }; G.Audio.play('tick'); } });
+        yy += 16;
+      });
+      return yy;
+    }, M.SM);
+  }
   return S;
 })();
 G.Menus.rank = c => G.RankUI.draw(c);

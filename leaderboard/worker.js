@@ -2,7 +2,8 @@
 // GET  /board              → 9 個分類前 20 名＋最近的「登上第 1 名」消息（30 秒快取）
 // POST /submit {id,tok,name,s} → 更新自己的數據，回傳自己在各分類的名次
 // POST /leave  {id,tok}    → 退出排行（刪除自己的資料）
-// 管理（需要 ADMIN_KEY）：GET /admin/list?key=…、POST /admin/del {key,id}
+// 管理（需要 ADMIN_KEY）：GET /admin/list?key=…、POST /admin/hide {key,id,h}（隱藏／復原）、POST /admin/del {key,id}（永久刪除）
+// v2.8.1：players.hidden＝1 的玩家不出現在排行（可復原）
 const CATS = ['heroes', 'minions', 'games', 'wr', 'kda', 'keys', 'dmg', 'time', 'ach'];
 const QUAL = { wr: 'games >= 10', kda: 'games >= 10' };          // 勝率、KDA 至少 10 場才上榜
 const FIELDS = ['heroes', 'minions', 'games', 'wins', 'kills', 'deaths', 'assists', 'keys', 'dmg', 'time', 'ach'];
@@ -25,17 +26,17 @@ const isQuota = e => /limit|exceed|quota/i.test(String((e && e.message) || e));
 
 async function board(env) {
   if (cache && Date.now() - cacheT < CACHE_MS) return cache;
-  const qs = CATS.map(k => env.DB.prepare(`SELECT id, name, ${k} AS v FROM players WHERE ${QUAL[k] || k + ' > 0'} ORDER BY ${k} DESC, created ASC LIMIT ${TOP}`));
+  const qs = CATS.map(k => env.DB.prepare(`SELECT id, name, ${k} AS v FROM players WHERE hidden = 0 AND ${QUAL[k] || k + ' > 0'} ORDER BY ${k} DESC, created ASC LIMIT ${TOP}`));
   qs.push(env.DB.prepare('SELECT id, t, pid, name, cat FROM news ORDER BY id DESC LIMIT 20'));
-  qs.push(env.DB.prepare('SELECT COUNT(*) AS n FROM players'));
+  qs.push(env.DB.prepare('SELECT COUNT(*) AS n FROM players WHERE hidden = 0'));
   const rs = await env.DB.batch(qs), cats = {};
   CATS.forEach((k, i) => { cats[k] = rs[i].results.map(r => [r.id, r.name, r.v]); });
   cache = { t: Date.now(), cats, news: rs[CATS.length].results, n: rs[CATS.length + 1].results[0].n }; cacheT = Date.now();
   return cache;
 }
 async function ranks(env, p) {
-  const qs = CATS.map(k => (QUAL[k] ? p.games < 10 : !(p[k] > 0)) ? null
-    : env.DB.prepare(`SELECT COUNT(*) AS n FROM players WHERE ${QUAL[k] ? QUAL[k] + ' AND ' : ''}(${k} > ?1 OR (${k} = ?1 AND created < ?2))`).bind(p[k], p.created));
+  const qs = CATS.map(k => (p.hidden || (QUAL[k] ? p.games < 10 : !(p[k] > 0))) ? null
+    : env.DB.prepare(`SELECT COUNT(*) AS n FROM players WHERE hidden = 0 AND ${QUAL[k] ? QUAL[k] + ' AND ' : ''}(${k} > ?1 OR (${k} = ?1 AND created < ?2))`).bind(p[k], p.created));
   const live = qs.filter(Boolean), rs = live.length ? await env.DB.batch(live) : [], out = {}; let j = 0;
   CATS.forEach((k, i) => { out[k] = qs[i] ? rs[j++].results[0].n + 1 : 0; });
   return out;
@@ -64,7 +65,7 @@ async function submit(req, env) {
     const c = await env.DB.prepare('SELECT COUNT(*) AS n FROM players WHERE ip = ? AND created > ?').bind(ih, now - 3600).first();
     if (c.n >= NEW_PER_IP_H) return J({ err: 'busy' }, 429);
   }
-  const p = { ...v, wr: v.games ? Math.round(v.wins / v.games * 1000) / 10 : 0, kda: Math.round((v.kills + v.assists) / Math.max(1, v.deaths) * 100) / 100, created: old ? old.created : now };
+  const p = { ...v, wr: v.games ? Math.round(v.wins / v.games * 1000) / 10 : 0, kda: Math.round((v.kills + v.assists) / Math.max(1, v.deaths) * 100) / 100, created: old ? old.created : now, hidden: old ? old.hidden : 0 };
   const before = await board(env);
   await env.DB.prepare(`INSERT INTO players (id, tok, name, ip, ${FIELDS.join(', ')}, wr, kda, created, updated) VALUES (?1, ?2, ?3, ?4, ${FIELDS.map((_, i) => '?' + (i + 5)).join(', ')}, ?16, ?17, ?18, ?19)
     ON CONFLICT(id) DO UPDATE SET name = excluded.name, ${FIELDS.map(f => f + ' = excluded.' + f).join(', ')}, wr = excluded.wr, kda = excluded.kda, updated = excluded.updated`)
@@ -86,8 +87,9 @@ async function leave(req, env) {
 async function admin(req, env, url) {
   const isPost = req.method === 'POST', b = isPost ? await req.json().catch(() => ({})) : {}, key = isPost ? b.key : url.searchParams.get('key');
   if (!env.ADMIN_KEY || key !== env.ADMIN_KEY) return J({ err: 'auth' }, 403);
-  if (url.pathname === '/admin/list') { const r = await env.DB.prepare('SELECT id, name, heroes, minions, games, wins, kills, deaths, assists, keys, dmg, time, ach, wr, kda, created, updated FROM players ORDER BY updated DESC LIMIT 200').all(); return J(r.results); }
-  if (url.pathname === '/admin/del' && isPost) { const r = await env.DB.prepare('DELETE FROM players WHERE id = ? OR name = ?').bind(String(b.id || ''), String(b.name || '\u0000')).run(); cache = null; return J({ ok: 1, deleted: r.meta.changes }); }
+  if (url.pathname === '/admin/list') { const r = await env.DB.prepare('SELECT id, name, hidden, heroes, minions, games, wins, kills, deaths, assists, keys, dmg, time, ach, wr, kda, created, updated FROM players ORDER BY updated DESC LIMIT 300').all(); return J(r.results); }
+  if (url.pathname === '/admin/hide' && isPost) { const r = await env.DB.prepare('UPDATE players SET hidden = ? WHERE id = ?').bind(b.h ? 1 : 0, String(b.id || '')).run(); cache = null; return J({ ok: 1, changed: r.meta.changes }); }
+  if (url.pathname === '/admin/del' && isPost) { const r = await env.DB.prepare('DELETE FROM players WHERE id = ? OR name = ?').bind(String(b.id || ''), String(b.name || '\u0000')).run(); await env.DB.prepare('DELETE FROM news WHERE pid = ?').bind(String(b.id || '')).run(); cache = null; return J({ ok: 1, deleted: r.meta.changes }); }
   return J({ err: 'nf' }, 404);
 }
 export default {
