@@ -1,5 +1,6 @@
 #!/bin/bash
 # Leaf of Legends 排行榜：一鍵部署／更新（可以重複執行）
+# （2026-11-19 起：source 分支一有推送，Cloudflare 會自動部署 leaderboard/，平常不用跑這支）
 # 第一次會開瀏覽器請你登入 Cloudflare 並按「Allow」；問要不要註冊 workers.dev 子網域時，輸入一個英文名字即可
 set -e
 cd "$(dirname "$0")"
