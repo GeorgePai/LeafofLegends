@@ -56,6 +56,7 @@ G.Unit = class {
       }
     }
     if (this.kind === 'creep') this.st.speed *= G.TUNE.creepSpeedMul;
+    const D = this.W && this.W.dif; if (D && this.side === 1 && !this.static) { this.st.hp = Math.round(this.st.hp * D.hp); this.st.power = Math.round(this.st.power * D.pow); }   // v3.0 關卡難度
     this.melee = this.st.range <= 40;
   }
   get r() { return this.vis.r; }
@@ -63,11 +64,13 @@ G.Unit = class {
 
 G.World = class {
   constructor(opt) {
-    this.stage = G.STAGES[opt.stage || 0];
+    this.stageI = opt.stage || 0; this.stage = G.STAGES[this.stageI] || G.STAGES[0];
+    this.dif = this.stage.dif || null; this.themeId = this.stage.theme || 'forest'; this.theme = this.stageI ? G.THEMES[this.themeId] : null;   // v3.0 關卡難度與場景
     const md = G.MAPS[this.stage.map], T = G.TILE;
     G.mapCache = G.mapCache || {};
     if (!G.mapCache[this.stage.map]) { const M = G.buildMap(md); G.mapCache[this.stage.map] = { M, ground: G.renderGround(M) }; }
     this.M = G.mapCache[this.stage.map].M; this.ground = G.mapCache[this.stage.map].ground;
+    if (this.theme && this.theme.nat) { const gk = this.stage.map + '|' + this.themeId; if (!G.mapCache[gk]) G.mapCache[gk] = G.withTheme(this.themeId, () => G.renderGround(this.M)); this.ground = G.mapCache[gk]; }
     this.units = []; this.projs = []; this.effects = []; this.decals = []; this.parts = new G.Particles(2600);
     this.spawnQ = []; this.time = 0; this.trauma = 0; this.flashScreen = 0; this.hitstop = 0; this.timeScale = 1;
     this.notices = []; this.stats = { kills: 0, time: 0, deaths: 0, assists: 0, camps: 0, towers: 0, gold: 0, dmg: 0, taken: 0, tower: 0, bosses: 0, hunters: 0, wboss: 0, potions: 0, tps: 0, maxFollow: 0, streak: 0, minHoly: 1, spent: 0 }; this.killT = [];   // 即時戰鬥數據
@@ -85,6 +88,7 @@ G.World = class {
       const name = side === 0 ? 'player_tower' : ['enemy_tower', 'enemy_tower2', 'enemy_tower3'][tier] || 'enemy_tower4';
       const u = this.add(new G.Unit(this, name, side, p[0] * T, p[1] * T, 1, 'tower')); u.lane = lane; u.tier = tier; this.towers[side].push(u);
       if (tier === 9) { const m = G.ORIG.towers.enemy_tower4; Object.assign(u.st, { hp: m.hp, power: m.power, armor: m.armor, range: m.range, delay: m.delay / 1000 }); u.hp = u.st.hp; u.main = true; }
+      if (side === 1 && this.dif) { u.st.hp = Math.round(u.st.hp * this.dif.tower); u.hp = u.st.hp; }   // v3.0 敵塔血量倍率
     }));
     // 保護鏈：同一路前一層塔沒倒，後一層有護盾；任一路內塔倒了才能打主塔；主塔倒了才能打聖所
     for (let side = 0; side < 2; side++) {
@@ -158,9 +162,10 @@ G.World = class {
       this.leafT = 0.22; const cam = G.Render.cam;
       if (!this.leafPool || this.time - (this.leafPoolT || -9) > 1) { this.leafPoolT = this.time; this.leafPool = this.M.props.filter(p => p.tree && Math.abs(p.x - cam.x) < 420 && Math.abs(p.y - cam.y) < 320); }
       const tr = this.leafPool.length && this.leafPool[(Math.random() * this.leafPool.length) | 0];
-      if (tr) this.parts.add(tr.x + G.rr(-8, 8), tr.y + G.rr(-2, 2), G.rr(30, 46), G.rr(10, 22), G.rr(-3, 3), G.rr(-4, 2), G.rr(2.8, 3.6), G.pick([22, 23, 22, 24, 16]), 3, 1, 9, 0, 2);
+      if (tr) this.parts.add(tr.x + G.rr(-8, 8), tr.y + G.rr(-2, 2), G.rr(30, 46), G.rr(10, 22), G.rr(-3, 3), G.rr(-4, 2), G.rr(2.8, 3.6), G.pick(this.theme ? this.theme.leaf : [22, 23, 22, 24, 16]), 3, 1, 9, 0, 2);
     }
     this.updateWaves(dt); this.updateSystems(dt);
+    if (this.stageI && !this.attract) { G.SoloW.tick(this, dt); G.SoloW.weather(this, dt); }   // v3.0 關卡特殊規則＋天氣
     if (G.Ach && !this.attract) G.Ach.tick(this, dt);
     // 廣播：最多同時顯示 4 則（上下堆疊），其餘排隊；顯示中的才計時
     if (this.notices.length) { for (let i = 0; i < Math.min(4, this.notices.length); i++) this.notices[i].age += dt; this.notices = this.notices.filter(n => n.age < n.t + G.NOTICE_OUT); }
@@ -197,15 +202,16 @@ G.World = class {
     if (this.over) return;
     for (let s = 0; s < 2; s++) {
       this.waveT[s] -= dt * (s === 0 && this.hero ? 1 + (this.hero.iWave || 0) / 100 : 1);   // 小兵藥水：我方出兵加速
-      if (this.waveT[s] <= 0) { this.waveT[s] = G.TUNE.waveInterval * (this.attract ? 0.5 : 1); this.spawnWave(s); }
+      if (this.waveT[s] <= 0) { this.waveT[s] = G.TUNE.waveInterval * (this.attract ? 0.5 : 1) * (s === 1 && this.dif ? this.dif.wave : 1); this.spawnWave(s); }
     }
     for (const q of this.spawnQ) q.t -= dt;
     for (const q of this.spawnQ.filter(q => q.t <= 0)) {
-      const lane = Math.min(q.lane ?? 1, this.nLanes - 1), [x, y] = this.laneSpawn[q.side][lane];
+      const lane = Math.min(q.lane ?? 1, this.nLanes - 1), [x, y] = q.at || this.laneSpawn[q.side][lane];
       // 雙生花：兩隻同時、左右並排出生（各自獨立行動）
       let sx = x + G.rr(-10, 10), sy = y + G.rr(-10, 10);
       if (q.twin != null) { const ox = x + (q.twin ? 8 : -8), oy = y + (q.twin ? 14 : -14); if (this.M.isWalk(ox, oy)) { sx = ox; sy = oy; } }
       const u = this.add(new G.Unit(this, q.name, q.side, sx, sy, q.level, q.kind || 'creep')); u.lane = lane;
+      if (q.ghost) { u.ghost = 1; u.hp = Math.max(1, Math.round(u.st.hp * q.ghost / 100)); }   // v3.0 亡者復甦：幽魂只剩部分血量
       G.FX.spawn(this, u); this.sfx('spawn', x, y);
     }
     this.spawnQ = this.spawnQ.filter(q => q.t > 0);
@@ -219,7 +225,8 @@ G.World = class {
         if (name === 'twinflower') { const t = (k++) * 0.4; for (let j = 0; j < 2; j++) this.spawnQ.push({ t, name, side: 0, level: this.stage.allyLevel, lane: l, twin: j }); }
         else this.spawnQ.push({ t: (k++) * 0.4, name, side: 0, level: this.stage.allyLevel, lane: l });
       });
-    } else {
+    } else if (this.stage.roster) { G.SoloW.wave(this, n); return; }   // v3.0 關卡：自訂敵人名單
+    else {
       // 依原著關卡順序逐波升級（第 n 波 = 原著第 n+1 關的敵人與等級）
       const st = G.ORIG.stages[Math.min(99, 1 + n)] || G.ORIG.stages[1], m = st.missions[0];
       for (let lane = 0; lane < this.nLanes; lane++) m.enemies.forEach((name, i) => this.spawnQ.push({ t: i * 0.45, name, side: 1, level: st.start_level, lane }));
@@ -249,7 +256,7 @@ G.World = class {
 
   // ---------- 移動 ----------
   moveDir(u, dx, dy, dt, mul = 1) {
-    const sp = u.st.speed * mul * (u.slow > 0 ? 0.5 : 1) * (u.iSpd || 1) * G.TUNE.moveMul;
+    const sp = u.st.speed * mul * (u.slow > 0 ? 0.5 : 1) * (u.iSpd || 1) * G.TUNE.moveMul * (this.wind > 0 ? G.SOLO_HZ.wind.k : 1) * (this.bliz > 0 ? G.SOLO_HZ.blizzard.k : 1);
     const k = G.damp(u.kind === 'hero' ? 20 : 9, dt);
     u.vx += (dx * sp - u.vx) * k; u.vy += (dy * sp - u.vy) * k;
     this.step(u, dt);
@@ -607,6 +614,7 @@ G.World = class {
     if ((t.side === 1 || t.side === 2) && (src === h || helped)) { const kc = G.keyCat(t); if (kc === 'boss') this.stats.bosses++; else if (kc === 'hunter') this.stats.hunters++; }
     if (t.side === 1 && src === h) { this.killT.push(this.time); this.killT = this.killT.filter(v => this.time - v <= 4); this.stats.streak = Math.max(this.stats.streak, this.killT.length); }   // 4 秒內連續擊倒
     this.tryKey(t, src);
+    if (this.stageI) G.SoloW.died(this, t);
     if (t.side === 1) this.killGold(t, src);
     if (t.side === 2) { if (h && h.alive && src && src.side === 0) this.gainExp(h, t.st.exp); this.wildReward(t, src); }
     if (t === h) { h.dead = Math.min(G.TUNE.heroRespawnMax, G.TUNE.heroRespawnBase + G.TUNE.heroRespawnPer * h.level + G.TUNE.heroRespawnMin * Math.max(0, this.time / 60 - 5)); h.cmd = null; h.pending = null; this.shake(0.5); this.clearFollow(); }

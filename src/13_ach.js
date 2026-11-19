@@ -76,7 +76,16 @@ G.ACH = [
   // v2.6 新增
   { id: 'early', c: 3, t: 1, n: '早起的鳥兒', d: '在早上 5～8 點打完一場戰鬥', hint: '太陽剛升起的時候……', g: 1, v: P => P.morning },
   { id: 'demoAll', c: 3, t: 3, n: '武學大全', d: '看過每位英雄每一招的技能展示', g: () => G.Ach.heroSkillIds().size, v: P => { const S = G.Ach.heroSkillIds(); return P.demo.filter(x => S.has(x)).length; } },
-  { id: 'scout', c: 3, t: 1, n: '戰場觀察家', d: '在戰鬥中打開大地圖 10 次', g: 10, v: P => P.maps }
+  { id: 'scout', c: 3, t: 1, n: '戰場觀察家', d: '在戰鬥中打開大地圖 10 次', g: 10, v: P => P.maps },
+  // v3.0 單人關卡
+  { id: 'stg1', c: 1, t: 1, n: '森林新兵', d: '通關「翠葉森林」', g: 1, v: P => P.stg && P.stg[1] ? 1 : 0 },
+  { id: 'stg2', c: 1, t: 2, n: '楓葉獵人', d: '通關「楓紅山谷」', g: 1, v: P => P.stg && P.stg[2] ? 1 : 0 },
+  { id: 'stg3', c: 1, t: 2, n: '破冰者', d: '通關「霜雪凍原」', g: 1, v: P => P.stg && P.stg[3] ? 1 : 0 },
+  { id: 'stg4', c: 1, t: 3, n: '浴火重生', d: '通關「熔岩火山」', g: 1, v: P => P.stg && P.stg[4] ? 1 : 0 },
+  { id: 'stg5', c: 1, t: 4, n: '深淵征服者', d: '通關「幽冥深淵」', g: 1, v: P => P.stg && P.stg[5] ? 1 : 0 },
+  { id: 'star3', c: 1, t: 2, n: '完美演出', d: '任一關拿到三顆星', g: 1, v: P => P.stg && Object.values(P.stg).some(q => q.s >= 3) ? 1 : 0 },
+  { id: 'starAll', c: 1, t: 4, n: '五星傳說', d: '五個關卡全部三顆星', g: 5, v: P => P.stg ? Object.values(P.stg).filter(q => q.s >= 3).length : 0 },
+  { id: 'huntKill', c: 1, t: 3, n: '獵人剋星', d: '在熔岩火山或幽冥深淵，一場擊倒 3 隻獵手並獲勝', g: 3, v: (P, B, M) => M && M.win && M.stage >= 4 ? M.st.hunters : 0 },
 ];
 G.ACH_BY = Object.fromEntries(G.ACH.map(a => [a.id, a]));
 
@@ -93,6 +102,7 @@ G.Ach = (() => {
     const p = v.p;
     for (const k of [...ADD, 'games', 'wins', 'chests', 'gamble5', 'codes', 'night', 'morning', 'maps']) if (typeof p[k] !== 'number') p[k] = 0;
     for (const k of ['guide', 'book', 'demo']) if (!Array.isArray(p[k])) p[k] = [];
+    if (!p.stg || typeof p.stg !== 'object' || Array.isArray(p.stg)) p.stg = {};   // v3.0 關卡紀錄 {關卡: {c 通關次數, s 最佳星數, t 最快秒數}}
     if (!p.best) p.best = {}; for (const k of BEST) if (typeof p.best[k] !== 'number') p.best[k] = 0;
     if (!v.ach) v.ach = {};
     return p;
@@ -155,12 +165,13 @@ G.Ach = (() => {
   };
   A.final = W => {
     if (W._fin || W.attract) return; W._fin = true;
+    if (G.SoloW) G.SoloW.finish(W, !!W.over.win);        // v3.0 關卡星等、獎勵（開發者模式也算星，但不給獎勵）
     if (A.off()) return;
     A.commit(W);
     const P = A.P(), win = !!W.over.win; P.games++; if (win) P.wins++;
     const hr = new Date().getHours(); if (hr < 5) P.night++; if (hr >= 5 && hr < 8) P.morning++;
     G.Team.save();
-    A.check({ win, st: W.stats, pts: W.loadPts }, W);
+    A.check({ win, st: W.stats, pts: W.loadPts, stage: W.stageI || 0 }, W);
     if (G.Rank) G.Rank.submit();                     // v2.8 戰鬥結束上傳排行
   };
   return A;

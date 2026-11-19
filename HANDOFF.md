@@ -52,6 +52,7 @@
 | 01b_necro / 06d_necro | **v2.6 死靈召喚力夫**：資料（技能 type 'necro'、`cds` 每級冷卻）；召喚物 `u.summoner`、`makeSummon`、`necroWhy`、`necroSkill`、`scapeHit`、特效、`G.lookOf/rampOf`、神話外框在 00_core（`G.mythGlow/rarGlow`）|
 | 06_fx / 06b_combat | 特效粒子；資料驅動戰鬥引擎（武器、傷害、狀態、技能） |
 | 06c_vfx | **技能特效（v1.5）**：加色光暈 `G.glow`、元素分類 `G.elemOf/G.ELEM`、`G.VFX`（施法法陣 `cast`、增益 `buffCast`、投射物外觀 `drawProj`＋殘影 `p.hist`＋拖尾 `trail`、命中 `impact/hitSpark`、星芒 `spark`、光源 `light/groundLight`、電弧 `arc`、落雷 `bolt`、光束 `beam`、隕石 `meteor/meteorImpact`、大地 `quake`、地刺 `spikes`、裂痕 `cracks`、身上狀態 `auraBack/auraFront`）。技能投射物帶 `fx`（元素）與 `fxS`（進階版）；延遲事件一律用 `G.VFX.later`，不用 setTimeout |
+| 06e_stages | **單人關卡（v3.0）**：`G.THEMES` 場景、`G.withTheme`／`G.themeImg`、9 個新敵人、`G.SOLO` 五關設定、`G.SOLO_HZ` 規則數值、`G.SoloW`（wave/tick/erupt/died/weather/finish/best/open） |
 | 07_world | 單位、AI、兵線、英雄指令、經驗升級、召集跟隨 `toggleFollow/followAI`、獵手 AI 分派 |
 | 07b_systems | 技能升級、金幣/商店/背包、計時增益、野區、技能數值表 `G.skillRows`、**敵方獵手 `hunter`（`spawnHunter/junglerAI/hunterReward`）、塔傳送 `startTeleport/updateTeleport`** |
 | 08_render | `R.resize`（固定比例＋整數倍）、`R.zoomMin`（可縮到全圖）、`R.hiQ/blitUI`、世界繪製（護盾光殼、稀有度外框、血條、準心、迷霧） |
@@ -66,6 +67,7 @@
 | 17_update | **版本更新通知（v2.8.5）**：`G.Update`（check/tick/corner/card、`_set/_open/force` 測試用）、讀 `version.json` |
 | 18_feedback | **反饋信箱（v2.8.6）**：`G.FbUI`（玩家寫信／看回覆；開發者模式＝玩家信箱）；連線在 16_rank 的 `K.fb*` |
 | 19_about | **關於（v2.8.6）**：`G.About` 片尾名單＋櫻花、結尾淡出回首頁（`post` 在首頁最後畫淡入）|
+| 20_solo | **選關畫面（v3.0）**：`G.Solo`（open/draw/key/stars、`_go` 測試用），畫面 `stages` |
 | 99_main | 啟動與主迴圈（啟動後先進 `intro` 畫面） |
 
 ## 5. 版本摘要（細節見 CHANGELOG.md）
@@ -85,6 +87,7 @@
 - v2.8.4：排行強制參加＋跳至自己、金銀銅外框固定、帳號管理（改名／登出／刪除）、存檔碼提醒、管理玩家幽靈帳號清除、教學拿掉英雄分類、圖鑑藥水併入分類條＋分頁式分類條＋資訊小按鈕
 - v2.8.6：反饋信箱（玩家↔開發者）、關於（片尾名單＋櫻花）、即時在線人數、商店橫屏不切、柔和選中光、App 圖示
 - v2.8.7：首頁聚光改橢圓、存檔→帳號／玩家名稱、說明文字重點上色、一帳號同時一台（/claim、moved）
+- v3.0：單人五關（場景、難度、特殊規則、9 個新敵人、選關畫面、星等獎勵、8 個成就）
 - v2.9：全部 71 個角色的專屬叫聲（轉盤停下／點中間角色）
 - v2.8.5：版本更新通知（version.json＋首頁右下「點擊更新」＋更新內容卡＋立即更新重新載入）
 - v2.4：敵塔範圍＋鎖定警示、道路 ×1.5、結算放慢＋鎖值＋音效、新藥水 5 種＋全部藥水特效、DEV 密碼、技能範圍顯示＋指定施放（拖曳／取消）、LOGO 改版、塔射程 190/210
@@ -103,6 +106,7 @@
 - （v2.8.4）**刪除帳號後舊存檔碼**：目前讀回舊存檔碼＝進度和排行回來（當成備份還原）；要不要讓伺服器記住已刪除帳號、讓舊碼失效？待 Pai 決定
 - （v2.8.6）排行榜伺服器 11/20 凌晨顯示 0 人（11/19 晚上還有 3 人）；這版只新增資料表沒動玩家資料，請 Pai 確認是不是自己清掉測試帳號
 - （v2.8.6）App 圖示（Leafy＋光芒＋草丘，`assets/icon-*.png`、`tools/icon_make.js`）與主畫面名稱「Leaf Legends」：Pai 可再要求改
+- （v3.0）單人關卡數值全部暫定（VALUES.md 6r）；只用「英雄不動」模擬過，需要 Pai 實際打打看調整難度。另外聖樹、塔、野區營地沒有跟著主題換造型
 - DEV 密碼只有 Pai 知道（程式內只有雜湊）；要改密碼請 Pai 提供新密碼，重算 `DEV_H`
 
 ## 7. 工作規則

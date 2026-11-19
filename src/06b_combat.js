@@ -39,7 +39,7 @@ G.skillSfx = SFX_OF;
 G.Combat = {
   // ---------- 普攻 ----------
   fire(u, t) {
-    u.atkT = u.st.delay * (u.bDel || 1) * (u.iDel || 1);
+    u.atkT = u.st.delay * (u.bDel || 1) * (u.iDel || 1) * (this.bliz > 0 ? G.SOLO_HZ.blizzard.atk : 1);   // v3.0 暴風雪：攻速變慢
     if (!t || !t.alive) { u.atkT = 0.15; return; }
     const w = G.ORIG.weapons[u.st.weapon] || { type: 'body', attack_type: 'single' }, opt = u.st.wopt || 0, pow = u.st.power;
     if (w.type !== 'body' && !u.static) u.recoil = 1;                   // 遠程：後座力（畫面用）

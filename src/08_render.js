@@ -140,7 +140,7 @@ G.Render = (() => {
       mk.ax = Math.round(gx); mk.ay = Math.round(gy - 8 - drop - bounce); mk.fade = fade;
     }
     // v2.5 河流微微流動：沿河道的短亮線順流移動、前後淡入淡出（只畫畫面內的，約幾十個像素）
-    { const rv = W.M.def.river, T = G.TILE; if (rv) { const pts = rv.pts; b.fillStyle = '#bcd8dc';
+    { const rv = W.M.def.river, T = G.TILE; if (rv) { const pts = rv.pts; b.fillStyle = W.theme ? W.theme.flow : '#bcd8dc';
       for (let i = 0; i < pts.length - 1; i++) { const [x0, y0] = pts[i], [x1, y1] = pts[i + 1], L = Math.hypot(x1 - x0, y1 - y0), ux = (x1 - x0) / L, uy = (y1 - y0) / L, n = Math.ceil(L * 1.4);
         for (let k = 0; k < n; k++) { const h1 = G.hash(i * 97 + k, 5), h2 = G.hash(i * 31 + k, 9), s2 = ((k + h1) / n + rt * (0.018 + h2 * 0.012)) % 1, lat = (h2 - 0.5) * 1.5 * rv.r;
           const wx = (x0 + ux * s2 * L - uy * lat) * T, wy = (y0 + uy * s2 * L + ux * lat) * T, sx = Math.round(wx * G.AX - ox), sy = Math.round(wy * G.AY - oy);
@@ -201,14 +201,14 @@ G.Render = (() => {
     const bars = [], arrows = [], reticles = [], flags = [];
     for (const it of list) {
       if (it.p) {
-        const p = it.p, s = p.s, ax = Math.round(p.x * G.AX - ox - s.w / 2), ay = Math.round(p.y * G.AY - oy - s.h + 2);
+        const p = it.p, s = p.s, ax = Math.round(p.x * G.AX - ox - s.w / 2), ay = Math.round(p.y * G.AY - oy - s.h + 2), sn = W.theme && W.theme.tree ? G.themeImg(s.n, W.themeId) : s.n;   // v3.0 主題換色
         if (p.tree) {                                    // v2.5 樹隨風搖：樹冠上段擺最多、中段一半、樹幹不動（三段貼圖，幾乎不耗效能）
           const ph = p.ph ?? (p.ph = G.hash(p.x | 0, p.y | 0) * 6.283), sw = Math.sin(rt * 1.3 + ph + p.x * 0.004) + Math.sin(rt * 2.9 + ph) * 0.25;
           const h1 = Math.round(s.h * 0.4), h2 = Math.round(s.h * 0.72) - h1, o1 = Math.round(sw * 1.2), o2 = Math.round(sw * 0.55);
-          b.drawImage(s.n, 0, 0, s.w, h1, ax + o1, ay, s.w, h1); b.drawImage(s.n, 0, h1, s.w, h2, ax + o2, ay + h1, s.w, h2); b.drawImage(s.n, 0, h1 + h2, s.w, s.h - h1 - h2, ax, ay + h1 + h2, s.w, s.h - h1 - h2);
+          b.drawImage(sn, 0, 0, s.w, h1, ax + o1, ay, s.w, h1); b.drawImage(sn, 0, h1, s.w, h2, ax + o2, ay + h1, s.w, h2); b.drawImage(sn, 0, h1 + h2, s.w, s.h - h1 - h2, ax, ay + h1 + h2, s.w, s.h - h1 - h2);
         } else {
           if (p.deco) G.pxDisc(b, ax + s.w / 2 + 2, ay + s.h - 1, s.w * 0.45, 2, 0, 0.5);
-          b.drawImage(s.n, ax, ay);
+          b.drawImage(sn, ax, ay);
           if (p.glow) { const fl = 0.75 + 0.15 * Math.sin(rt * 3 + p.x) + 0.1 * Math.sin(rt * 11 + p.y); G.glow(b, ax + s.w / 2, ay + 5, 9, 13, 0.32 * fl); G.glow(b, ax + s.w / 2, ay + s.h, 12, 13, 0.1 * fl, 0.5); }
         }
       } else if (it.u) {
@@ -314,6 +314,9 @@ G.Render = (() => {
     }
     W.parts.draw(b, ox, oy, W.frame, false);
     for (const e of W.effects) if (e.layer === 1 && e.draw) e.draw(b, o);
+    // v3.0 關卡整體調色（秋天偏暖、雪地偏冷、火山偏紅、深淵壓暗偏紫）；暴風雪時再蓋一層白霧
+    if (W.theme && W.theme.grade) { const [mode, col, a] = W.theme.grade; b.globalCompositeOperation = mode; b.globalAlpha = a; b.fillStyle = col; b.fillRect(0, 0, bw, bh); b.globalCompositeOperation = 'source-over'; b.globalAlpha = 1; }
+    if (W.bliz > 0) { b.globalAlpha = Math.min(0.28, W.bliz * 0.1, (G.SOLO_HZ.blizzard.dur - W.bliz) * 0.2 + 0.02); b.fillStyle = '#e8f2fa'; b.fillRect(0, 0, bw, bh); b.globalAlpha = 1; }
     // 迷霧：看不到的區域蓋上一層暗色（逐格淡入淡出，邊緣柔和）
     if (W.vis && !W.attract) {
       // 迷霧：地圖外圍的森林邊界也要蓋（向外延伸 PD 格，數值沿用最靠近的邊緣格），縮小時才不會出現一圈明顯的框線

@@ -1,5 +1,5 @@
 'use strict';
-G.VERSION = 'V2.9';                                  // 版本號（唯一來源；setup.sh 也從這行讀）
+G.VERSION = 'V3.0';                                  // 版本號（唯一來源；setup.sh 也從這行讀）
 /* =========================================================
    選單：首頁 / 隊伍 / 圖鑑 / 教學
    版面：直屏上下堆疊，橫屏左右分欄
@@ -372,7 +372,7 @@ G.Menus = (() => {
   const land = () => R.uw > R.uh * 1.15;
 
   // ---------- 首頁 ----------
-  const ITEMS = [['單人', 'SOLO', 'i_play', () => U().start()], ['多人', 'MULTI', 'i_users', () => { modal = 2.2; }], ['隊伍', 'TEAM', 'i_tree', () => go('team')], ['商店', 'SHOP', 'i_key', () => go('store')],
+  const ITEMS = [['單人', 'SOLO', 'i_play', () => G.Solo.open()], ['多人', 'MULTI', 'i_users', () => { modal = 2.2; }], ['隊伍', 'TEAM', 'i_tree', () => go('team')], ['商店', 'SHOP', 'i_key', () => go('store')],
     ['成就', 'TROPHY', 'i_trophy', () => go('ach')], ['排行', 'RANK', 'i_rank', () => go('rank')], ['圖鑑', 'BOOK', 'i_book', () => go('book')], ['教學', 'GUIDE', 'i_guide', () => M.openGuide(false)], ['帳號', 'ACCOUNT', 'i_save', () => go('save')], ['設定', 'SETTING', 'i_gear', () => { setOpen = true; }], ['反饋', 'MAIL', 'i_mail', () => go('fb')], ['關於', 'ABOUT', 'i_info', () => go('about')]];
   // 執行首頁選項：會切換畫面的先播轉場（按鈕撥開 → 光圈展開）；多人、設定是彈窗，直接開
   const runItem = i => { if (G.Trans.busy()) return; const it = ITEMS[i]; if (it[0] === '多人' || it[0] === '設定') it[3](); else G.Trans.start(it[3]); };
@@ -1791,6 +1791,35 @@ G.Menus = (() => {
           }
         },
         {
+          t: '單人關卡', m: '首頁「{單人}」左右滑選關卡；通關上一關才會{解鎖下一關}，最後一張是經典戰場',
+          draw(c, x, y, w, h, t, dk) {
+            const T = t % 4, k = ss(seg(T, 1.2, 1.8)), cw = Math.min(w - 40, 96), ch = Math.min(h - 20, 74), cy = Math.round(y + h / 2 - ch / 2), ids = ['forest', 'autumn', 'snow'];
+            for (let i = 0; i < 3; i++) { const d = i - k, cx = Math.round(x + w / 2 + d * (cw + 8) - cw / 2); if (cx > x + w || cx + cw < x) continue;
+              H().box(c, cx, cy, cw, ch, 1, Math.abs(d) < 0.5 ? 13 : 6, false); c.drawImage(G.withTheme(ids[i], () => G.groundStrip(cw - 6, Math.round(ch * 0.5))), cx + 3, cy + 3);
+              G.cn(c, G.SOLO[i].n, cx + cw / 2, cy + ch * 0.5 + 6, 9, 0.5); if (i === 2 && k < 1) H().icon(c, 'i_lock', cx + cw / 2, cy + ch * 0.3); }
+            if (T < 1.8) ptr(dk)(c, Math.round(lerp(x + w * 0.7, x + w * 0.35, ss(seg(T, 0.6, 1.6)))), cy + ch - 10, T > 0.6 && T < 1.6);
+          }
+        },
+        {
+          t: '關卡星等', m: '通關得 1 星；{聖樹血量保持一半以上}、{英雄沒陣亡}各加 1 星，新星送鑰匙',
+          draw(c, x, y, w, h, t) {
+            const T = t % 3.6, n = T < 0.6 ? 0 : T < 1.2 ? 1 : T < 1.8 ? 2 : 3, sw = 3 * 11, sx = Math.round(x + w / 2 - sw), sy = Math.round(y + h / 2 - 14);
+            c.save(); c.translate(sx, sy); c.scale(2, 2); G.Solo.stars(c, 0, 0, n, 3, 9); c.restore();
+            if (n === 3) { H().icon(c, 'i_key', x + w / 2 - 18, sy + 30); G.cn(c, '+15', x + w / 2 - 10, sy + 24, 13); }
+          }
+        },
+        {
+          t: '關卡天氣', m: '各關規則：{秋風}加速、{暴風雪}變慢、{火山}落熔岩、{深淵}亡者復甦',
+          draw(c, x, y, w, h, t) {
+            const i = ((t / 1.6) | 0) % 4, id = ['autumn', 'snow', 'lava', 'abyss'][i], sw = Math.min(w - 16, 150), sh = Math.min(h - 26, 70), sx = Math.round(x + w / 2 - sw / 2), sy = Math.round(y + 4);
+            c.drawImage(G.withTheme(id, () => G.groundStrip(sw, sh)), sx, sy);
+            const T = G.THEMES[id]; for (let k = 0; k < 18; k++) { const u = ((t * 0.3 + G.hash(k, 3)) % 1), up = id === 'lava' || id === 'abyss'; c.fillStyle = P[id === 'snow' ? 9 : id === 'lava' ? 14 : id === 'abyss' ? 27 : 14]; c.fillRect(Math.round(sx + G.hash(k, 9) * sw), Math.round(up ? sy + sh - u * sh : sy + u * sh), 1, 1); }
+            if (T.grade) { const [m2, col, a] = T.grade; c.globalCompositeOperation = m2; c.globalAlpha = a; c.fillStyle = col; c.fillRect(sx, sy, sw, sh); c.globalCompositeOperation = 'source-over'; c.globalAlpha = 1; }
+            if (id === 'lava') { const r = 8 + (t * 6 % 6); G.pxEllipse(c, sx + sw / 2, sy + sh * 0.6, r, r * 0.5, 10); }
+            G.cn(c, ['秋風', '暴風雪', '火山噴發', '亡者復甦'][i], x + w / 2, sy + sh + 4, 13, 0.5);
+          }
+        },
+        {
           t: '成就', m: '完成挑戰就會{解鎖成就}；{累計遊玩、擊倒首領、推塔}都算進度',
           draw(c, x, y, w, h, t) {
             const T = t % 3.6, f = ss(seg(T, 0.3, 1.6)), done = T > 1.6, cw = w - 16, cx = x + 8;
@@ -2037,11 +2066,12 @@ G.Menus = (() => {
     if ((k === 'escape' || k === 'backspace') && s === 'save' && G.SaveUI.esc()) return;
     if ((k === 'escape' || k === 'backspace') && s === 'ach' && G.AchUI.esc()) return;
     if (k === 'escape' || k === 'backspace') { if (demo) { demo = null; sbKey = ''; } else if (info) info = null; else if (picker) picker = null; else if (s === 'guide' && U().guideBack) U().guideBack(); else if (s !== 'menu') U().goMenu(); return; }
+    if (s === 'stages' && G.Solo.key(k)) return;                                   // v3.0 選關：左右換關、Enter 出發
     if ((s === 'team' || s === 'book') && !demo) { car = cars[s]; if (k === 'arrowright' || k === 'd') M.carStep(1); if (k === 'arrowleft' || k === 'a') M.carStep(-1); }
     if (s === 'menu' && !resetAsk && !setOpen && modal <= 0 && !(G.SaveUI && G.SaveUI.welcome)) { if (k === 'arrowdown' || k === 's') mw.step(1); if (k === 'arrowup' || k === 'w') mw.step(-1); if (k === 'enter' || k === ' ') runItem(mw.idx()); if (k === '1') U().start(); }
     if (s === 'guide') { if (k === 'arrowright') M.guideTurn(1); if (k === 'arrowleft') M.guideTurn(-1); }
   };
-  M.covers = s => s === 'fb' || s === 'about' || s === 'team' || s === 'book' || s === 'guide' || s === 'store' || s === 'ach' || s === 'rank' || s === 'save' || s === 'intro' || s === 'tap';
+  M.covers = s => s === 'stages' || s === 'fb' || s === 'about' || s === 'team' || s === 'book' || s === 'guide' || s === 'store' || s === 'ach' || s === 'rank' || s === 'save' || s === 'intro' || s === 'tap';
   // 給其他模組（成就、存檔、開場動畫）共用的元件
   M.ui = { resetCars: () => { cars.team.inited = false; cars.book.inited = false; }, tick: () => tick(), pr, tap, bg, header, btnPrimary, btnSecondary, tabs, scrollDetail, SM, gt: () => gt, bigTitle: (...a) => bigTitle(...a), logoSize: w => M.logoSize(w), land, sprFit, go: s2 => go(s2) };
   M.guidePageCount = () => CATS.reduce((a, k, i) => a + pagesOf(i).length, 0);

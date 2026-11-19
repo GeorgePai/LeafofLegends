@@ -83,7 +83,7 @@ G.UI = (() => {
   // ---------- 畫面切換 ----------
   const leaveBattle = () => { if (G.W && !G.W.attract && G.Ach) G.Ach.commit(G.W); };
   U.goTitle = U.goMenu = () => { if (U.screen && U.screen !== 'menu' && U.screen !== 'tap' && U.screen !== 'intro' && G.Trans) G.Trans.reveal(); leaveBattle(); if (G.Menus) G.Menus.resetIntro(); U.screen = 'menu'; U.paused = false; if (!G.W || !G.W.attract) G.newWorld({ attract: true }); R.cam.zoom = 1; G.Audio.setMode('menu'); };
-  U.start = () => { leaveBattle(); U.bagW = null; U.bagUse = null; U.bagEx = 1; U.tpAsk = null; G.Team.sanitize(); const T = G.Team.get(); U.screen = 'battle'; U.paused = false; G.newWorld({ hero: T.hero, loadout: T.loadout }); R.cam.follow = true; R.cam.zoom = 1; G.Audio.musicRestart('battle'); G.Audio.setMode('battle'); G.Audio.play('level'); };
+  U.start = st => { if (typeof st === 'number') U.stageI = st; leaveBattle(); U.bagW = null; U.bagUse = null; U.bagEx = 1; U.tpAsk = null; G.Team.sanitize(); const T = G.Team.get(); U.screen = 'battle'; U.paused = false; G.newWorld({ hero: T.hero, loadout: T.loadout, stage: U.stageI || 0 }); R.cam.follow = true; R.cam.zoom = 1; G.Audio.musicRestart('battle'); G.Audio.setMode('battle'); G.Audio.play('level'); };
   // 全畫面暗幕：純黑半透明（不用顆粒，眼睛比較舒服）
   const dim = (...a) => U.h.dim(...a);
   const _dim = (c, a) => { if (R.hi) for (const q of R.hi) q.cov = true; c.fillStyle = 'rgba(10,10,10,' + a + ')'; c.fillRect(0, 0, R.uw, R.uh); };
@@ -762,6 +762,14 @@ G.UI = (() => {
       const hl = highlights(st); let hx2 = lx + 14 + G.cnW('鑰匙 +' + kg) + 8;
       hl.forEach(([, s2, col]) => { const w2 = G.cnW(s2) + 6; if (hx2 + w2 > lx + colL) return; c.fillStyle = P[0]; c.fillRect(hx2, yl, w2, 13); c.fillStyle = P[col]; c.fillRect(hx2, yl, w2, 1); c.fillRect(hx2, yl + 12, w2, 1); c.fillRect(hx2, yl, 1, 13); c.fillRect(hx2 + w2 - 1, yl, 1, 13); G.cn(c, s2, hx2 + 3, yl, col); hx2 += w2 + 3; });
       yl += 16;
+      const sr = W.soloRes; if (sr && sr.win) {                                // v3.0 關卡星等與獎勵
+        G.Solo.stars(c, lx + 2, yl + 2, sr.stars, 3, 9);
+        const txt = sr.rew ? (sr.first ? '首次通關 ' : '新星等 ') + '+' + sr.rew : G.Team.dev ? '不計獎勵' : '已拿過這個星等', one = G.cnW(txt) + (sr.rew ? 14 : 0) <= colL - 40;
+        const tx = one ? lx + 40 : lx + 2, ty = one ? yl : yl + 14;
+        if (sr.rew) icon(c, 'i_key', tx + 6, ty + 6);
+        const ls = G.cnWrap(txt, colL - (tx - lx) - (sr.rew ? 14 : 0)); ls.forEach((l, i) => G.cn(c, l, tx + (sr.rew ? 14 : 0), ty + i * 13, sr.rew ? 13 : 6));
+        yl = ty + ls.length * 13 + 3;
+      }
       if (ach.length) {
         icon(c, 'i_trophy', lx + 6, yl + 6); G.cn(c, '成就達成 ×' + ach.length, lx + 14, yl, 13); yl += 14;
         const tip = n2 => (n2 > 0 ? '還有 ' + n2 + ' 個，' : '') + '到「成就」領取', tipH = G.cnWrap(tip(ach.length), colL - 8).length * 13;
@@ -774,7 +782,7 @@ G.UI = (() => {
     // ── 按鈕（文字＋圖示）
     if (t >= TK.btn) {
       const bh = 18, by = LD ? uh - I.b - bh - 2 : Math.min(uh - I.b - bh - 2, Math.max(yl, yr) + 8), bw = Math.floor((PW - 6) / 2);
-      [['i_retry', '再來一局', () => U.start(U.hero), 13], ['i_tree', '回首頁', () => U.goTitle(), 7]].forEach(([ic, lab, fn, col], i) => {
+      [['i_retry', '再來一局', () => U.start(U.hero), 13], W.stageI ? ['i_play', '選擇關卡', () => { U.goTitle(); G.Solo.open(); }, 7] : ['i_tree', '回首頁', () => U.goTitle(), 7]].forEach(([ic, lab, fn, col], i) => {
         const x = px + i * (bw + 6), id = 'end' + i, o = U.press[id] > 0 ? 1 : 0;
         if (i === 0) { c.fillStyle = P[Math.sin(t * 6) > 0 ? 13 : 14]; c.fillRect(x - 1, by - 1 + o, bw + 2, bh + 2); }
         U.h.key(c, x, by + o, bw, bh, o, i === 0 ? 0 : col, i === 0 ? 13 : 1);

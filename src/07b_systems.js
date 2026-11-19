@@ -81,7 +81,8 @@ Object.assign(G.World.prototype, {
     const md = G.MAPS[this.stage.map], T = G.TILE;
     if (md.wild && !this.attract) for (const [key, p] of md.wild) this.camps.push({ key, def: G.WILD[key], x: p[0] * T, y: p[1] * T, u: null, t: 1.5 });
     if (md.wild && this.attract) for (const [key, p] of md.wild) this.camps.push({ key, def: G.WILD[key], x: p[0] * T, y: p[1] * T, u: null, t: 0.2 });
-    this.jg = { t: G.TUNE.jungle.first, u: null };
+    const HT = this.stage.hunt || { n: 1, first: G.TUNE.jungle.first };          // v3.0 關卡：獵手數量與出動時間
+    this.jgs = Array.from({ length: HT.n }, (_, i) => ({ t: HT.first + i * 20, u: null })); this.jgRe = HT.re || G.TUNE.jungle.respawn;
     this.keysGot = 0; this.keyFx = [];
     // 視野網格（每格 48 單位）：v[side][cell] = 1 看得到
     const cs = G.TUNE.vision.cell, gw = Math.ceil(this.M.ww / cs), gh = Math.ceil(this.M.wh / cs);
@@ -106,7 +107,7 @@ Object.assign(G.World.prototype, {
     if (this.over) return;
     if (this.hero && !this.attract) { this.gold += G.TUNE.gold.perSec * dt; this.stats.gold += G.TUNE.gold.perSec * dt; }
     // 敵方獵手：同時最多 1 隻，死亡後倒數再出動
-    if (!this.attract && this.camps.length && !(this.jg.u && this.jg.u.alive)) { if (this.jg.u) { this.jg.u = null; this.jg.t = G.TUNE.jungle.respawn; } this.jg.t -= dt; if (this.jg.t <= 0) this.spawnHunter(); }
+    if (!this.attract && this.camps.length) for (const jg of this.jgs) if (!(jg.u && jg.u.alive)) { if (jg.u) { jg.u = null; jg.t = this.jgRe; } jg.t -= dt; if (jg.t <= 0) this.spawnHunter(jg); }
     this.updateTeleport(dt);
     if (!this.attract) this.updateVision(dt);
     for (const c of this.camps) {
@@ -154,11 +155,11 @@ Object.assign(G.World.prototype, {
     G.Audio.play('keyDrop', 1, 0);
   },
   // ----- 敵方獵手 -----
-  spawnHunter() {
+  spawnHunter(jg) {
     const [x, y] = this.spawnPt[1], st = G.ORIG.stages[Math.min(99, this.stageNow || 1)] || G.ORIG.stages[1];
-    const lv = G.clamp(st.start_level || 1, 3, G.TUNE.jungle.maxLv);
+    const lv = G.clamp(st.start_level || 1, 3, G.TUNE.jungle.maxLv) + (this.dif ? this.dif.lv : 0);
     const u = this.add(new G.Unit(this, 'hunter', 1, x, y, lv, 'jungler')); u.jHome = [x, y];
-    this.jg.u = u; G.FX.spawn(this, u);
+    (jg || this.jgs[0] || {}).u = u; G.FX.spawn(this, u);
     this.say({ s: '敵方獵手出動了', ic: 'i_attack', col: 14, t: 2.4 });
   },
   junglerAI(u, dt) {
@@ -213,7 +214,7 @@ Object.assign(G.World.prototype, {
       const v = V.v[side]; v.fill(0);
       for (const u of this.units) {
         if (!u.alive || u.side !== side) continue;
-        const R = u.kind === 'holy' ? VT.holy : u.static ? VT.tower : u.kind === 'hero' ? VT.hero : u.kind === 'boss' ? VT.boss : u.kind === 'jungler' ? VT.jungler : VT.creep;
+        const R = (u.kind === 'holy' ? VT.holy : u.static ? VT.tower : u.kind === 'hero' ? VT.hero : u.kind === 'boss' ? VT.boss : u.kind === 'jungler' ? VT.jungler : VT.creep) * (side === 0 && !u.static && this.theme && this.theme.vis ? this.theme.vis : 1);   // v3.0 深淵：我方視野變小
         const c0 = Math.max(0, ((u.x - R) / cs) | 0), c1 = Math.min(V.gw - 1, ((u.x + R) / cs) | 0), r0 = Math.max(0, ((u.y - R) / cs) | 0), r1 = Math.min(V.gh - 1, ((u.y + R) / cs) | 0);
         for (let gy = r0; gy <= r1; gy++) for (let gx = c0; gx <= c1; gx++) {
           const i = gy * V.gw + gx; if (v[i]) continue;

@@ -146,4 +146,14 @@ S.append(['menu-online',"G.Rank.online.t=Date.now()+9e9;G.Rank.online.n=1234;G.R
 for k in [3, 15, 30, 45, 60]: S.append([f'about-{k}',f"G.Menus.ui.go('about');G.About._skip({k},false)",250])
 S.append(['about-end',"G.Menus.ui.go('about');G.About._end()",250]); S.append(['about-x',"G.Menus.ui.go('menu');G.UI.goMenu()",100])
 
+
+# v3.0 單人關卡：選關（每張卡、鎖住、已通關）、各關戰鬥開場、結算星等
+S.append(['stg-open',"G.Ach.P().stg={};G.Solo.open()",500])
+for k in range(6): S.append([f'stg-card{k}',f"G.Solo._go({k})",400])
+S.append(['stg-done',"G.Ach.P().stg={1:{c:3,s:3},2:{c:1,s:2},3:{c:1,s:1},4:{c:12,s:3},5:{c:1,s:1}};G.Solo._go(4)",400])
+S.append(['stg-done2',"G.Solo._go(1)",300])
+for k in range(1,6): S.append([f'stg-b{k}',f"G.UI.start({k})",900])
+S.append(['stg-win',"G.W.kill(G.W.holy[1],G.W.hero)",9000])
+S.append(['stg-x',"G.Ach.P().stg={};G.UI.goTitle()",300])
+
 json.dump(S,open('/tmp/tc.json','w'))
