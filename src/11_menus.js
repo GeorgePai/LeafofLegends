@@ -541,7 +541,7 @@ G.Menus = (() => {
       arrow('mwU', top - 6, -1, mw.tgt > 0); arrow('mwD', bot + 2, 1, mw.tgt < ITEMS.length - 1);
       c.globalAlpha = 1;
     }
-    G.text(c, 'V2.7', uw - I.r - 2, uh - I.b - 6, 3, 1, null, 1);
+    G.text(c, 'V2.8', uw - I.r - 2, uh - I.b - 6, 3, 1, null, 1);
     // 右上：鑰匙數；左下：開發者模式開關
     const kt = G.Team.dev ? '∞' : String(G.Team.keys()), kw = 22 + G.cnW(kt);
     H().box(c, uw - I.r - kw, I.t, kw, 14, 0, 13); H().icon(c, 'i_key', uw - I.r - kw + 9, I.t + 7); G.cn(c, kt, uw - I.r - 4, I.t + 1, 13, 1);
@@ -1680,6 +1680,19 @@ G.Menus = (() => {
               c.globalAlpha = 0.75 + Math.sin(gt * 4 + i) * 0.25; c.drawImage(gl.c, px - gl.p, py - gl.p); c.globalAlpha = 1; c.drawImage(s.n, px, py);
               G.cnRar(c, r.n, x0 + gw * i + gw / 2, gy + 6, i, 0.5);
             });
+          }
+        },
+        {
+          // v2.8 開箱光色：箱縫的光一階一階升級，停在哪個顏色就是開到的稀有度
+          t: '開箱光色', m: '箱縫的光會{升級}：白→{g:綠}→{p:紫}→{o:橘}→{m:七彩}，停在哪色就開到哪個稀有度',
+          draw(c, x, y, w, h, t) {
+            const T = t % 5.5, st = T < 1.2 ? 0 : Math.min(4, 1 + (((T - 1.2) / 0.8) | 0)), col = [9, 11, 17, 14, -1][st], cx = Math.round(x + w / 2), gy = Math.round(y + h * 0.72);
+            const sx = Math.round(Math.sin(gt * 48) * (0.5 + st * 0.5));
+            G.Store.drawChest(c, 'hero', cx + sx, gy, 2, false, col, 0.5 + st * 0.12);
+            c.fillStyle = col < 0 ? P[[10, 14, 13, 11, 12, 17][((gt * 8) | 0) % 6]] : P[col]; c.globalAlpha = 0.9;
+            for (let q = -3; q <= 3; q++) { const hh = Math.round((4 + st * 2) * (1 - Math.abs(q) * 0.2) * (0.8 + Math.sin(gt * 30 + q) * 0.2)); c.fillRect(cx + sx + q * 6, gy - 22 - hh, 1, hh); }
+            c.globalAlpha = 1;
+            if (st) G.cnRar(c, G.RARITY[st].n, cx, y + 2, st, 0.5); else G.cn(c, '白光：還看不出來', cx, y + 2, 7, 0.5);
           }
         },
         {

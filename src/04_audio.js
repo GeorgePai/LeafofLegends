@@ -59,6 +59,13 @@ G.Audio = (() => {
     voices++; s.onended = () => voices--;
   }
 
+  // 升級鈴：每升一階音更高、更亮，加一點上揚的風聲
+  function rankUp(t, i) {
+    const f = [0, 784, 988, 1175, 1568][i];
+    osc('sine', f, f, t, 0.6, 0.22); osc('sine', f * 2, f * 2, t, 0.4, 0.07); osc('triangle', f * 1.5, f * 1.5, t + 0.03, 0.5, 0.09);
+    noise(t, 0.25, 0.1 + i * 0.03, 'bandpass', 2000, 8000, 2); osc('sine', 220, Math.max(40, f / 8), t, 0.2, 0.3);
+    if (i >= 3) osc('pulse', f / 2, f / 2, t, 0.3, 0.06, sfxBus, { lp: 3000 });
+  }
   const SFX = {
     magic: t => { osc('sine', 1100, 420, t, 0.13, 0.22); osc('triangle', 2200, 900, t, 0.06, 0.06); },
     magic2: t => { osc('sine', 600, 1400, t, 0.18, 0.25); osc('square', 300, 700, t, 0.12, 0.05, sfxBus, { lp: 2000 }); noise(t, 0.2, 0.08, 'bandpass', 3000, 6000, 3); },
@@ -105,6 +112,18 @@ G.Audio = (() => {
     fanfare3: t => { [523, 659, 784, 1047, 1319, 1568, 2093, 2637].forEach((f, i) => osc('pulse', f, f, t + i * 0.07, 0.3, 0.12, sfxBus, { lp: 6000 })); osc('triangle', 262, 262, t, 1.1, 0.18); osc('triangle', 392, 392, t + 0.3, 0.9, 0.12); for (let i = 0; i < 6; i++) noise(t + 0.5 + i * 0.09, 0.08, 0.08, 'highpass', 7000, 9000, 1); },
     dud: t => { osc('triangle', 392, 370, t, 0.25, 0.16); osc('triangle', 330, 300, t + 0.25, 0.25, 0.16); osc('triangle', 262, 220, t + 0.5, 0.45, 0.16); },
     keyDrop: t => { osc('sine', 2637, 2637, t, 0.08, 0.12); osc('sine', 3520, 3520, t + 0.07, 0.12, 0.1); noise(t, 0.25, 0.08, 'highpass', 6000, 9000, 1); osc('triangle', 1319, 2637, t, 0.18, 0.06); },
+    // v2.8 開寶箱分級音效：敲擊、搖晃、升級鈴（越升越高）、心跳、爆開、碎裂、揭曉、蓋章、神話號角
+    chestKnock: t => { osc('sine', 120, 50, t, 0.2, 0.5); noise(t, 0.09, 0.35, 'bandpass', 900, 300, 1.5); osc('square', 180, 90, t, 0.07, 0.07, sfxBus, { lp: 700 }); },
+    chestRattle: t => { noise(t, 0.05, 0.16, 'bandpass', 1300 + Math.random() * 700, 600, 3); osc('square', 110 + Math.random() * 40, 90, t, 0.04, 0.04, sfxBus, { lp: 500 }); },
+    rankUp1: t => rankUp(t, 1), rankUp2: t => rankUp(t, 2), rankUp3: t => rankUp(t, 3), rankUp4: t => rankUp(t, 4),
+    fizzle: t => { osc('triangle', 700, 140, t, 0.5, 0.12); noise(t, 0.4, 0.12, 'lowpass', 3000, 200); },
+    heartbeat: t => { osc('sine', 75, 42, t, 0.16, 0.6); osc('sine', 70, 40, t + 0.17, 0.14, 0.45); },
+    rumble: t => { osc('sine', 52, 38, t, 0.8, 0.35, sfxBus, { atk: 0.3 }); noise(t, 0.8, 0.16, 'lowpass', 250, 120, 1); },
+    bigBoom: t => { noise(t, 1.2, 0.6, 'lowpass', 4500, 70); osc('sine', 95, 26, t, 1.0, 0.75); osc('square', 62, 30, t, 0.4, 0.12, sfxBus, { lp: 300 }); noise(t + 0.15, 1.4, 0.08, 'highpass', 7000, 9000, 1); },
+    shatter: t => { for (let i = 0; i < 10; i++) { noise(t + i * 0.025, 0.12, 0.2, 'highpass', 5000 + Math.random() * 4000, 3000, 2); osc('sine', 2000 + Math.random() * 2500, 0, t + i * 0.03, 0.3, 0.05); } },
+    reveal: t => { osc('triangle', 600, 2400, t, 0.25, 0.15); noise(t, 0.3, 0.15, 'bandpass', 2000, 9000, 2); osc('sine', 1568, 0, t + 0.2, 0.5, 0.12); osc('sine', 2093, 0, t + 0.25, 0.5, 0.1); },
+    stamp: t => { osc('sine', 150, 48, t, 0.25, 0.5); noise(t, 0.15, 0.3, 'lowpass', 1500, 200); },
+    fanfare4: t => { [523, 659, 784, 1047, 1319, 1568, 2093, 2637, 3136].forEach((f, i) => osc('pulse', f, f, t + i * 0.06, 0.35, 0.11, sfxBus, { lp: 6500 })); [262, 330, 392, 523, 659].forEach(f => osc('triangle', f, f, t + 0.55, 1.7, 0.09, sfxBus, { atk: 0.08 })); osc('sawtooth', 523, 523, t + 0.55, 1.4, 0.03, sfxBus, { lp: 2000, atk: 0.1 }); for (let i = 0; i < 12; i++) { noise(t + 0.6 + i * 0.08, 0.07, 0.06, 'highpass', 8000, 10000, 1); osc('sine', 2600 + Math.random() * 1600, 0, t + 0.6 + i * 0.08, 0.2, 0.04); } },
     keyGet: t => { [1568, 2093, 2637, 3136].forEach((f, i) => osc('sine', f, f, t + i * 0.045, 0.14, 0.11)); osc('square', 1047, 1047, t, 0.06, 0.04, sfxBus, { lp: 5000 }); },
     // 開場動畫：柔和的鈴聲與光點聲（參考 GBA 時代開場的閃光、精靈出場聲）
     opTwinkle: t => { const f = [1568, 1760, 2093, 2349, 2637, 3136][(Math.random() * 6) | 0]; osc('sine', f, f, t, 0.5, 0.045, sfxBus, { atk: 0.006 }); osc('sine', f * 2, f * 2, t, 0.25, 0.012, sfxBus, { atk: 0.006 }); },
