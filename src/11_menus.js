@@ -1,5 +1,5 @@
 'use strict';
-G.VERSION = 'V2.8.7';                                  // 版本號（唯一來源；setup.sh 也從這行讀）
+G.VERSION = 'V2.9';                                  // 版本號（唯一來源；setup.sh 也從這行讀）
 /* =========================================================
    選單：首頁 / 隊伍 / 圖鑑 / 教學
    版面：直屏上下堆疊，橫屏左右分欄
@@ -749,8 +749,10 @@ G.Menus = (() => {
     const before = carIdx();
     const k = 1 - Math.exp(-dt * 11); car.pos += (car.tgt - car.pos) * k;
     if (carIdx() !== before) { G.Audio.play('tick', 1, 0.02); car.bump = 1; }
-    if (!car.settled && Math.abs(car.tgt - car.pos) < 0.02) { car.pos = car.tgt; car.settled = true; G.Audio.play('snap'); sbKey = ''; skillSel = -1; }
+    if (!car.settled && Math.abs(car.tgt - car.pos) < 0.02) { car.pos = car.tgt; car.settled = true; G.Audio.play('snap'); sbKey = ''; skillSel = -1; cryNow(); }
   }
+  // v2.9 角色叫聲：轉盤停下來（或點中間那隻）就叫一聲；同一隻連續停兩次不重複叫
+  function cryNow(force) { const nm = car.list && car.list[Math.round(car.pos)]; if (!nm || (!force && car.cried === nm)) return; car.cried = nm; G.Audio.cry(nm); }
   // 位置：中央 → 第一格較寬，之後較密；尺寸：中央放大（整數倍，像素清晰），兩側 1 倍
   const carX = (d, sp) => { const a = Math.abs(d); return Math.sign(d) * (a < 1 ? a * sp : sp + (a - 1) * sp * 0.62); };
   const carS = (d, S) => 1 + (S - 1) * Math.pow(Math.max(0, 1 - Math.abs(d)), 1.4);
@@ -805,6 +807,7 @@ G.Menus = (() => {
         }
       }
       if (!centre && Math.abs(d) < 2.6) tap('car' + i, Math.round(px - 14), y + 8, 28, h - 12, () => { car.tgt = i; car.settled = false; })
+      else if (centre && car.settled) tap('car' + i, Math.round(px - 16), y + 8, 32, h - 12, () => { car.bump = 1; cryNow(true); });   // v2.9 點中間那隻：再叫一聲
     }
     // 兩側暗角
     for (let k = 0; k < 26; k += 2) { const a = (1 - k / 26) * 0.55; c.fillStyle = G.pat(c, 0, a); c.fillRect(x + k, y, 2, h); c.fillRect(x + w - k - 2, y, 2, h); }
@@ -1731,6 +1734,20 @@ G.Menus = (() => {
             const q = (T * 1.4) % 1, s2 = si ? G.SPR.mistic[0] : G.SPR.magicball; c.drawImage(s2.n, Math.round(lerp(px + pw * 0.3 + 6, px + pw * 0.72, q) - s2.w / 2), Math.round(py + 15 + sh * 0.8 - 10 - s2.h / 2));
             ['i_attack', 'i_mistic', 'i_slam'].forEach((ic, k) => { const bx = px + pw / 2 - 31 + k * 22; H().key(c, bx, py + ph - 16, 18, 14, k === si, k === si ? 13 : 6); H().icon(c, ic, bx + 9, py + ph - 9); });
             if (T > 1.8 && T < 2.5) ptr(dk)(c, px + pw / 2 - 31 + 22 + 9, py + ph - 8, T > 2.1 && T < 2.3);
+          }
+        },
+        {
+          t: '角色叫聲', m: '轉盤停下或{點中間的角色}會發出{專屬叫聲}，進化型比較低沉',
+          draw(c, x, y, w, h, t, dk) {
+            const T = t % 2.6, cx = Math.round(x + w / 2), fl = Math.round(y + h / 2 + 14), nm = ((t / 2.6) | 0) % 2 ? 'eliteleafy' : 'leafy';
+            unit(c, nm, cx, fl, false); G.cn(c, G.nameOf(nm), cx, fl + 4, 9, 0.5);
+            for (let i = 0; i < 3; i++) {                     // 聲波：左右各 3 道弧線往外擴散
+              const k = seg(T, 0.5 + i * 0.18, 1.5 + i * 0.18); if (k <= 0 || k >= 1) continue;
+              const r = 9 + k * 16; c.globalAlpha = 1 - k; c.fillStyle = P[13];
+              for (let a = -0.75; a <= 0.75; a += 0.08) { const dy2 = Math.round(Math.sin(a) * r), dx2 = Math.round(Math.cos(a) * r); c.fillRect(cx + dx2, fl - 6 + dy2, 1, 1); c.fillRect(cx - dx2, fl - 6 + dy2, 1, 1); }
+              c.globalAlpha = 1;
+            }
+            if (T < 0.7) ptr(dk)(c, cx + 4, fl - 8, T > 0.35 && T < 0.55);
           }
         },
         {

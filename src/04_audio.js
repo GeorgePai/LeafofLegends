@@ -296,6 +296,8 @@ G.Audio = (() => {
 
   return {
     init, play,
+    raw: () => ac && !muted && VOL.sfx > 0.001 && ac.state === 'running' ? { ac, bus: sfxBus } : null,   // v2.9 給角色叫聲（04b_cry）用
+    cry: (n, v) => G.Cry && G.Cry.play(n, v),
     running: () => !!ac && ac.state === 'running',      // 瀏覽器是否已允許出聲
     music: (n, v) => Music.set(n, v), musicRestart: n => Music.restart(n), musicPrime: n => Music.prime(n), musicUpdate: dt => Music.update(dt),
     setMode: m => BGM.setMode(m),
