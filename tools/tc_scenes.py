@@ -128,4 +128,10 @@ S.append(['bk4-boss',"G.UI.screen='book';G.Menus._btab(0)",400]); S.append(['bk4
 S.append(['bk4-wild',"G.Menus._btab(3)",400]); S.append(['bk4-wkey',"G.Menus._binfo('key')",300]); S.append(['bk4-winfo',"G.Menus._binfo('info')",300])
 S.append(['bk4-hunt',"G.Menus._btab(4)",400]); S.append(['bk4-hinfo',"G.Menus._binfo('info')",300]); S.append(['bk4-x',"G.Menus._binfo(null)",100])
 S.append(['rank4-jump',"G.Rank._mock();G.UI.screen='rank';G.RankUI.cat(2);G.RankUI.jump()",900])
+# v2.8.5 版本更新通知
+S.append(['upd-menu',"G.Update._set('V9.9.9',[{v:'V9.9.9',d:'12/31',n:['新增版本更新通知：有新版本時，首頁右下角會出現「點擊更新」','八個字的名字喔八個字的名字喔八個字的名字喔']},{v:'V9.9.8',n:['a','b']}]);G.UI.goTitle();G.Intro.skip();G.Menus._mt(3)",1500])
+S.append(['upd-card',"G.Update._open(true)",300])
+S.append(['upd-card-long',"G.Update._set('V9.9.9',Array.from({length:12},(_, i)=>({v:'V9.9.'+(9-i),n:['更新內容第 '+i+' 項，說明文字比較長一點，測試換行']})))",300])
+S.append(['upd-x',"G.Update._open(false);G.Update._set(null,[])",100])
+
 json.dump(S,open('/tmp/tc.json','w'))

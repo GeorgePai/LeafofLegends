@@ -1,4 +1,5 @@
 'use strict';
+G.VERSION = 'V2.8.5';                                  // 版本號（唯一來源；setup.sh 也從這行讀）
 /* =========================================================
    選單：首頁 / 隊伍 / 圖鑑 / 教學
    版面：直屏上下堆疊，橫屏左右分欄
@@ -588,7 +589,7 @@ G.Menus = (() => {
       arrow('mwU', top - 6, -1, mw.tgt > 0); arrow('mwD', bot + 2, 1, mw.tgt < ITEMS.length - 1);
       c.globalAlpha = 1;
     }
-    G.text(c, 'V2.8.4', uw - I.r - 2, uh - I.b - 6, 3, 1, null, 1);
+    G.Update.corner(c, uw - I.r - 2, uh - I.b - 6);                                      // v2.8.5 版本號＋有新版時「點擊更新」
     // 右上：鑰匙數；左下：開發者模式開關
     const kt = G.Team.dev ? '∞' : String(G.Team.keys()), kw = 22 + G.cnW(kt);
     H().box(c, uw - I.r - kw, I.t, kw, 14, 0, 13); H().icon(c, 'i_key', uw - I.r - kw + 9, I.t + 7); G.cn(c, kt, uw - I.r - 4, I.t + 1, 13, 1);
@@ -645,6 +646,7 @@ G.Menus = (() => {
     G.Menus.pillPos = LD ? [bx, uh - I.b - 15, uw - I.r - 26 - bx] : null;   // 橫屏：備份提醒改成選單下方的小膠囊（不蓋到 LOGO）
     G.Menus.greetPos = LD ? [Math.round((I.l + bx - 20) / 2), uh - I.b - 36, bx - 20 - I.l] : [uw / 2, uh - I.b - 38, uw - I.l - I.r];
     if (G.SaveUI) { G.SaveUI.drawGreet(c); if (!resetAsk && !setOpen && modal <= 0) G.SaveUI.drawBackupTip(c, menuT); G.SaveUI.drawWelcome(c); }
+    G.Update.card(c);
     if (G.Intro) G.Intro.drawFlash(c);
     if (modal > 0) {
       modal -= M.dt;
@@ -1862,6 +1864,29 @@ G.Menus = (() => {
             const gk = seg(T, 1.6, 1.8);
             if (gk > 0) { const gs = Math.round(3 + (1 - gk) * 3), gx = x + w - 24, gy2 = y + 41, rr = 12 + Math.round((1 - gk) * 5); c.fillStyle = P[0]; c.fillRect(gx - rr - 1, gy2 - rr - 1, rr * 2 + 2, rr * 2 + 2); c.fillStyle = P[14]; c.fillRect(gx - rr, gy2 - rr, rr * 2, rr * 2); c.fillStyle = P[1]; c.fillRect(gx - rr + 2, gy2 - rr + 2, rr * 2 - 4, rr * 2 - 4); G.text(c, 'S', gx, gy2 - Math.round(gs * 2.5), 14, gs, null, 0.5); }
             if (T > 2.0) { H().icon(c, 'i_key', x + 14, y + 66); G.cn(c, '鑰匙 +3', x + 22, y + 60, 13); H().icon(c, 'i_trophy', x + 14, y + 80); G.cn(c, '成就達成 ×2', x + 22, y + 74, 13); }
+          }
+        },
+        {
+          // v2.8.5 版本更新通知
+          t: '版本更新', m: '首頁右下角出現{點擊更新}時，點它看更新內容，再按{立即更新}；{進度不會不見}',
+          draw(c, x, y, w, h, t) {
+            const T = t % 5.2, rx = x + w - 8, vy = y + h - 12;
+            if (T < 2.4) {
+              const bob = Math.round(Math.abs(Math.sin(gt * 4)) * 2), lab = '點擊更新', lw = G.cnW(lab) + 10, vw = G.textW('V2.8.4'), ax = Math.round(rx - vw / 2), lx = Math.min(rx - lw + 2, ax - Math.round(lw / 2)), ly = vy - 27 - bob;
+              G.text(c, 'V2.8.4', rx, vy, 13, 1, null, 1);
+              H().box(c, lx, ly, lw, 14, 0, 13, false); G.cn(c, lab, lx + lw / 2, ly + 1, 13, 0.5);
+              c.fillStyle = P[13]; c.fillRect(ax, ly + 14, 1, vy - 5 - (ly + 14)); for (let k = 0; k < 4; k++) c.fillRect(ax - 3 + k, vy - 6 + k, 7 - k * 2, 1);
+              const k = ss(seg(T, 0.5, 1.4)); hand(c, Math.round(lerp(x + w * 0.4, lx + lw / 2, k)), Math.round(lerp(y + h * 0.4, ly + 8, k)), T > 1.7 && T < 2.1);
+            } else {
+              const cw = Math.min(w - 16, 140), cx = Math.round(x + w / 2 - cw / 2), ch = 86, cy = Math.round(y + h / 2 - ch / 2);
+              H().box(c, cx, cy, cw, ch, 1, 13);
+              G.cn(c, '有新版本！', cx + cw / 2, cy + 4, 13, 0.5);
+              [['・', '新角色登場'], ['・', '平衡調整']].forEach(([b, s2], i) => { G.cn(c, b, cx + 8, cy + 22 + i * 13, 13); G.cn(c, s2, cx + 18, cy + 22 + i * 13, 7); });
+              const bw = Math.floor((cw - 22) / 2), by = cy + ch - 21, dn = T > 4.0 && T < 4.4;
+              H().box(c, cx + 8, by, bw, 15, 1, 5, false); G.cn(c, '稍後', cx + 8 + bw / 2, by + 1, 7, 0.5);
+              H().key(c, cx + cw - 8 - bw, by + (dn ? 1 : 0), bw, 15, dn, 13, 2); G.cn(c, '立即更新', cx + cw - 8 - bw / 2, by + 1 + (dn ? 1 : 0), 9, 0.5);
+              const k = ss(seg(T, 2.8, 3.8)); hand(c, Math.round(lerp(x + w * 0.3, cx + cw - 8 - bw / 2, k)), Math.round(lerp(y + h - 10, by + 9, k)), dn);
+            }
           }
         }
       ]

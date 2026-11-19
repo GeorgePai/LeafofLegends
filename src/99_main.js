@@ -39,6 +39,7 @@ G.boot = function () {
       G.Audio.music(M, sc === 'battle' && W.over ? 0.45 : 1); G.Audio.musicUpdate(dt); }
     if (G.FreeChest && U.screen !== 'intro' && U.screen !== 'tap') G.FreeChest.tick();
     if (G.Rank) G.Rank.tick();
+    if (G.Update) G.Update.tick();
     U.draw(dt);
     G.Render.blitUI();
     requestAnimationFrame(frame);
