@@ -164,7 +164,7 @@ Object.assign(G.Combat, {
       this.sfx('clone', u.x, u.y);
       own.slice(0, n).forEach((s, i) => G.VFX.later(this, 0.25 + i * 0.04, () => {
         if (!s.alive) return;
-        const a = (s.id * 2.399) % 6.283, ox = Math.cos(a) * 14, oy = Math.sin(a) * 9;
+        const a = (s.id * 2.399) % 6.283, ox = Math.cos(a) * 26, oy = Math.sin(a) * 14;   // v2.7 複製體一出生就站開一點
         let x = s.x + ox, y = s.y + oy; if (this.M && !this.M.isWalk(x, y)) { x = s.x - ox; y = s.y - oy; if (!this.M.isWalk(x, y)) { x = s.x; y = s.y; } }
         const c = new G.Unit(this, s.name, s.side, x, y, s.level, s.kind);
         c.st = Object.assign({}, s.st); c.hp = sd.value_1 || 1; c.clone = true; c.charm = s.charm; c.lane = s.lane; c.home = [x, y]; c.knock = 0; c.face = s.face; c.rar = s.rar;

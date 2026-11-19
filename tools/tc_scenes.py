@@ -91,7 +91,7 @@ S.append(['hpanel',"G.UI.toast=null;G.UI.heroPanel=true",300]); S.append(['hpane
 S.append(['aim',"G.UI.start();var h=G.W.hero;h.skills.forEach(s=>s.lv=1);h.mp=999;G.UI.aim={i:2,s:h.skills[2],on:true,pre:false,bx:G.Render.uw-20,by:G.Render.uh-20,dx:-40,dy:-24,ux:G.Render.uw-60,uy:G.Render.uh-44};",400])
 S.append(['aim-cancel',"var A=G.UI.aim,b=G.UI.cancelBtn;if(A&&b){A.ux=b.x;A.uy=b.y;G.UI.aimUpdate();}",200]); S.append(['aim-x',"G.UI.aim=null",100])
 S.append(['guide',"G.UI.screen='guide'",300])
-for k in range(66):
+for k in range(72):   # v2.7 教學 6 類約 68 頁
   S.append([f'guide{k}',"G.Menus.guideTurn(1)",120])
   S.append([f'guide{k}b',"G.Menus._gt(1.9)",60]); S.append([f'guide{k}c',"G.Menus._gt(3.0)",60])
 # v2.6 寶箱新角色→前往隊伍、NEW、死靈召喚力夫戰鬥

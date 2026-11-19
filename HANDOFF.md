@@ -2,7 +2,7 @@
 
 > 新 session 只要讀這份。**做任何新設計前，先對照第 8 節「設計守則」**。
 > 各版完成內容在 `CHANGELOG.md`、暫定數值在 `VALUES.md`，需要時用 grep 找到段落再讀，不要整份讀。
-> 最後更新：2026-11-19，版本 **v2.6.1**
+> 最後更新：2026-11-19，版本 **v2.7**
 
 ## 1. 專案是什麼
 - Pai 的 HTML5 瀏覽器遊戲，仿 Gamevil《Plants War》（三路推塔＋英雄操作＋小兵兵線）
@@ -55,7 +55,7 @@
 | 08_render | `R.resize`（固定比例＋整數倍）、`R.zoomMin`（可縮到全圖）、`R.hiQ/blitUI`、世界繪製（護盾光殼、稀有度外框、血條、準心、迷霧） |
 | 09_ui | 戰鬥 HUD：HP/MP/XP 三條等粗、鑰匙＋K/D/A 列、小地圖 `mapDraw`＋展開大地圖 `bigMap`、戰鬥數據 `statPanel`、廣播 `drawNotices`、技能水平列＋置中鈕（大招上方）、長按技能卡（動畫，`cardC`）、增益卡、商店、左側道具欄（效果短標）、暫停選單（有名稱）；所有輸入（`evXY` 已扣黑邊）|
 | 10_sandbox | 中文字工具 `G.cn/cnWrap`、標籤 `tagOf`、**技能展示沙盒 `G.Sandbox`（依技能類型的情境：`scBasic/scActive/scBuff/scPassive`，被動用對照演出）** |
-| 11_menus | 首頁（大標題 5×7 字形 `TITLE_GLYPH`）、隊伍／圖鑑（共用轉盤 `cars.team/book`，橫屏轉盤高度依 `nameplateH`）、技能展示彈窗 `demoPanel`（動畫＋數值表 `lvTable`：整張一種版型、欄位對齊）、數值條 `G.statBars/G.statMax`、三欄陣容 `laneCols`、教學（4 類約 50 頁；`G.Menus.openGuide(fromBattle)`、`M._gt(t)` 測試用跳時間）；捲動狀態 `SM`/`SD` 分開 |
+| 11_menus | 首頁（大標題 5×7 字形 `TITLE_GLYPH`）、隊伍／圖鑑（共用轉盤 `cars.team/book`，橫屏轉盤高度依 `nameplateH`）、技能展示彈窗 `demoPanel`（動畫＋數值表 `lvTable`：每列同一行，放不下就數值欄左右滑動 `TS`）、數值條 `G.statBars/G.statMax`、三欄陣容 `laneCols`、教學（6 類約 64 頁，說明文字用 `{重點}` 上色；`G.Menus.openGuide(fromBattle)`、`M._gt(t)` 測試用跳時間）；捲動狀態 `SM`/`SD` 分開 |
 | 12_store | **商店／寶箱**：`G.CHESTS`（機率表）、`G.Store`（畫面、說明視窗、開箱動畫、寶箱像素圖 `drawChest`） |
 | 13_ach | **成就（v1.7）**：`G.ACH`（43 個定義：c 分類、t 等級 1～4、g 目標、v 取值、hint 隱藏提示）、`G.Ach`（`P()` 檔案、`check/commit/tick/final/on/claim`、`recent`、`banner`）、`G.AchUI` 成就畫面、`G.Ach.drawBanner` |
 | 14_save | **存檔碼（v1.7）**：`G.SaveCode`（`make/read/clean/apply/summary`）、`G.Dom`（疊在 canvas 上的 input/textarea，每幀 `place`，沒用到自動隱藏）、`G.SaveUI`（存檔畫面 home/name/code/load/confirm、`drawWelcome` 歡迎回來、`drawGreet` 開啟問候） |
@@ -72,12 +72,14 @@
 - v2.5：開場 5 秒兩軍對陣、存檔碼不再刷免費寶箱、戰場動態（樹擺、落葉、河流、石像／燈籠／斷柱）、野怪不再來回跑、重生變長、圖鑑藥水、解散跟隨＋扇形隊形、塔隨時間成長＋升溫、瞄準靠邊補償
 - v2.6：數值條補間、戰場自然配色（G.NAT）＋聖樹上色、寶箱「前往隊伍」＋NEW、17 個新成就、神話稀有度（七彩）、DEV 開局滿級、新英雄死靈召喚力夫（召喚物系統）
 - v2.6.1：聲音加固（iPhone 靜音開關／中斷後恢復／被擋的音樂在下一次點擊補播），**待 Pai 在 iPhone 確認**
+- v2.7：初始鑰匙 8、教學重點上色＋「英雄」分類、技能數值表左右滑動、同陣營站開、道路再 ×1.5（聖所附近維持原寬）
 - v2.4：敵塔範圍＋鎖定警示、道路 ×1.5、結算放慢＋鎖值＋音效、新藥水 5 種＋全部藥水特效、DEV 密碼、技能範圍顯示＋指定施放（拖曳／取消）、LOGO 改版、塔射程 190/210
 
 ## 6. 待 Pai 決定
 - 畫質再提升：A＝高解析文字（像素角色＋平滑字體），B＝提高像素解析度（480×270，整套美術重畫）。尚未選擇
 - 圖鑑動畫重畫：Pai 說「有些動畫可以描繪得更好」，等他指定哪幾隻
-- 暫定數值全部在 `VALUES.md`（最新：6i v2.6 段）
+- 暫定數值全部在 `VALUES.md`（最新：6j v2.7 段）
+- （v2.7）成就鑰匙過剩：全收集只要 90 把，成就給 138 把；「群英薈萃／森羅萬象」較晚完成的那個獎勵用不到。Pai 決定先保留，等鑰匙有新用途再說
 - （v2.4）首頁 RESET 要不要也加密碼鎖？隕石等範圍技仍可在塔射程外打到塔（目前視為合理技能消耗），要不要禁止？
 - （v2.5）重生時間、塔成長／升溫、野怪脫戰規則等暫定數值待確認（VALUES.md 6h）
 - （v2.6）死靈召喚力夫的 MP、成長、解鎖等級、召喚上限 12、血祭可控對象、神話機率 3% 等待確認（VALUES.md 6i）。犧牲召喚可獻祭 1 血複製體換滿血小兵的連招：Pai 決定先保留試強度（2026-11-19），太強再平衡
@@ -85,7 +87,7 @@
 
 ## 7. 工作規則
 **每次更新流程**：改 src → build → `bash /home/claude/tools/tc_all.sh`（背景跑，0 筆才可交付）→ 只截有改到的畫面，用 `sheet.py` 拼成一張看 → 發佈 artifact（先 `get_artifact` 取 version，再 `publish_files`，index.html＝dist/index.html）→ 推 GitHub main（遊戲）＋ source（原始碼）→ 備份 Mac（`LeafofLegends.html`、`versions/LeafofLegends_v版本.zip`、有改到的 `source/` 檔案）→ 升版號
-- 版本號在 `src/11_menus.js`（`'V2.6.1'`）
+- 版本號在 `src/11_menus.js`（`'V2.7'`）
 - 推 main：clone 到 `/home/claude/leafoflegends` → 複製 `dist/index.html` 成根目錄 `index.html`（保留 `.nojekyll`；音樂有改才更新 `audio/`）→ commit → `git -c push.negotiate=true push origin HEAD:main`，約 1～2 分鐘生效。備援：Pai 在 Mac Terminal 執行 `bash ~/Desktop/Claude/LeafofLegends/deploy_github.sh`
 - 推 source：在 `/home/claude/leafwar` commit（dist/ 已在 .gitignore）→ `git -c push.negotiate=true push origin HEAD:source`
 - 長時間指令（文字檢查等）一律用 Bash 的 `run_in_background`，不要用 nohup／`&` 丟著（回合結束會被砍掉），也不要用長 sleep 輪詢；文字檢查（4 支 Chrome 平行）跑的時候不要同時截圖，會逾時

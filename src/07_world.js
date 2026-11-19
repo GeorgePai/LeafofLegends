@@ -4,6 +4,8 @@
    ========================================================= */
 
 // 依原著成長公式算出某等級的數值
+// v2.7 站位：同一邊單位以圖片大小分開（SEP_X／SEP_Y＝兩隻寬／高總和的比例，0.375 ≈ 左右重疊 25%）；跟隨隊形相鄰間距
+G.SEP_X = 0.45; G.SEP_Y = 0.5; G.FOLLOW_GAP = 38;
 G.stats = function (name, lv, side, kind) {
   if (kind === 'holy') { const h = G.TUNE.holy[side === 0 ? 'player' : 'enemy']; return { hp: h.hp, mp: 0, power: 0, armor: h.armor, crit: 0, delay: 9, range: 0, speed: 0, hpReg: h.heal_hp, mpReg: 0, weapon: null, exp: 600 }; }
   const o = G.ORIG.units[name] || G.ORIG.towers[name], L = lv - 1;
@@ -101,7 +103,7 @@ G.World = class {
       const fl = [[], []];
       for (let li = 0; li < nl; li++) {
         let wt = null;
-        if (nl > 1) { wt = new Float32Array(M.nav.length); for (let i = 0; i < M.nav.length; i++) { const [x, y] = M.cellXY(i); wt[i] = M.laneDist(li, x / T, y / T) <= md.lanes[li].r + 1.2 ? 1 : 15; } }
+        if (nl > 1) { wt = new Float32Array(M.nav.length); for (let i = 0; i < M.nav.length; i++) { const [x, y] = M.cellXY(i); wt[i] = M.laneIn(li, x / T, y / T) <= 1.2 ? 1 : 15; } }
         fl[0][li] = M.dijkstra(seeds(this.holy[1]), wt); fl[1][li] = M.dijkstra(seeds(this.holy[0]), wt);
       }
       G.flowCache[fk] = fl;
@@ -280,9 +282,18 @@ G.World = class {
       const a = us[i]; if (!a.alive) continue;
       for (let j = i + 1; j < us.length; j++) {
         const b = us[j]; if (!b.alive || (a.static && b.static) || (!!a.vis.fly !== !!b.vis.fly)) continue;
-        const rr = (a.r + b.r) * 0.85, dx = b.x - a.x, dy = b.y - a.y, d2 = dx * dx + dy * dy;
-        if (d2 >= rr * rr || d2 < 0.0001) continue;
-        const d = Math.sqrt(d2), ov = (rr - d) / d;
+        const dx = b.x - a.x, dy = b.y - a.y, d2 = dx * dx + dy * dy;
+        if (d2 < 0.0001) continue;
+        let ov;
+        if (a.side === b.side && !a.static && !b.static) {
+          // v2.7 同一邊的單位：用「畫面上的圖片大小」分開，左右只容許約 10% 重疊、上下不重疊，每一隻都點得到
+          const sa = a.spr[0], sb = b.spr[0], hx = (sa.w + sb.w) * G.SEP_X / G.AX, hy = (sa.h + sb.h) * G.SEP_Y / G.AY;
+          const q = (dx * dx) / (hx * hx) + (dy * dy) / (hy * hy); if (q >= 1) continue;
+          ov = (1 / Math.sqrt(q) - 1);
+        } else {
+          const rr = (a.r + b.r) * 0.85; if (d2 >= rr * rr) continue;
+          const d = Math.sqrt(d2); ov = (rr - d) / d;
+        }
         let wa = a.static ? 0 : a.kind === 'hero' || a.kind === 'boss' ? 0.3 : 1, wb = b.static ? 0 : b.kind === 'hero' || b.kind === 'boss' ? 0.3 : 1;
         if (a.side === b.side) { if (a.kind === 'hero') wa = 0; if (b.kind === 'hero') wb = 0; }   // v2.5 英雄不被自己人擠，小兵讓路
         const s = wa + wb; if (!s) continue; wa /= s; wb /= s;
@@ -495,8 +506,16 @@ G.World = class {
     const sp = Math.hypot(h.vx, h.vy), dir = sp > 10 ? Math.atan2(h.vy / 0.7, h.vx) : (h.face > 0 ? 0 : Math.PI), back = dir + Math.PI;
     const fs = this.units.filter(u => u.follow && u.alive).sort((a, b) => a.st.range - b.st.range || a.id - b.id), rings = [[], [], []];
     for (const u of fs) rings[u.st.range <= 45 ? 0 : u.st.range <= 110 ? 1 : 2].push(u);
-    rings.forEach((rg, ri) => { const R0 = [26, 42, 58][ri] + Math.floor(rg.length / 9) * 12, span = Math.min(Math.PI * 0.95, (rg.length - 1) * (0.5 - ri * 0.08));
-      rg.forEach((u, i) => { const a = back + (rg.length > 1 ? -span / 2 + span * i / (rg.length - 1) : 0); u.fOff = [Math.cos(a) * R0, Math.sin(a) * R0 * 0.7]; }); });
+    // v2.7 站開：同一排相鄰間距固定 G.FOLLOW_GAP（約一隻小兵寬），一排排不下就往外再排一排
+    let nextR = 0;
+    rings.forEach((rg, ri) => {
+      let R0 = Math.max([42, 80, 118][ri], nextR), i0 = 0;
+      while (i0 < rg.length) {
+        const cap = Math.floor(Math.PI * 0.95 * R0 / G.FOLLOW_GAP) + 1, row = rg.slice(i0, i0 + cap), n = row.length, step = G.FOLLOW_GAP / R0, span = (n - 1) * step;
+        row.forEach((u, i) => { const a = back + (n > 1 ? -span / 2 + step * i : 0); u.fOff = [Math.cos(a) * R0, Math.sin(a) * R0]; });   // 畫面本身已經上下壓扁（AY），隊形不再額外壓扁
+        i0 += cap; nextR = R0 + 38; if (i0 < rg.length) R0 += 38;
+      }
+    });
   }
   // 回傳 true = 本幀已處理
   followAI(u, dt) {

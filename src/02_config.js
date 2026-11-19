@@ -152,8 +152,19 @@ G.MAPS.lanes5 = (() => {
   const top = sc([[8.75, 51.25], [8.12, 41.25], [8.12, 17.5], [11.25, 10], [20, 8.12], [60, 8.12], [71.25, 8.75]]);
   const mid = sc([[8.75, 51.25], [17.5, 44.4], [30, 36.9], [40, 30], [50, 23.1], [62.5, 15.6], [71.25, 8.75]]);
   const bot = mp(top).reverse();
-  const LW = 1.5;                                    // v2.4 道路加寬 1.5 倍
-  const lanes = [{ r: 2.2 * LW, pts: top }, { r: 2.4 * LW, pts: mid }, { r: 2.2 * LW, pts: bot }];
+  const LW = 1.5, LW2 = 2.25;                        // v2.4 道路加寬 1.5 倍；v2.7 再 ×1.5（LW2）
+  // v2.7：路寬改成「每一段各自的寬度」（rs）。靠近聖所、紅營旁邊那一段維持 v2.4 寬度（不然會把紅營吃掉），
+  //       其餘加寬 1.5 倍，中間用 3 格過渡。a／b＝起點／終點那端維持原寬的長度（格）
+  const widen = (pts, r0, a, b) => {
+    const rN = r0 * LW, rW = r0 * LW2, rT = (rN + rW) / 2, segL = [], L = pts.slice(1).reduce((s2, p, i) => { const l = Math.hypot(p[0] - pts[i][0], p[1] - pts[i][1]); segL.push(l); return s2 + l; }, 0);
+    const at = d => { let acc = 0; for (let i = 0; i < segL.length; i++) { if (d <= acc + segL[i]) { const t = (d - acc) / segL[i]; return [+(pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t).toFixed(2), +(pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t).toFixed(2)]; } acc += segL[i]; } return pts[pts.length - 1]; };
+    const cuts = [a - 3, a, L - b, L - b + 3].filter(d => d > 0.5 && d < L - 0.5);
+    const ds = []; let acc = 0; pts.forEach((p, i) => { ds.push(acc); if (i < segL.length) acc += segL[i]; });
+    const all = [...ds.map((d, i) => [d, pts[i]]), ...cuts.map(d => [d, at(d)])].sort((x, y) => x[0] - y[0]).filter((e, i, arr) => !i || e[0] - arr[i - 1][0] > 0.01);
+    const rs = all.slice(1).map((e, i) => { const m = (all[i][0] + e[0]) / 2; return (a > 0 && m < a - 3) || (b > 0 && m > L - b + 3) ? rN : (a > 0 && m < a) || (b > 0 && m > L - b) ? rT : rW; });
+    return { r: rW, rs, pts: all.map(e => e[1]) };
+  };
+  const lanes = [widen(top, 2.2, 22.6, 0), widen(mid, 2.4, 23, 23), widen(bot, 2.2, 0, 22.6)];
   // 我方野區小徑（敵方點對稱）
   const jp = [
     [[10.6, 44], [22, 44], [30, 53]],                 // 西野區：上路 → 中路
@@ -165,7 +176,7 @@ G.MAPS.lanes5 = (() => {
   // 凹槽營地：營地中心 + 一條窄入口（接到小徑或河道）
   const pockets = [
     { k: 'red', c: [18, 51.5], r: 3.1, e: [18, 44] },
-    { k: 'exp', c: [34, 40.5], r: 3.0, e: [27, 36.5] },
+    { k: 'exp', c: [33.2, 38.6], r: 3.0, e: [27, 36.5] },     // v2.7 路加寬：往小徑挪一點（原 [34, 40.5]），和中路保持距離
     { k: 'blue', c: [56, 49.5], r: 3.1, e: [56, 57] },
     { k: 'frost', c: [20.6, 30.6], r: 3.9, e: [24.2, 24.4], w: 2.0 }   // 河道旁的首領坑（入口較寬）
   ];

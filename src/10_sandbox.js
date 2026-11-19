@@ -108,6 +108,38 @@ G.cnWrap = (s, maxW) => {
   }
   return out;
 };
+// v2.7 重點標示：{詞}＝黃色重點；{r:詞} 紅、{g:詞} 綠、{b:詞} 藍、{p:詞} 紫、{o:詞} 橘、{w:詞} 白、{m:詞} 七彩
+const HI_COL = { r: 10, g: 11, b: 12, p: 17, o: 14, w: 9 }, RAINBOW = [10, 14, 13, 11, 12, 17];
+G.cnStrip = s => String(s).replace(/\{(?:[rgbpowm]:)?([^}]*)\}/g, '$1');
+G.cnParse = (s, hi = 13) => {           // → [[字, 顏色或 null]...]（\n 保留）
+  const out = []; String(s).replace(/\{(?:([rgbpowm]):)?([^}]*)\}|([^{]+|\{)/g, (all, k, inner, plain) => {
+    if (plain != null) { for (const ch of plain) out.push([ch, null]); return ''; }
+    let i = 0; for (const ch of inner) out.push([ch, k === 'm' ? RAINBOW[i++ % RAINBOW.length] : k ? HI_COL[k] : hi]); return '';
+  });
+  return out;
+};
+// 有重點的換行：寬度只算字本身；回傳每行 [[文字, 顏色或 null]...] 片段
+G.cnWrapRich = (s, maxW, hi = 13) => {
+  const lines = [];
+  for (const para of (() => { const ps = [[]]; for (const e of G.cnParse(s, hi)) e[0] === '\n' ? ps.push([]) : ps[ps.length - 1].push(e); return ps; })()) {
+    let line = [];
+    const str = a => a.map(e => e[0]).join('');
+    for (const e of para) {
+      if (G.cnW(str(line) + e[0]) > maxW && line.length) {
+        if (NO_START.includes(e[0]) && line.length > 1) { const last = line.pop(); lines.push(line); line = [last, e]; }
+        else { lines.push(line); line = e[0].trim() ? [e] : []; }
+      } else line.push(e);
+    }
+    lines.push(line);
+  }
+  return lines.map(l => { const seg = []; for (const [ch, c] of l) { const t = seg[seg.length - 1]; if (t && t[1] === c) t[0] += ch; else seg.push([ch, c]); } return seg; });
+};
+// 畫一行有重點的字（align 0 靠左、0.5 置中）；回傳寬度
+G.cnRich = (ctx, seg, x, y, col = 8, align = 0) => {
+  const ws = seg.map(s => G.cnW(s[0])), W = ws.reduce((a, b) => a + b, 0); let xx = x - W * align;
+  seg.forEach((s, i) => { G.cn(ctx, s[0], xx, y, s[1] == null ? col : s[1]); xx += ws[i]; });
+  return W;
+};
 G.cnBlock = (ctx, s, x, y, maxW, col = 7, lh = 13, maxLines = 9) => { const ls = G.cnWrap(s, maxW).slice(0, maxLines); ls.forEach((l, i) => G.cn(ctx, l, x, y + i * lh, col)); return ls.length * lh; };
 
 // ---------- 隊伍（存在瀏覽器本機） ----------
@@ -126,9 +158,9 @@ G.Team = {
       try { this.v = JSON.parse(localStorage.getItem('leafwar_team')); } catch (e) { }
       if (!this.v || !G.HEROES[this.v.hero] || !Array.isArray(this.v.loadout)) this.v = { hero: 0, loadout: G.STAGES[0].loadout.map((n, i) => ({ n, l: i % 3 })) };
       this.v.loadout = this.v.loadout.map(e => typeof e === 'string' ? { n: e, l: 1 } : e).filter(e => G.ORIG.units[e.n]);
-      // v1.2 起：角色要開寶箱取得；開局只有「普通」稀有度，鑰匙 5 把
-      if (!this.v.owned) { this.v.owned = { h: G.HEROES.map(h => h.name).filter(n => G.rarityOf(n) === 0), m: G.ROSTER.minions.filter(n => G.rarityOf(n) === 0) }; this.v.keys = 5; this.sanitize(true); }
-      if (this.v.keys == null) this.v.keys = 5;
+      // v1.2 起：角色要開寶箱取得；開局只有「普通」稀有度，鑰匙 8 把（v2.7：5→8）
+      if (!this.v.owned) { this.v.owned = { h: G.HEROES.map(h => h.name).filter(n => G.rarityOf(n) === 0), m: G.ROSTER.minions.filter(n => G.rarityOf(n) === 0) }; this.v.keys = 8; this.sanitize(true); }
+      if (this.v.keys == null) this.v.keys = 8;
       try { this.dev = localStorage.getItem('leafwar_dev') === '1'; } catch (e) { }
     }
     return this.v;

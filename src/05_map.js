@@ -5,7 +5,7 @@
 G.buildMap = function (def) {
   const T = G.TILE, M = { def, w: def.w, h: def.h, ww: def.w * T, wh: def.h * T };
   const segs = [];
-  for (const l of def.lanes) for (let i = 0; i < l.pts.length - 1; i++) segs.push([l.pts[i][0], l.pts[i][1], l.pts[i + 1][0], l.pts[i + 1][1], l.r]);
+  for (const l of def.lanes) for (let i = 0; i < l.pts.length - 1; i++) segs.push([l.pts[i][0], l.pts[i][1], l.pts[i + 1][0], l.pts[i + 1][1], l.rs ? l.rs[i] : l.r]);   // v2.7 rs：每段各自的寬度
   // 河道（可涉水通過，不算路面）
   const rsegs = []; if (def.river) { const rp = def.river.pts; for (let i = 0; i < rp.length - 1; i++) rsegs.push([rp[i][0], rp[i][1], rp[i + 1][0], rp[i + 1][1], def.river.r]); }
   const segDist = (px, py, s) => {
@@ -29,7 +29,8 @@ G.buildMap = function (def) {
   M.river = (tx, ty) => { let d = 1e9; for (const s of rsegs) { const v = segDist(tx, ty, s) - s[4] + (G.fbm(tx * 0.7 + 9, ty * 0.7) - 0.5) * 0.9; if (v < d) d = v; } return d; };
   M.hasRiver = rsegs.length > 0;
   // 與某條路中心線的距離（格）
-  M.laneSegs = def.lanes.map(l => { const a = []; for (let i = 0; i < l.pts.length - 1; i++) a.push([l.pts[i][0], l.pts[i][1], l.pts[i + 1][0], l.pts[i + 1][1], l.r]); return a; });
+  M.laneSegs = def.lanes.map(l => { const a = []; for (let i = 0; i < l.pts.length - 1; i++) a.push([l.pts[i][0], l.pts[i][1], l.pts[i + 1][0], l.pts[i + 1][1], l.rs ? l.rs[i] : l.r]); return a; });
+  M.laneIn = (li, tx, ty) => { let d = 1e9; for (const sg of M.laneSegs[li]) { const v = segDist(tx, ty, sg) - sg[4]; if (v < d) d = v; } return d; };   // 離路面邊緣多遠（<0 在路上）
   M.laneDist = (li, tx, ty) => { let d = 1e9; for (const sg of M.laneSegs[li]) { const v = segDist(tx, ty, sg); if (v < d) d = v; } return d; };
   // 路面程度（0=路中央，1=路邊）
   M.pathiness = (tx, ty) => {

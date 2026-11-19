@@ -896,6 +896,10 @@ G.UI = (() => {
       if (e.pointerType === 'mouse') U.mouse = evXY(e);
       const p = ptrs.get(e.pointerId); if (!p) return;
       const [x, y] = evXY(e), dx = x - p.x, dy = y - p.y; p.x = x; p.y = y;
+      if (p.mode === 'ui' && p.btn && p.btn.hdrag) {          // v2.7 左右滑動的表格：橫向拖曳才滑表格，直向拖曳照常捲動
+        if (!p.hlock && Math.abs(x - p.sx) > 4 * R.dpr && Math.abs(x - p.sx) >= Math.abs(y - p.sy)) p.hlock = true;
+        if (p.hlock) { p.btn.hdrag(toUI(x, y)[0]); return; }
+      }
       if (p.mode === 'ui' && p.btn && p.btn.drag) { const [ux, uy] = toUI(x, y); p.btn.drag(ux, uy); return; }
       if (p.mode === 'ui' && p.btn && p.btn.id === 'mini' && U.miniDrag) { const [ux, uy] = toUI(x, y); U.miniTo(ux, uy); }
       else if (p.mode === 'ui' && p.btn && p.btn.wheel && Math.abs(y - p.sy) > 4 * R.dpr && Math.abs(y - p.sy) >= Math.abs(x - p.sx)) { p.mode = 'vw'; p.wh = p.btn.wheel; p.btn = null; p.ly = p.sy; p.wh.grab(); }
@@ -929,7 +933,7 @@ G.UI = (() => {
       if (p.mode === 'ui' && p.btn) {
         U.miniDrag = false;
         const [ux, uy] = toUI(p.x, p.y), b = hitBtn(ux, uy);
-        if (p.btn.up && ((b && b.id === p.btn.id) || p.btn.drag)) p.btn.up();
+        if (p.btn.up && ((b && b.id === p.btn.id) || p.btn.drag || p.btn.hdrag)) p.btn.up();
       }
       if (U.hold) U.hold = null;
       if (p.mode === 'swipe' && Math.abs(p.x - p.sx) > 30 * R.dpr && G.Menus) G.Menus.guideTurn(p.x < p.sx ? 1 : -1);
@@ -939,6 +943,7 @@ G.UI = (() => {
     cv.addEventListener('wheel', e => {
       e.preventDefault();
       { const [ux, uy] = evXY(e).map(v => v / R.uiS); for (let i = U.btns.length - 1; i >= 0; i--) { const b = U.btns[i]; if (b.wheel && ux >= b.x && ux < b.x + b.w && uy >= b.y && uy < b.y + b.h) { const now = performance.now(); if (now - (U.wheelT || 0) > 90) { U.wheelT = now; b.wheel.step(Math.sign(e.deltaY || e.deltaX)); } return; } } }
+      if (G.Menus && G.Menus.hscroll && (Math.abs(e.deltaX) > Math.abs(e.deltaY) || e.shiftKey) && G.Menus.hscroll(e.shiftKey && !e.deltaX ? e.deltaY * 0.5 : e.deltaX * 0.5, ...evXY(e).map(v => v / R.uiS))) return;   // v2.7 表格左右滑動
       if ((U.screen === 'team' || U.screen === 'book') && G.Menus && G.Menus.inCar(...evXY(e).map(v => v / R.uiS))) { const now = performance.now(); if (now - (U.wheelT || 0) > 90) { U.wheelT = now; G.Menus.carStep(Math.sign(e.deltaY || e.deltaX)); } return; }
       if ((U.screen === 'team' || U.screen === 'book' || U.screen === 'ach') && G.Menus) { G.Menus.scroll(e.deltaY * 0.25, ...evXY(e).map(v => v / R.uiS)); return; }
       if (U.screen === 'battle' && !U.paused) R.setZoom(R.cam.zoom * Math.exp(-e.deltaY * 0.0012));   // 只有戰鬥中能縮放（首頁背景固定）
