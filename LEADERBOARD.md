@@ -3,7 +3,7 @@
 > 伺服器：https://lol-rank.leafoflegends.workers.dev（Cloudflare Worker `lol-rank`＋D1 `lol-rank`）
 > 程式：`leaderboard/`（worker.js、schema.sql、wrangler.toml、deploy.sh、admin.sh）；Mac：`~/Desktop/Claude/LeafofLegends/leaderboard/`
 > 部署／更新：**全自動**——Cloudflare Workers Builds 已連到 GitHub（repo GeorgePai/LeafofLegends、source 分支、根目錄 /leaderboard、`npx wrangler deploy`）；推 source 就會部署。資料表由 Worker 自己建立／升級（worker.js 的 SCHEMA／UPGRADES），不用跑 SQL。確認部署：用桌面 App 的內建瀏覽器開 Cloudflare 的 lol-rank → Deployments，或開 /board 看回應（雲端 session 的 shell 連不到 Cloudflare 和 workers.dev）。deploy.sh 只是備援
-> 管理：遊戲裡開發者模式 → 排行 →「管理玩家」（隱藏／復原／刪除；第一次要貼上管理密鑰）；或 Mac：`admin.sh list`／`admin.sh del 名字或ID`（密鑰在 admin_key.txt，不進 git；複製：`cat ~/Desktop/Claude/LeafofLegends/leaderboard/admin_key.txt | pbcopy`）
+> 管理：遊戲裡開發者模式 → 排行 →「管理玩家」（隱藏／復原／刪除；權限＝開發者密碼，開啟開發者模式時自動記住）；或 Mac：`admin.sh list`／`admin.sh del 名字或ID`（密鑰在 admin_key.txt，不進 git；複製：`cat ~/Desktop/Claude/LeafofLegends/leaderboard/admin_key.txt | pbcopy`）
 
 ## 結論
 1. **你的 Vultr $6（1 vCPU／1GB／25GB／2TB 流量）效能綽綽有餘**：排行榜每次請求只是幾 KB 的 JSON，一顆核心每秒可處理上百次，1000 人同時在線也只用到一小部分。

@@ -114,7 +114,7 @@ G.Rank = (() => {
     if (pend && K.joined() && !G.Team.dev && Date.now() - lastSub > (G.RANK_GAP + 1) * 1000) { K.submit(); return; }
     K.poll();
   };
-  // ---- v2.8.1 管理（開發者模式）：隱藏／復原／永久刪除；密鑰存在這台裝置（leafwar_adm），不進存檔碼 ----
+  // ---- 管理（開發者模式）：隱藏／復原／永久刪除；v2.8.2 權限＝開發者密碼（開啟開發者模式時記在這台裝置 leafwar_adm），不進存檔碼 ----
   K.admKey = () => { try { return localStorage.getItem('leafwar_adm') || ''; } catch (e) { return ''; } };
   K.adm = { list: null, busy: 0, err: '' };
   K.admLoad = async key => {
@@ -123,7 +123,7 @@ G.Rank = (() => {
     let j; try { const r = await fetch(G.RANK_URL + '/admin/list?key=' + encodeURIComponent(k)); j = await r.json(); } catch (e) { j = { err: 'net' }; }
     K.adm.busy = 0;
     if (Array.isArray(j)) { K.adm.list = j; if (key) try { localStorage.setItem('leafwar_adm', key); } catch (e) { } return true; }
-    K.adm.err = j.err === 'auth' ? '密鑰不對' : '連不上伺服器'; if (j.err === 'auth' && !key) try { localStorage.removeItem('leafwar_adm'); } catch (e) { }
+    K.adm.err = j.err === 'auth' ? '密碼不對' : j.err === 'locked' ? '猜錯太多次，1 小時後再試' : '連不上伺服器';
     return false;
   };
   K.admAct = async (act, id, h) => {
@@ -239,11 +239,8 @@ G.RankUI = (() => {
   function admin(c, M, x, y, W, B) {
     const Kk = K(), A = Kk.adm, key = Kk.admKey();
     const bh = bar(c, x, B, W, ['隱藏可以復原', '刪除無法復原'], 3, ['rkAdmBk', '返回', () => { adm = false; askDel = null; G.Audio.play('click'); }]);
-    if (!key || (!A.list && A.err === '密鑰不對')) {                                           // 第一次：貼上管理密鑰
-      G.cnWrap('第一次使用請貼上管理密鑰（只存在這台裝置）', W - 8).forEach((l, i) => G.cn(c, l, x + 4, y + i * 13, 7));
-      const iy = y + 30, e = G.Dom.place('adm', 'input', x + 4, iy, W - 72, 18, { ph: '管理密鑰', max: 64 });
-      M.btnPrimary(c, 'rkAdmOk', x + W - 62, iy + 1, 58, 16, '確定', async () => { const v = (e.value || '').trim(); if (v && await Kk.admLoad(v)) { e.value = ''; G.Audio.play('level'); } else G.Audio.play('deny'); });
-      if (A.err) G.cn(c, A.err, x + 4, iy + 24, 10);
+    if (!key || A.err === '密碼不對') {                                                       // 舊版開過開發者模式的裝置：重新輸入一次開發者密碼就好
+      G.cnWrap('請先關閉開發者模式，再重新開啟一次（輸入密碼）', W - 8).forEach((l, i) => G.cn(c, l, x + 4, y + i * 13, 7));
       return;
     }
     if (!A.list) { G.cn(c, A.busy ? '讀取中…' : A.err || '讀取中…', x + W / 2, y + 16, A.err ? 10 : 6, 0.5); if (!A.busy && !A.err) Kk.admLoad(); return; }

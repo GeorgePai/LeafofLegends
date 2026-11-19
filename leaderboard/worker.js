@@ -4,6 +4,7 @@
 // POST /leave  {id,tok}    → 退出排行（刪除自己的資料）
 // 管理（需要 ADMIN_KEY）：GET /admin/list?key=…、POST /admin/hide {key,id,h}（隱藏／復原）、POST /admin/del {key,id}（永久刪除）
 // v2.8.1：players.hidden＝1 的玩家不出現在排行（可復原）
+// v2.8.2：管理權限＝遊戲的開發者密碼（key 傳 8 位數密碼，和遊戲用同一個雜湊檢查）；猜錯會被擋：同一個 IP 每小時 5 次、全部合計每小時 30 次
 const CATS = ['heroes', 'minions', 'games', 'wr', 'kda', 'keys', 'dmg', 'time', 'ach'];
 const QUAL = { wr: 'games >= 10', kda: 'games >= 10' };          // 勝率、KDA 至少 10 場才上榜
 const FIELDS = ['heroes', 'minions', 'games', 'wins', 'kills', 'deaths', 'assists', 'keys', 'dmg', 'time', 'ach'];
@@ -11,6 +12,7 @@ const MAX = { heroes: 40, minions: 80, ach: 200, games: 1e6, wins: 1e6, kills: 1
 const TOP = 20, CACHE_MS = 30000, GAP_S = 30, NEW_PER_IP_H = 3, DMG_PS = 1000;
 const BAD = ['幹你', '操你', '靠北', '靠杯', '雞掰', '機掰', '去死', '智障', '白痴', '白癡', '屌', 'fuck', 'shit', 'bitch', 'cnm', 'nmsl', 'admin', '管理員', '官方'];
 let cache = null, cacheT = 0;
+const DEV_H = 3224873579, devHash = s => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h; };
 
 const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'GET,POST,OPTIONS', 'access-control-allow-headers': 'content-type', 'access-control-max-age': '86400' };
 const J = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { ...CORS, 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } });
@@ -86,7 +88,11 @@ async function leave(req, env) {
 }
 async function admin(req, env, url) {
   const isPost = req.method === 'POST', b = isPost ? await req.json().catch(() => ({})) : {}, key = isPost ? b.key : url.searchParams.get('key');
-  if (!env.ADMIN_KEY || key !== env.ADMIN_KEY) return J({ err: 'auth' }, 403);
+  const ih = (await sha((req.headers.get('cf-connecting-ip') || '') + '|lol')).slice(0, 16), hr = Math.floor(Date.now() / 1000) - 3600;
+  const f = await env.DB.batch([env.DB.prepare('SELECT COUNT(*) AS n FROM fails WHERE ip = ? AND t > ?').bind(ih, hr), env.DB.prepare('SELECT COUNT(*) AS n FROM fails WHERE t > ?').bind(hr)]);
+  if (f[0].results[0].n >= 5 || f[1].results[0].n >= 30) return J({ err: 'locked' }, 429);
+  const k = String(key || ''), ok = (env.ADMIN_KEY && k === env.ADMIN_KEY) || (/^[0-9]{8}$/.test(k) && devHash(k) === DEV_H);
+  if (!ok) { await env.DB.batch([env.DB.prepare('INSERT INTO fails (ip, t) VALUES (?, ?)').bind(ih, hr + 3600), env.DB.prepare('DELETE FROM fails WHERE t < ?').bind(hr)]); return J({ err: 'auth' }, 403); }
   if (url.pathname === '/admin/list') { const r = await env.DB.prepare('SELECT id, name, hidden, heroes, minions, games, wins, kills, deaths, assists, keys, dmg, time, ach, wr, kda, created, updated FROM players ORDER BY updated DESC LIMIT 300').all(); return J(r.results); }
   if (url.pathname === '/admin/hide' && isPost) { const r = await env.DB.prepare('UPDATE players SET hidden = ? WHERE id = ?').bind(b.h ? 1 : 0, String(b.id || '')).run(); cache = null; return J({ ok: 1, changed: r.meta.changes }); }
   if (url.pathname === '/admin/del' && isPost) { const r = await env.DB.prepare('DELETE FROM players WHERE id = ? OR name = ?').bind(String(b.id || ''), String(b.name || '\u0000')).run(); await env.DB.prepare('DELETE FROM news WHERE pid = ?').bind(String(b.id || '')).run(); cache = null; return J({ ok: 1, deleted: r.meta.changes }); }
@@ -98,7 +104,8 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS players (id TEXT PRIMARY KEY, tok TEXT NOT NULL, name TEXT NOT NULL, ip TEXT, heroes INTEGER DEFAULT 0, minions INTEGER DEFAULT 0, games INTEGER DEFAULT 0, wins INTEGER DEFAULT 0, kills INTEGER DEFAULT 0, deaths INTEGER DEFAULT 0, assists INTEGER DEFAULT 0, keys INTEGER DEFAULT 0, dmg INTEGER DEFAULT 0, time INTEGER DEFAULT 0, ach INTEGER DEFAULT 0, wr REAL DEFAULT 0, kda REAL DEFAULT 0, created INTEGER, updated INTEGER, hidden INTEGER DEFAULT 0)`,
   ...['heroes', 'minions', 'games', 'wr', 'kda', 'keys', 'dmg', 'time', 'ach'].map(k => `CREATE INDEX IF NOT EXISTS i_${k} ON players (${k} DESC, created)`),
   'CREATE INDEX IF NOT EXISTS i_ip ON players (ip, created)',
-  'CREATE TABLE IF NOT EXISTS news (id INTEGER PRIMARY KEY AUTOINCREMENT, t INTEGER, pid TEXT, name TEXT, cat TEXT)'
+  'CREATE TABLE IF NOT EXISTS news (id INTEGER PRIMARY KEY AUTOINCREMENT, t INTEGER, pid TEXT, name TEXT, cat TEXT)',
+  'CREATE TABLE IF NOT EXISTS fails (ip TEXT, t INTEGER)'
 ];
 const UPGRADES = ['ALTER TABLE players ADD COLUMN hidden INTEGER DEFAULT 0'];   // 已經有這欄就會報錯，略過即可
 async function migrate(env) {

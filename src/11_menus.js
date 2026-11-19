@@ -341,7 +341,7 @@ G.Menus = (() => {
     if (devAsk.s.length >= DEV_LEN) return;
     devAsk.s += d; G.Audio.play('tick');
     if (devAsk.s.length === DEV_LEN) {
-      if (devHash(devAsk.s) === DEV_H) { devAsk = null; G.Team.setDev(true); G.Audio.play('level'); }
+      if (devHash(devAsk.s) === DEV_H) { try { localStorage.setItem('leafwar_adm', devAsk.s); } catch (e) { } devAsk = null; G.Team.setDev(true); G.Audio.play('level'); }   // v2.8.2：記住密碼＝排行榜管理權限（只存在這台裝置）
       else { devAsk.err = 0.45; devAsk.s = ''; G.Audio.play('deny'); }
     }
   };
@@ -541,7 +541,7 @@ G.Menus = (() => {
       arrow('mwU', top - 6, -1, mw.tgt > 0); arrow('mwD', bot + 2, 1, mw.tgt < ITEMS.length - 1);
       c.globalAlpha = 1;
     }
-    G.text(c, 'V2.8.1', uw - I.r - 2, uh - I.b - 6, 3, 1, null, 1);
+    G.text(c, 'V2.8.2', uw - I.r - 2, uh - I.b - 6, 3, 1, null, 1);
     // 右上：鑰匙數；左下：開發者模式開關
     const kt = G.Team.dev ? '∞' : String(G.Team.keys()), kw = 22 + G.cnW(kt);
     H().box(c, uw - I.r - kw, I.t, kw, 14, 0, 13); H().icon(c, 'i_key', uw - I.r - kw + 9, I.t + 7); G.cn(c, kt, uw - I.r - 4, I.t + 1, 13, 1);
