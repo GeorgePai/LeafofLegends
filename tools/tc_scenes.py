@@ -13,6 +13,7 @@ S.append(['menu2',"G.Intro.skip();",1600])
 for t in (0.3,0.5,0.62,0.9,1.6): S.append([f'logo{t}',f"G.Menus._mt({t})",30])
 for k in range(10): S.append([f'menuwheel{k}',f"G.Menus.menuWheel.go({k})",450])
 S.append(['greet',"G.Team.get().name='八個字的名字喔';G.SaveUI.greet={t:2.5,name:'八個字的名字喔'}",200])
+S.append(['hi-wide',"G.SaveUI.greet=null;G.Team.get().name='WWWWWWWW'",200])   # v2.8.3 左上打招呼：最寬的名字
 S.append(['welcome',"G.SaveUI.greet=null;G.SaveUI.welcome={t:1.5,name:'八個字的名字喔',parts:[]}",300])
 S.append(['welcome-x',"G.SaveUI.welcome=null",100])
 S.append(['backup-tip',"G.Team.get().bk={n:5,t:0};G.Menus._mt(3)",300]); S.append(['backup-x',"G.Team.get().bk={n:0,t:Date.now()}",100])

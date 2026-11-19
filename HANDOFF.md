@@ -2,7 +2,7 @@
 
 > 新 session 只要讀這份。排行榜相關再看 `LEADERBOARD.md`。**做任何新設計前，先對照第 8 節「設計守則」**。
 > 各版完成內容在 `CHANGELOG.md`、暫定數值在 `VALUES.md`，需要時用 grep 找到段落再讀，不要整份讀。
-> 最後更新：2026-11-19，版本 **v2.8.2**
+> 最後更新：2026-11-19，版本 **v2.8.3**
 
 ## 1. 專案是什麼
 - Pai 的 HTML5 瀏覽器遊戲，仿 Gamevil《Plants War》（三路推塔＋英雄操作＋小兵兵線）
@@ -77,6 +77,7 @@
 - v2.7：初始鑰匙 8、教學重點上色＋「英雄」分類、技能數值表左右滑動、同陣營站開、道路再 ×1.5（聖所附近維持原寬）
 - v2.8：開寶箱演出重做（敲擊→光一階一階升級→分級爆開、剪影揭曉、11 個新音效）＋教學「開箱光色」；**線上排行榜**（9 分類、存檔自動參加、每 30 秒刷新、前三名通知、全服第 1 名跑馬燈）
 - v2.8.1～2.8.2：排行分類改上下滾輪、名字「…」截斷（Pai 指定例外）、開發者模式「管理玩家」（隱藏／復原／刪除，權限＝開發者密碼，猜錯 5 次鎖 1 小時）；伺服器改 Cloudflare 連 GitHub 自動部署
+- v2.8.3：排行畫面 10 秒刷新＋倒數、數據有變自動上傳、前三名獎盃＋光暈、首頁左上「嗨！名字」
 - v2.4：敵塔範圍＋鎖定警示、道路 ×1.5、結算放慢＋鎖值＋音效、新藥水 5 種＋全部藥水特效、DEV 密碼、技能範圍顯示＋指定施放（拖曳／取消）、LOGO 改版、塔射程 190/210
 
 ## 6. 待 Pai 決定
@@ -87,13 +88,13 @@
 - （v2.4）首頁 RESET 要不要也加密碼鎖？隕石等範圍技仍可在塔射程外打到塔（目前視為合理技能消耗），要不要禁止？
 - （v2.5）重生時間、塔成長／升溫、野怪脫戰規則等暫定數值待確認（VALUES.md 6h）
 - （v2.6）死靈召喚力夫的 MP、成長、解鎖等級、召喚上限 12、血祭可控對象、神話機率 3% 等待確認（VALUES.md 6i）。犧牲召喚可獻祭 1 血複製體換滿血小兵的連招：Pai 決定先保留試強度（2026-11-19），太強再平衡
-- （v2.8）開箱節奏與排行榜暫定數值（VALUES.md 6k）待確認；排行榜還沒經過 Pai 實機完整測試「管理玩家」（測試存檔「GM」等他自己處理）
+- （v2.8）開箱節奏與排行榜暫定數值（VALUES.md 6k、6l）待確認；排行榜還沒經過 Pai 實機完整測試「管理玩家」（測試存檔「GM」等他自己處理）
 - （v2.8）排行榜可考慮第二階段：本週榜、好友榜（LEADERBOARD.md）
 - DEV 密碼只有 Pai 知道（程式內只有雜湊）；要改密碼請 Pai 提供新密碼，重算 `DEV_H`
 
 ## 7. 工作規則
 **每次更新流程**：改 src → build → `bash /home/claude/tools/tc_all.sh`（背景跑，0 筆才可交付）→ 只截有改到的畫面，用 `sheet.py` 拼成一張看 → 發佈 artifact（先 `get_artifact` 取 version，再 `publish_files`，index.html＝dist/index.html）→ 推 GitHub main（遊戲）＋ source（原始碼）→ 備份 Mac（`LeafofLegends.html`、`versions/LeafofLegends_v版本.zip`、有改到的 `source/` 檔案）→ 升版號
-- 版本號在 `src/11_menus.js`（`'V2.8.2'`）
+- 版本號在 `src/11_menus.js`（`'V2.8.3'`）
 - 推 main：clone 到 `/home/claude/leafoflegends` → 複製 `dist/index.html` 成根目錄 `index.html`（保留 `.nojekyll`；音樂有改才更新 `audio/`）→ commit → `git -c push.negotiate=true push origin HEAD:main`，約 1～2 分鐘生效。備援：Pai 在 Mac Terminal 執行 `bash ~/Desktop/Claude/LeafofLegends/deploy_github.sh`
 - 推 source：在 `/home/claude/leafwar` commit（dist/ 已在 .gitignore）→ `git -c push.negotiate=true push origin HEAD:source`
 - **排行榜伺服器**（Pai 要求全自動，不要叫他跑指令）：改 `leaderboard/worker.js` → 本機先測（`cd leaderboard && npm i wrangler@4`，用 `wrangler dev --local` 加假的 database_id 設定檔，curl 測 /board /submit /admin）→ 推 source 即自動部署。新欄位加在 worker.js 的 `SCHEMA`／`UPGRADES`。雲端 shell 連不到 Cloudflare 和 workers.dev：要確認部署就用桌面 App 內建瀏覽器（`mcp__remote-devices__Claude_Browser__*`，已登入 Cloudflare）開 lol-rank → Deployments，或開 /board。**不要用錯的密碼測管理 API**（猜錯 5 次會把 Pai 家的 IP 鎖 1 小時）

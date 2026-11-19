@@ -541,10 +541,13 @@ G.Menus = (() => {
       arrow('mwU', top - 6, -1, mw.tgt > 0); arrow('mwD', bot + 2, 1, mw.tgt < ITEMS.length - 1);
       c.globalAlpha = 1;
     }
-    G.text(c, 'V2.8.2', uw - I.r - 2, uh - I.b - 6, 3, 1, null, 1);
+    G.text(c, 'V2.8.3', uw - I.r - 2, uh - I.b - 6, 3, 1, null, 1);
     // 右上：鑰匙數；左下：開發者模式開關
     const kt = G.Team.dev ? '∞' : String(G.Team.keys()), kw = 22 + G.cnW(kt);
     H().box(c, uw - I.r - kw, I.t, kw, 14, 0, 13); H().icon(c, 'i_key', uw - I.r - kw + 9, I.t + 7); G.cn(c, kt, uw - I.r - 4, I.t + 1, 13, 1);
+    // v2.8.3 左上：有存檔名稱就打招呼（單純白字、無外框；和右上鑰匙數字同高；放不下就把名字換到第二行，不截斷）
+    { const gn = String(G.Team.get().name || '').trim();
+      if (gn) { const avail = uw - I.r - kw - 8 - I.l - 2, s0 = '嗨！' + gn, ls = G.cnW(s0) <= avail ? [s0] : ['嗨！'].concat(G.cnWrap(gn, avail)); ls.forEach((l, i) => G.cn(c, l, I.l + 2, I.t + 1 + i * 13, 9)); } }
     const dv = G.Team.dev, dvw = dv ? 40 : 24, dvx = I.l + 2, dvy = uh - I.b - 13, dvo = pr('dev') ? 1 : 0;
     H().key(c, dvx, dvy + dvo, dvw, 12, dvo, dv ? 14 : 4, dv ? 13 : 1); G.text(c, dv ? 'DEV ON' : 'DEV', dvx + dvw / 2, dvy + 4 + dvo, dv ? 0 : 5, 1, null, 0.5);
     tap('dev', dvx, dvy, dvw, 12, () => { if (G.Team.dev) { G.Team.setDev(false); G.Audio.play('click'); } else { devAsk = { s: '', err: 0 }; G.Audio.play('open'); } });   // 開啟要密碼、關閉不用

@@ -1,5 +1,5 @@
 // Leaf of Legends 線上排行榜（Cloudflare Worker＋D1）
-// GET  /board              → 9 個分類前 20 名＋最近的「登上第 1 名」消息（30 秒快取）
+// GET  /board              → 9 個分類前 20 名＋最近的「登上第 1 名」消息（10 秒快取；v2.8.3 排行畫面每 10 秒刷新）
 // POST /submit {id,tok,name,s} → 更新自己的數據，回傳自己在各分類的名次
 // POST /leave  {id,tok}    → 退出排行（刪除自己的資料）
 // 管理（需要 ADMIN_KEY）：GET /admin/list?key=…、POST /admin/hide {key,id,h}（隱藏／復原）、POST /admin/del {key,id}（永久刪除）
@@ -9,7 +9,7 @@ const CATS = ['heroes', 'minions', 'games', 'wr', 'kda', 'keys', 'dmg', 'time', 
 const QUAL = { wr: 'games >= 10', kda: 'games >= 10' };          // 勝率、KDA 至少 10 場才上榜
 const FIELDS = ['heroes', 'minions', 'games', 'wins', 'kills', 'deaths', 'assists', 'keys', 'dmg', 'time', 'ach'];
 const MAX = { heroes: 40, minions: 80, ach: 200, games: 1e6, wins: 1e6, kills: 1e8, deaths: 1e8, assists: 1e8, keys: 1e7, dmg: 1e12, time: 1e9 };
-const TOP = 20, CACHE_MS = 30000, GAP_S = 30, NEW_PER_IP_H = 3, DMG_PS = 1000;
+const TOP = 20, CACHE_MS = 10000, GAP_S = 30, NEW_PER_IP_H = 3, DMG_PS = 1000;
 const BAD = ['幹你', '操你', '靠北', '靠杯', '雞掰', '機掰', '去死', '智障', '白痴', '白癡', '屌', 'fuck', 'shit', 'bitch', 'cnm', 'nmsl', 'admin', '管理員', '官方'];
 let cache = null, cacheT = 0;
 const DEV_H = 3224873579, devHash = s => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h; };

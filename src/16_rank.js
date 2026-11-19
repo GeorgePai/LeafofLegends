@@ -1,13 +1,14 @@
 // ============================================================
 // v2.8 線上排行榜（伺服器：Cloudflare Worker＋D1，程式在 leaderboard/）
-// 規則一句話：存過檔取了名字就能參加，排行榜每 30 秒刷新，進前三名就廣播
+// 規則一句話：存過檔取了名字就能參加，排行榜畫面每 10 秒刷新，進前三名就廣播
 // - 身分：P.rk = { id, tok }（放在成就檔案裡，所以會跟著存檔碼走，換手機也是同一個人）
-// - 上傳：存檔、每場戰鬥結束、開遊戲時；同一人 30 秒最多 1 次（伺服器也會擋）
-// - 刷新：不在戰鬥中、畫面在前景時，每 30 秒拿一次排行（順便收全服「登上第 1 名」消息）
+// - 上傳：存檔、每場戰鬥結束、開遊戲時；v2.8.3 起數據有變（開箱、領成就…）也自動上傳；同一人 30 秒最多 1 次（伺服器也會擋）
+// - 刷新：v2.8.3 開著排行榜畫面每 10 秒、其他選單畫面每 30 秒（順便收全服「登上第 1 名」消息）；戰鬥中、背景不連線
 // - DEV 模式不上傳
 // ============================================================
 G.RANK_URL = 'https://lol-rank.leafoflegends.workers.dev';                    // 部署後填入 https://lol-rank.<子網域>.workers.dev
-G.RANK_GAP = 30;                      // 刷新間隔（秒）
+G.RANK_GAP = 30;                      // 上傳間隔＆一般刷新間隔（秒）
+G.RANK_FAST = 10;                     // v2.8.3 開著排行榜畫面時的刷新間隔（秒）
 G.RANK_CATS = [                       // [欄位, 短名（分類格）, 全名, 單位]
   ['heroes', '英雄', '英雄收集', '位'], ['minions', '小兵', '小兵收集', '隻'], ['games', '場數', '戰鬥場數', '場'],
   ['wr', '勝率', '勝率', ''], ['kda', 'KDA', 'KDA', ''], ['keys', '鑰匙', '累積鑰匙', '把'],
@@ -15,7 +16,7 @@ G.RANK_CATS = [                       // [欄位, 短名（分類格）, 全名,
 ];
 G.Rank = (() => {
   const K = {}, CN = Object.fromEntries(G.RANK_CATS.map(c => [c[0], c[2]]));
-  let board = null, boardT = 0, lastPoll = -1e12, lastSub = -1e12, busy = 0, pend = true, state = 'idle', ranks = null;
+  let board = null, boardT = 0, lastPoll = -1e12, lastSub = -1e12, busy = 0, pend = true, state = 'idle', ranks = null, sig = '', sigT = 0;
   const ls = (k, v) => { try { if (v === undefined) return JSON.parse(localStorage.getItem('leafwar_rk_' + k)); localStorage.setItem('leafwar_rk_' + k, JSON.stringify(v)); } catch (e) { return null; } };
   const hex = n => { const a = new Uint8Array(n / 2); (window.crypto || {}).getRandomValues ? crypto.getRandomValues(a) : a.forEach((_, i) => a[i] = Math.random() * 256); return [...a].map(x => x.toString(16).padStart(2, '0')).join(''); };
   const P = () => G.Ach.P();
@@ -26,6 +27,7 @@ G.Rank = (() => {
   K.state = () => state;
   K.board = () => board;
   K.age = () => board ? Math.max(0, Math.round((Date.now() - boardT) / 1000)) : -1;
+  K.next = () => busy ? 0 : Math.max(0, Math.ceil((lastPoll + (G.UI.screen === 'rank' ? G.RANK_FAST : G.RANK_GAP) * 1000 - Date.now()) / 1000));   // v2.8.3 距離下次刷新幾秒（倒數）
   K.ranks = () => ranks || ls('ranks') || {};
   K.fmt = (k, v) => {
     v = +v || 0;
@@ -71,7 +73,7 @@ G.Rank = (() => {
   }
   // ---- 拿排行（不在戰鬥中，每 30 秒）----
   K.poll = async force => {
-    if (!K.on() || busy || (!force && Date.now() - lastPoll < G.RANK_GAP * 1000)) return;
+    if (!K.on() || busy || (!force && Date.now() - lastPoll < (G.UI.screen === 'rank' ? G.RANK_FAST : G.RANK_GAP) * 1000)) return;
     busy = 1; lastPoll = Date.now(); if (!board) state = 'load';
     const j = await req('/board'); busy = 0;
     if (j.err || !j.cats) { state = errState(j); return; }
@@ -88,8 +90,8 @@ G.Rank = (() => {
     if (!K.on() || G.Team.dev || !K.joined()) return;
     if (busy || Date.now() - lastSub < (G.RANK_GAP + 1) * 1000) { pend = true; return; }
     busy = 1; pend = false; lastSub = Date.now();
-    const me = K.me(), j = await req('/submit', { id: me.id, tok: me.tok, name: K.name(), s: K.stats() }); busy = 0;
-    if (j.ok) { diff(j.ranks || {}); lastPoll = -1e12; return; }                 // 上傳後馬上刷新排行
+    const me = K.me(), st = K.stats(), j = await req('/submit', { id: me.id, tok: me.tok, name: K.name(), s: st }); busy = 0;
+    if (j.ok) { sig = K.name() + JSON.stringify(st); diff(j.ranks || {}); lastPoll = -1e12; return; }                 // 上傳後馬上刷新排行
     if (j.err === 'wait') { pend = true; lastSub = Date.now() - (G.RANK_GAP - (j.wait || 5)) * 1000; return; }
     if (j.err === 'auth') { P().rk = null; G.Team.save(); ranks = {}; ls('ranks', {}); banner('排行身分失效，請重新參加', 10); return; }
     if (j.err === 'name') { banner('這個名字不能上排行，請到存檔改名', 10); return; }
@@ -111,7 +113,9 @@ G.Rank = (() => {
   K.tick = () => {
     if (!K.on()) return;
     const sc = G.UI.screen; if (sc === 'battle' || sc === 'intro' || sc === 'tap' || document.hidden) return;
-    if (pend && K.joined() && !G.Team.dev && Date.now() - lastSub > (G.RANK_GAP + 1) * 1000) { K.submit(); return; }
+    const now = Date.now();
+    if (!pend && sig && K.joined() && !G.Team.dev && now - sigT > 2000) { sigT = now; if (K.name() + JSON.stringify(K.stats()) !== sig) pend = true; }   // v2.8.3 數據有變（開箱、領成就、改名…）就排隊上傳
+    if (pend && K.joined() && !G.Team.dev && now - lastSub > (G.RANK_GAP + 1) * 1000) { K.submit(); return; }
     K.poll();
   };
   // ---- 管理（開發者模式）：隱藏／復原／永久刪除；v2.8.2 權限＝開發者密碼（開啟開發者模式時記在這台裝置 leafwar_adm），不進存檔碼 ----
@@ -177,9 +181,53 @@ G.RankUI = (() => {
     for (let q = 0; q < 4; q++) { c.fillRect(x + 2 - ax + q, cy - 3 + q, 1, 7 - q * 2); c.fillRect(x + w - 3 + ax - q, cy - 3 + q, 1, 7 - q * 2); }
     return bot - top;
   }
-  function badge(c, x, y, r) {
-    if (r <= 3) { c.fillStyle = P[0]; c.fillRect(x, y, 13, 12); c.fillStyle = P[[13, 7, 14][r - 1]]; c.fillRect(x + 1, y + 1, 11, 10); G.text(c, String(r), x + 7, y + 4, 0, 0.5); }
+  // v2.8.3 前三名：像素獎盃（金／銀／銅，四階明暗，H 反光、L 亮面、M 中間、D 暗面＋把手；深灰底座），每隔幾秒杯口閃一下星光
+  const TROPHY = [
+    '.HHLLLLMMD.',
+    'D.HLLLLMD.D',
+    'D.HLLLLMD.D',
+    '.DHLLLLMDD.',
+    '...HLLMD...',
+    '....LMD....',
+    '.....M.....',
+    '....LMD....',
+    '...bbbbb...',
+    '..BBBBBBB..'
+  ];
+  const TCOL = [
+    { H: '#fffbe0', L: '#ffd84a', M: '#eaa516', D: '#b0680c' },
+    { H: '#ffffff', L: '#e2e7f0', M: '#aab3c4', D: '#737c8f' },
+    { H: '#ffe2c4', L: '#ec9e5e', M: '#c86c2c', D: '#8a4416' }
+  ];
+  const _tro = [];
+  function trophyImg(r) {
+    if (_tro[r]) return _tro[r];
+    const cv = G.canvas(11, 10), g = cv.getContext('2d'), col = Object.assign({ b: '#7a7a7a', B: '#4a4a4a' }, TCOL[r]);
+    TROPHY.forEach((row, y) => [...row].forEach((ch, x) => { if (col[ch]) { g.fillStyle = col[ch]; g.fillRect(x, y, 1, 1); } }));
+    return (_tro[r] = cv);
+  }
+  const GLOW = ['#ffd84a', '#dfe6f2', '#f08a3a'];
+  function badge(c, x, y, r) {                                                              // y＝框內第一列；獎盃上下各留 1 px
+    if (r <= 3) {
+      c.drawImage(trophyImg(r - 1), x + 1, y + 1);
+      const t = (ui().gt() + r * 1.1) % 3.3;                                                // 星光：三個錯開
+      if (t < 0.5) { const k = Math.sin(t / 0.5 * Math.PI), n = k > 0.6 ? 2 : 1, sx = x + 9, sy = y + 2; c.globalAlpha = k; c.fillStyle = '#ffffff'; c.fillRect(sx, sy - n, 1, n * 2 + 1); c.fillRect(sx - n, sy, n * 2 + 1, 1); c.globalAlpha = 1; }
+    }
     else G.cn(c, String(r), x + 6, y, 5, 0.5);
+  }
+  // v2.8.3 前三名資訊條的光暈（全部畫在框內，不加粗外框）：左邊淡淡的底色、框內 2 px 柔光呼吸、外框微微發亮、每隔幾秒一道斜向掃光
+  function honor(c, x, y, w, h, r) {
+    const gt = ui().gt(), col = GLOW[r - 1], br = 0.5 + 0.5 * Math.sin(gt * 2.4 + r * 2), tw = Math.round(w * 0.45);
+    c.fillStyle = col;
+    for (let i = 0; i < tw; i += 2) { c.globalAlpha = 0.13 * (1 - i / tw); c.fillRect(x + 1 + i, y + 1, 2, h - 2); }
+    [[1, 0.1 + 0.12 * br], [2, 0.05 * br]].forEach(([d, al]) => { c.globalAlpha = al; c.fillRect(x + d, y + d, w - d * 2, 1); c.fillRect(x + d, y + h - 1 - d, w - d * 2, 1); c.fillRect(x + d, y + d + 1, 1, h - d * 2 - 2); c.fillRect(x + w - 1 - d, y + d + 1, 1, h - d * 2 - 2); });
+    c.globalAlpha = 0.28 * br; c.fillStyle = '#ffffff';                                       // 外框發亮（同一條線，不變粗）
+    c.fillRect(x + 1, y, w - 2, 1); c.fillRect(x + 1, y + h - 1, w - 2, 1); c.fillRect(x, y + 1, 1, h - 2); c.fillRect(x + w - 1, y + 1, 1, h - 2);
+    const t = (gt * 0.9 + r * 0.37) % 3.2;                                                    // 3.2 秒一輪，0.7 秒掃過
+    if (t < 0.7) { const sx = Math.round(x - 8 + (w + 16) * t / 0.7); c.save(); c.beginPath(); c.rect(x + 1, y + 1, w - 2, h - 2); c.clip(); c.fillStyle = '#ffffff';
+      for (let q = 0; q < h; q++) { c.globalAlpha = 0.16; c.fillRect(sx - (q >> 1), y + q, 4, 1); c.globalAlpha = 0.08; c.fillRect(sx - (q >> 1) + 5, y + q, 2, 1); }
+      c.restore(); }
+    c.globalAlpha = 1;
   }
   // 底部列：文字 1～2 行（高度跟著行數），右邊一顆按鈕
   function bar(c, x, B, W, lines, col, btn) {
@@ -195,8 +243,9 @@ G.RankUI = (() => {
     const W = Math.min(Rr - L, 420), x = Math.round((L + Rr) / 2 - W / 2);
     if (adm) return admin(c, M, x, y0, W, B);
     // 標題列右邊：人數＋更新狀態
-    const age = Kk.age(), stTxt = !Kk.on() ? '' : st === 'quota' ? '額度用完' : st === 'err' ? '連不上' : st === 'load' ? '讀取中' : age >= 0 ? (age < 3 ? '剛剛更新' : age + ' 秒前') : '';
-    const hd = (b ? b.n + ' 人' : '') + (b && stTxt ? '・' : '') + stTxt; if (hd) G.cn(c, hd, Rr, I.t + 1, st === 'err' || st === 'quota' ? 10 : 6, 1);
+    const nx = Kk.next(), stTxt = !Kk.on() ? '' : st === 'quota' ? '額度用完' : st === 'err' ? '連不上' : st === 'load' ? '讀取中' : Kk.age() >= 0 ? (nx <= 0 ? '更新中' : nx + ' 秒後更新') : '';   // v2.8.3 改成倒數
+    const room = Rr - (L + 24 + G.cnW(adm ? '管理玩家' : '排行榜') + 8), cand = [(b ? b.n + ' 人' : '') + (b && stTxt ? '・' : '') + stTxt, stTxt, stTxt.replace(' 秒後更新', ' 秒')], hd = cand.find(q => G.cnW(q) <= room) || cand[2];   // 放不下：先拿掉人數，再縮短
+    if (hd) G.cn(c, hd, Rr, I.t + 1, st === 'err' || st === 'quota' ? 10 : 6, 1);
     const k = G.RANK_CATS[cat()][0];
     let lx = x, lw = W, y = y0;
     if (LD) { wheel(c, x, y + 4, 96, 2); lx = x + 102; lw = W - 102; }
@@ -227,6 +276,7 @@ G.RankUI = (() => {
         if (yy + 15 <= y || yy >= y + listH) { yy += 16; return; }                          // 捲出清單範圍的列不畫
         const w = lw - 6, mine = me && id === me.id, vs = Kk.fmt(k, v), vw = G.cnW(vs);
         H().box(c, lx, yy, w, 14, 1, mine ? 13 : i < 3 ? [13, 7, 14][i] : 3, false);
+        if (i < 3) honor(c, lx, yy, w, 14, i + 1);
         badge(c, lx + 3, yy + 1, i + 1);
         G.cn(c, ell(nm, w - 19 - vw - 10), lx + 19, yy + 1, mine ? 13 : 9);
         G.cn(c, vs, lx + w - 4, yy + 1, mine ? 13 : i < 3 ? 9 : 7, 1);
