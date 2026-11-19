@@ -93,10 +93,11 @@ G.Dom = (() => {
 // ---------- 存檔畫面 ----------
 G.SaveUI = (() => {
   const S = {}, P = G.PAL, R = G.Render, H = () => G.UI.h, U = () => G.UI, ui = () => G.Menus.ui;
-  let step = 'home', msg = null, code = '', pend = null, copied = 0, busy = false;
+  let step = 'home', msg = null, code = '', pend = null, copied = 0, busy = false, copiedOnce = false, askDel = 0, working = false;
   S.welcome = null; S.greet = null;
-  S.reset = () => { step = 'home'; msg = null; pend = null; copied = 0; busy = false; };
-  S.esc = () => { if (step === 'home') return false; step = step === 'confirm' ? 'load' : step === 'code' ? 'home' : 'home'; msg = null; return true; };
+  S.reset = () => { step = 'home'; msg = null; pend = null; copied = 0; busy = false; askDel = 0; working = false; };
+  S.go = st => { step = st; msg = null; if (st === 'out') prepOut(); };   // 測試用
+  S.esc = () => { if (step === 'home') return false; step = step === 'confirm' ? 'load' : (step === 'out' || step === 'del') ? 'acct' : 'home'; msg = null; return true; };
   const say = (s, col = 10) => { msg = { s, col, t: 0 }; };
   // iPhone／iPad 用 Safari 開（還沒加到主畫面）時，提醒「加入主畫面」：Safari 7 天沒玩會清掉網站資料，主畫面版不受影響
   S.forceIos = false;
@@ -120,9 +121,9 @@ G.SaveUI = (() => {
     return y + hh;
   }
   // 大按鈕卡：圖示＋標題＋一行說明
-  function actCard(c, id, x, y, w, ic, t, sub, fn) {
+  function actCard(c, id, x, y, w, ic, t, sub, fn, col = 7) {
     const M = ui(), o = M.pr(id) ? 1 : 0, ls = G.cnWrap(sub, w - 34), hh = 18 + ls.length * 12 + 4;
-    H().key(c, x, y + o, w, hh, o, 7);
+    H().key(c, x, y + o, w, hh, o, col);
     H().icon(c, ic, x + 14, y + Math.round(hh / 2) + o);
     G.cn(c, t, x + 28, y + 3 + o, 9); ls.forEach((l, i) => G.cn(c, l, x + 28, y + 17 + i * 12 + o, 6));
     M.tap(id, x, y, w, hh, fn);
@@ -135,6 +136,28 @@ G.SaveUI = (() => {
     return y + 22;
   };
   const centerTitle = (c, x, w, y, t, sub) => { G.cn(c, t, x + w / 2, y, 13, 0.5); y += 15; if (sub) { const ls = G.cnWrap(sub, w); ls.forEach((l, i) => G.cn(c, l, x + w / 2, y + i * 13, 6, 0.5)); y += ls.length * 13; } return y + 4; };
+  // v2.8.3＋：存檔碼保存提醒（黃框，一定看得到）
+  function keepCard(c, x, y, w, s2) {
+    const ls = G.cnWrap(s2 || '請把存檔碼存好（貼到記事本、截圖或傳給自己）。遺失就找不回進度！', w - 22), hh = 6 + ls.length * 13 + 2;
+    H().box(c, x, y, w, hh, 0, 13, false);
+    H().icon(c, 'i_save', x + 9, y + Math.round(hh / 2));
+    ls.forEach((l, i) => G.cn(c, l, x + 17, y + 4 + i * 13, 13));
+    return y + hh;
+  }
+  // v2.8.4 帳號：登出／刪除後回到新玩家（和首頁 RESET 一樣清空本機）
+  function wipe(txt) {
+    try { localStorage.removeItem('leafwar_team'); } catch (e) { }
+    G.Team.v = null; G.Team.get(); G.Menus.ui.resetCars(); if (G.Rank) G.Rank.forget();
+    step = 'home'; msg = null; code = ''; askDel = 0; working = false; S.greet = null;
+    G.Menus.ui.go('menu'); U().goMenu(); G.Ach.queueBanner({ rk: { s: txt, col: 9 }, t: 0 }); G.Audio.play('open');
+  }
+  async function prepOut() { copiedOnce = false; code = ''; busy = true; code = await G.SaveCode.make(); busy = false; const e = G.Dom.get('code', 'textarea'); e.value = code; e.scrollTop = 0; }
+  async function doDelete() {
+    if (working) return; working = true; say('刪除中…', 13);
+    const j = G.Rank ? await G.Rank.remove() : { ok: 1 }; working = false;
+    if (!j.ok) { say('連不上伺服器，請稍後再試（帳號還沒刪除）', 10); G.Audio.play('deny'); askDel = 0; return; }
+    wipe('帳號已刪除');
+  }
   async function makeCode() {
     busy = true; code = await G.SaveCode.make(); busy = false; step = 'code'; copied = 0; msg = null; G.Ach.on('code'); if (G.Rank) G.Rank.autoJoin();
     const e = G.Dom.get('code', 'textarea'); e.value = code; e.scrollTop = 0;
@@ -143,7 +166,8 @@ G.SaveUI = (() => {
     const e = G.Dom.el('code'); let ok = false;
     try { await navigator.clipboard.writeText(code); ok = true; } catch (err) { }
     if (!ok && e) { try { e.readOnly = false; e.focus(); e.select(); e.setSelectionRange(0, code.length); ok = document.execCommand('copy'); e.readOnly = true; } catch (err) { } }
-    if (ok) { copied = 1.6; G.Audio.play('coin'); say('已複製到剪貼簿', 11); } else { if (e) { e.focus(); e.select(); } say(isDesk() ? '已選取，按 Cmd+C（Windows 按 Ctrl+C）複製' : '已選取，選「拷貝」即可', 13); }
+    copiedOnce = true;
+    if (ok) { copied = 1.6; G.Audio.play('coin'); say('已複製！記得貼到安全的地方保存', 11); } else { if (e) { e.focus(); e.select(); } say(isDesk() ? '已選取，按 Cmd+C（Windows 按 Ctrl+C）複製' : '已選取，選「拷貝」即可', 13); }
   }
   // 貼上：先試著直接讀剪貼簿；瀏覽器不允許時，把游標放進輸入框，按 Cmd+V／Ctrl+V 即可（貼上後自動讀取）
   const isDesk = () => !matchMedia('(pointer: coarse)').matches;
@@ -168,7 +192,7 @@ G.SaveUI = (() => {
     pend = r.v; step = 'confirm'; msg = null; G.Audio.play('open');
   }
   function doLoad() {
-    G.SaveCode.apply(pend); pend = null; G.Menus.ui.resetCars();
+    G.SaveCode.apply(pend); pend = null; G.Menus.ui.resetCars(); if (G.Rank) G.Rank.forget();
     G.Menus.ui.go('menu'); U().goMenu();
     S.welcome = { t: 0, name: G.Team.get().name || '玩家', parts: [] }; G.Audio.play('fanfare');
   }
@@ -186,12 +210,14 @@ G.SaveUI = (() => {
         if (S.iosTip()) iosCard(c, x, iy + 6, lw);
         let yy = actCard(c, 'svMake', rx, y, rw, 'i_save', '產生存檔碼', '存成一串文字', () => { step = 'name'; msg = null; const e = G.Dom.get('name', 'input'); e.value = v.name || ''; });
         yy = actCard(c, 'svLoad', rx, yy + 6, rw, 'i_paste', '讀取存檔碼', '貼上就能還原進度', () => { step = 'load'; msg = null; const e = G.Dom.get('load', 'textarea'); e.value = ''; if (isDesk()) setTimeout(() => e.focus(), 60); });
+        if (v.name) yy = actCard(c, 'svAcct', rx, yy + 6, rw, 'i_gear', '帳號管理', '改名、登出、刪除帳號', () => { step = 'acct'; msg = null; askDel = 0; });
         const fl = G.cnWrap('存檔碼可以跨裝置使用', rw); fl.forEach((l, i) => G.cn(c, l, rx, yy + 8 + i * 13, 4));
 
       } else {
         y = infoCard(c, x, y, W, v.name, G.SaveCode.summary(v)) + 8;
         y = actCard(c, 'svMake', x, y, W, 'i_save', '產生存檔碼', '存成一串文字', () => { step = 'name'; msg = null; const e = G.Dom.get('name', 'input'); e.value = v.name || ''; }) + 6;
         y = actCard(c, 'svLoad', x, y, W, 'i_paste', '讀取存檔碼', '貼上就能還原進度', () => { step = 'load'; msg = null; const e = G.Dom.get('load', 'textarea'); e.value = ''; if (isDesk()) setTimeout(() => e.focus(), 60); }) + 8;
+        if (v.name) y = actCard(c, 'svAcct', x, y - 2, W, 'i_gear', '帳號管理', '改名、登出、刪除帳號', () => { step = 'acct'; msg = null; askDel = 0; }) + 8;
         const fl = G.cnWrap('存檔碼可以跨裝置使用', W); fl.forEach((l, i) => G.cn(c, l, x + W / 2, y + i * 13, 4, 0.5));
         if (S.iosTip()) iosCard(c, x, y + fl.length * 13 + 6, W);
       }
@@ -212,10 +238,37 @@ G.SaveUI = (() => {
       const th = LD ? Math.max(40, Math.min(70, B - y - 58)) : 78;
       H().box(c, x, y, W, th + 2, 0, 13, false);
       const e = G.Dom.place('code', 'textarea', x + 1, y + 1, W - 2, th, { ro: true }); if (e.value !== code) e.value = code;
-      y += th + 8;
+      y += th + 6;
+      y = keepCard(c, x, y, W) + 6;                                                            // v2.8.4 提醒保存存檔碼
       btnRow(c, x, y, W, ['svDone', '完成', () => { step = 'home'; msg = null; }], ['svCopy', copied > 0 ? '已複製！' : '複製', () => copyCode()]);
       y += 24;
-      if (!(msg && msg.t < 3.2)) G.cnWrap('貼到記事本或傳給自己保存。之後在「讀取存檔碼」貼上，就能還原進度。', W).forEach((l, i) => G.cn(c, l, x + W / 2, y + i * 13, 4, 0.5));   // 有訊息時先顯示訊息
+      if (!(msg && msg.t < 3.2)) G.cnWrap('之後在「讀取存檔碼」貼上，就能還原進度。', W).forEach((l, i) => G.cn(c, l, x + W / 2, y + i * 13, 4, 0.5));   // 有訊息時先顯示訊息
+    } else if (step === 'acct') {                                                              // v2.8.4 帳號管理
+      const id = G.Rank ? G.Rank.uid() : '';
+      y = infoCard(c, x, y, W, v.name, [['玩家 ID', id || '尚未上榜']]) + 8;
+      y = actCard(c, 'svRename', x, y, W, 'i_pen', '改名', '排行榜上的名字會一起更新，紀錄都保留', () => { step = 'name'; msg = null; const e = G.Dom.get('name', 'input'); e.value = v.name || ''; }) + 6;
+      y = actCard(c, 'svOut', x, y, W, 'i_out', '登出', '回到新玩家。之後用存檔碼就能登入回來', () => { step = 'out'; msg = null; prepOut(); }) + 6;
+      y = actCard(c, 'svDel', x, y, W, 'i_trash', '刪除帳號', '從排行榜永久移除，並清空這台裝置的進度', () => { step = 'del'; msg = null; askDel = 0; }, 10) + 8;
+      ui().btnSecondary(c, 'svAcBk', Math.round(x + W / 2 - 40), y, 80, 18, '返回', () => { step = 'home'; msg = null; });
+      y += 22;
+    } else if (step === 'out') {                                                               // 登出：先複製存檔碼才能登出
+      y = centerTitle(c, x, W, y + 2, '登出前，先保存存檔碼', '登出後這台裝置會回到新玩家。想回來時，在「讀取存檔碼」貼上就好。');
+      const th = LD ? Math.max(30, Math.min(50, B - y - 96)) : 56;
+      H().box(c, x, y, W, th + 2, 0, 13, false);
+      const e = G.Dom.place('code', 'textarea', x + 1, y + 1, W - 2, th, { ro: true }); if (e.value !== code) e.value = code;
+      y += th + 6;
+      y = keepCard(c, x, y, W, '沒有存檔碼就找不回這個帳號，請先按「複製」保存') + 6;
+      btnRow(c, x, y, W, ['svCopy', copied > 0 ? '已複製！' : '複製存檔碼', () => copyCode()], ['svOutGo', '登出', () => { if (!copiedOnce || busy) { say('請先按「複製存檔碼」保存', 10); G.UI.h.deny('svOutGo'); return; } wipe('已登出'); }]);
+      y += 22;
+      ui().btnSecondary(c, 'svOutNo', Math.round(x + W / 2 - 40), y, 80, 16, '取消', () => { step = 'acct'; msg = null; });
+      y += 20;
+    } else if (step === 'del') {                                                               // 刪除帳號：按兩下確認
+      y = centerTitle(c, x, W, y + 2, '確定要刪除帳號？', null);
+      y = infoCard(c, x, y, W, v.name, G.SaveCode.summary(v)) + 6;
+      const ls = G.cnWrap('排行榜紀錄會永久刪除，這台裝置的進度也會清空，無法復原。', W); ls.forEach((l, i) => G.cn(c, l, x + W / 2, y + i * 13, 10, 0.5)); y += ls.length * 13 + 6;
+      const ask = askDel && Date.now() - askDel < 3000;
+      btnRow(c, x, y, W, ['svDelNo', '取消', () => { step = 'acct'; msg = null; askDel = 0; }], ['svDelGo', working ? '刪除中' : ask ? '再按一次刪除' : '刪除帳號', () => { if (working) return; if (ask) doDelete(); else { askDel = Date.now(); G.Audio.play('tick'); } }]);
+      y += 24;
     } else if (step === 'load') {
       y = centerTitle(c, x, W, y + 2, '讀取存檔碼', '貼上之前保存的存檔碼，會自動讀取');
       const th = LD ? Math.max(40, Math.min(70, B - y - 40)) : 78;

@@ -68,7 +68,7 @@ G.ACH = [
   { id: 'legend3', c: 2, t: 3, n: '傳說收藏家', d: '擁有 3 個傳說以上稀有度的角色', g: 3, v: () => { const o = G.Team.get().owned; return [...o.h, ...o.m].filter(n => G.rarityOf(n) >= 3).length; } },
   { id: 'mythic', c: 2, t: 4, n: '神話降臨', d: '擁有一位神話英雄', hint: '傳說之上，還有傳說。', g: 1, v: () => G.Team.get().owned.h.filter(n => G.rarityOf(n) === 4).length },
   // ----- 探索 -----
-  { id: 'guide', c: 3, t: 1, n: '好學生', d: '看過教學的每一頁', g: () => G.Ach.guideTotal(), v: P => P.guide.length },
+  { id: 'guide', c: 3, t: 1, n: '好學生', d: '看過教學的每一頁', g: () => G.Ach.guideTotal(), v: P => { const ks = G.Menus && G.Menus.guideKeys ? G.Menus.guideKeys() : null; return ks ? P.guide.filter(k => ks.includes(k)).length : P.guide.length; } },
   { id: 'book', c: 3, t: 2, n: '博物學家', d: '在圖鑑看過每一種角色', g: () => G.Ach.bookTotal(), v: P => P.book.length },
   { id: 'demo', c: 3, t: 1, n: '招式研究員', d: '看過 20 種不同的技能展示', g: 20, v: P => P.demo.length },
   { id: 'save', c: 3, t: 1, n: '未雨綢繆', d: '第一次產生存檔碼', g: 1, v: P => P.codes },

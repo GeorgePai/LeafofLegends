@@ -4,6 +4,7 @@
 // POST /leave  {id,tok}    → 退出排行（刪除自己的資料）
 // 管理（需要 ADMIN_KEY）：GET /admin/list?key=…、POST /admin/hide {key,id,h}（隱藏／復原）、POST /admin/del {key,id}（永久刪除）
 // v2.8.1：players.hidden＝1 的玩家不出現在排行（可復原）
+// v2.8.4：POST /admin/purge {key, days} 清除 days 天沒上線的帳號（至少 7 天）
 // v2.8.2：管理權限＝遊戲的開發者密碼（key 傳 8 位數密碼，和遊戲用同一個雜湊檢查）；猜錯會被擋：同一個 IP 每小時 5 次、全部合計每小時 30 次
 const CATS = ['heroes', 'minions', 'games', 'wr', 'kda', 'keys', 'dmg', 'time', 'ach'];
 const QUAL = { wr: 'games >= 10', kda: 'games >= 10' };          // 勝率、KDA 至少 10 場才上榜
@@ -93,7 +94,12 @@ async function admin(req, env, url) {
   if (f[0].results[0].n >= 5 || f[1].results[0].n >= 30) return J({ err: 'locked' }, 429);
   const k = String(key || ''), ok = (env.ADMIN_KEY && k === env.ADMIN_KEY) || (/^[0-9]{8}$/.test(k) && devHash(k) === DEV_H);
   if (!ok) { await env.DB.batch([env.DB.prepare('INSERT INTO fails (ip, t) VALUES (?, ?)').bind(ih, hr + 3600), env.DB.prepare('DELETE FROM fails WHERE t < ?').bind(hr)]); return J({ err: 'auth' }, 403); }
-  if (url.pathname === '/admin/list') { const r = await env.DB.prepare('SELECT id, name, hidden, heroes, minions, games, wins, kills, deaths, assists, keys, dmg, time, ach, wr, kda, created, updated FROM players ORDER BY updated DESC LIMIT 300').all(); return J(r.results); }
+  if (url.pathname === '/admin/list') { const r = await env.DB.prepare('SELECT id, name, hidden, heroes, minions, games, wins, kills, deaths, assists, keys, dmg, time, ach, wr, kda, created, updated FROM players ORDER BY updated DESC LIMIT 500').all(); return J(r.results); }
+  if (url.pathname === '/admin/purge' && isPost) {                                    // v2.8.4 清除 N 天（至少 7 天）沒上線的幽靈帳號
+    const days = Math.max(7, Math.floor(Number(b.days) || 30)), cut = Math.floor(Date.now() / 1000) - days * 86400;
+    await env.DB.prepare('DELETE FROM news WHERE pid IN (SELECT id FROM players WHERE updated < ?)').bind(cut).run();
+    const r = await env.DB.prepare('DELETE FROM players WHERE updated < ?').bind(cut).run(); cache = null; return J({ ok: 1, deleted: r.meta.changes });
+  }
   if (url.pathname === '/admin/hide' && isPost) { const r = await env.DB.prepare('UPDATE players SET hidden = ? WHERE id = ?').bind(b.h ? 1 : 0, String(b.id || '')).run(); cache = null; return J({ ok: 1, changed: r.meta.changes }); }
   if (url.pathname === '/admin/del' && isPost) { const r = await env.DB.prepare('DELETE FROM players WHERE id = ? OR name = ?').bind(String(b.id || ''), String(b.name || '\u0000')).run(); await env.DB.prepare('DELETE FROM news WHERE pid = ?').bind(String(b.id || '')).run(); cache = null; return J({ ok: 1, deleted: r.meta.changes }); }
   return J({ err: 'nf' }, 404);

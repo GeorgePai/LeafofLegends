@@ -61,6 +61,36 @@ G.Menus = (() => {
     });
     return y + 19;
   }
+  // v2.8.4 可左右滑的分類條：放得下就照字寬平均撐滿；放不下就一次顯示放得下的幾格（整格，不切字），左右箭頭／左右滑／滾輪一次換一格，選到的那格一定在畫面內
+  const TBS = {};
+  function tabsS(c, x, y, w, items, cur, fn, pre, key) {
+    const tw0 = items.map(t => G.cnW(t)), PAD = 12, sum = tw0.reduce((a, b) => a + b, 0), n = items.length;
+    const st = TBS[key] = TBS[key] || { a: 0 };
+    let fits = () => n, scroll = false;
+    const shift = d => { if (!scroll) return; if (d < 0 ? st.a <= 0 : st.a + fits(st.a) >= n) return; st.a += d; G.Audio.play('tick'); };
+    const row = (from, to, x0, w0) => {                                // from..to-1 這幾格平均撐滿 w0
+      const ws = tw0.slice(from, to), extra = (w0 - ws.reduce((a, b) => a + b, 0)) / ws.length; let xx = x0;
+      for (let i = from; i < to; i++) {
+        const tw = i === to - 1 ? Math.round(x0 + w0 - xx) : Math.round(tw0[i] + extra), on = cur === i;
+        if (on) H().box(c, xx + 1, y + 1, tw - 2, 13, 3, 9, false);
+        G.cn(c, items[i], xx + tw / 2, y + 1, on ? 9 : 5, 0.5);
+        U().btns.push({ id: pre + i, x: xx, y, w: tw, h: 15, down: ux => { st.ux = ux; st.dr = 0; }, hdrag: ux => { const d = ux - st.ux; if (Math.abs(d) > 18) { st.ux = ux; st.dr = 1; shift(d < 0 ? 1 : -1); } }, up: () => { if (st.dr) { st.dr = 0; return; } G.Audio.play('click'); fn(i); } });
+        xx += tw;
+      }
+    };
+    H().box(c, x, y, w, 15, 0, 3, false);
+    if (sum + PAD * n <= w - 2) { delete st.region; row(0, n, x + 1, w - 2); return y + 19; }
+    scroll = true;
+    const AW = 11, inner = w - 2 - AW * 2; fits = a => { let t = 0, k = a; while (k < n && t + tw0[k] + PAD <= inner) t += tw0[k++] + PAD; return Math.max(1, k - a); };
+    if (st.cur !== cur) { st.cur = cur; if (cur < st.a) st.a = cur; while (cur >= st.a + fits(st.a)) st.a++; }
+    st.a = G.clamp(st.a, 0, n - 1); const cnt = fits(st.a), end = Math.min(n, st.a + cnt);
+    st.region = [x, y, w, 15]; st.shift = shift;
+    row(st.a, end, x + 1 + AW, inner);
+    const arrow = (ax, d, on) => { const id = pre + (d < 0 ? 'L' : 'R'), o = on && pr(id) ? 1 : 0; c.fillStyle = P[on ? 13 : 3]; for (let k = 0; k < 3; k++) c.fillRect(d < 0 ? ax + k : ax - k, y + 7 - k + o, 1, k * 2 + 1); if (on) tap(id, d < 0 ? x : x + w - AW - 1, y, AW + 1, 15, () => shift(d)); };
+    arrow(x + 4, -1, st.a > 0); arrow(x + w - 5, 1, end < n);
+    return y + 19;
+  }
+  M.tabScroll = (dx, ux, uy) => { for (const k in TBS) { const st = TBS[k], r = st.region; if (r && ux >= r[0] && ux <= r[0] + r[2] && uy >= r[1] && uy <= r[1] + r[3]) { const now = performance.now(); if (Math.abs(dx) > 0.5 && now - (st.wt || 0) > 160) { st.wt = now; st.shift(dx > 0 ? 1 : -1); } return true; } } return false; };
   function sprFit(c, name, cx, by, maxW, maxH, frame = 0) {
     const s = G.SPR[G.VIS[name].spr], f = s[frame % s.length];
     const sc = Math.min(1, maxW / f.w, maxH / f.h);
@@ -92,7 +122,7 @@ G.Menus = (() => {
   //   2. 還是放不下 → 標籤欄固定，三個數值欄可以「左右滑動」（v2.7，取代舊的「標籤一行、數值一行」）
   //   三級相同的數值也每一格都寫（v2.7）；和前一級不同的數值標黃
   const TS = { s: 0, tgt: 0, max: 0, cw: 1, key: '', region: null, drag: false };
-  M.hscroll = (dx, ux, uy) => { const r = TS.region; if (!r || ux < r[0] || ux > r[0] + r[2] || uy < r[1] || uy > r[1] + r[3]) return false; const now = performance.now(); if (Math.abs(dx) > 0.5 && now - (TS.wt || 0) > 160) { TS.wt = now; TS.tgt = G.clamp(TS.tgt + Math.sign(dx) * TS.cw, 0, TS.max); } return true; };   // 滾輪：一次滑一欄
+  M.hscroll = (dx, ux, uy) => { if (M.tabScroll && M.tabScroll(dx, ux, uy)) return true; const r = TS.region; if (!r || ux < r[0] || ux > r[0] + r[2] || uy < r[1] || uy > r[1] + r[3]) return false; const now = performance.now(); if (Math.abs(dx) > 0.5 && now - (TS.wt || 0) > 160) { TS.wt = now; TS.tgt = G.clamp(TS.tgt + Math.sign(dx) * TS.cw, 0, TS.max); } return true; };   // 滾輪：一次滑一欄
   function lvTable(c, x, cy, w, sd, levels) {
     const rows = G.skillRows(sd);
     if (!levels) {                                        // 單一等級（敵方）：兩欄清單，同樣整張表一致
@@ -214,8 +244,13 @@ G.Menus = (() => {
   // ---------- 角色詳細：介紹 + 數值條 + 技能按鈕（點了開技能展示）----------
   function detail(c, x, y, w, name, side, cta, keyTab) {
     let cy = y;
-    if (cta) cy = cta(x, cy, w) + 2;
-    if (keyTab) {                                         // 圖鑑：鑰匙掉落率
+    if (cta) cy = cta(c, x, cy, w) + 2;
+    if (keyTab) cy = keyCard(c, x, cy, w, name, keyTab);
+    cy = G.statBars(c, x, cy, w, statOf(name, 1, side), G.statMax(groupOf(name)), null, { anim: 'det' }) + 4;
+    return cy;
+  }
+  function keyCard(c, x, cy, w, name, keyTab) {
+    {                                                     // 圖鑑：鑰匙掉落率
       const r = G.keyRateOf(name, keyTab);
       if (r > 0) {
         const pc = v => (Math.round(v * 10) / 10) + '%';
@@ -229,8 +264,20 @@ G.Menus = (() => {
         cy += hh + 4;
       }
     }
-    cy = G.statBars(c, x, cy, w, statOf(name, 1, side), G.statMax(groupOf(name)), null, { anim: 'det' }) + 4;
     return cy;
+  }
+  // v2.8.4 圖鑑資訊卡（鑰匙機率／角色說明）：點小方塊按鈕才彈出，黑色遮罩、置中、點任意處關閉
+  let binfo = null;
+  const _mc = G.canvas(1, 1).getContext('2d');                // 量高度用（畫在 1×1 的畫布上，不顯示）
+  function bookInfo(c) {
+    if (!binfo) return;
+    const uw = R.uw, uh = R.uh, w = Math.min(uw - 24, 220), x = Math.round(uw / 2 - w / 2);
+    const drawIt = (cc, y) => binfo.k === 'key' ? keyCard(cc, x, y, w, binfo.nm, binfo.tab) - 4 : binfo.cta(cc, x, y, w) - 6;
+    const h = drawIt(_mc, 0), y = Math.round(uh / 2 - (h + 16) / 2);
+    H().btn('biBg', 0, 0, uw, uh, null, () => { binfo = null; G.Audio.play('click'); });
+    H().dim(c, 0.7);
+    drawIt(c, y);
+    G.cn(c, '點任意處關閉', uw / 2, y + h + 4, 5, 0.5);
   }
   // ---------- 技能展示（彈出視窗）：上方動畫、下方切換列、再下方是該技能的說明與數值 ----------
   let demo = null;
@@ -541,7 +588,7 @@ G.Menus = (() => {
       arrow('mwU', top - 6, -1, mw.tgt > 0); arrow('mwD', bot + 2, 1, mw.tgt < ITEMS.length - 1);
       c.globalAlpha = 1;
     }
-    G.text(c, 'V2.8.3', uw - I.r - 2, uh - I.b - 6, 3, 1, null, 1);
+    G.text(c, 'V2.8.4', uw - I.r - 2, uh - I.b - 6, 3, 1, null, 1);
     // 右上：鑰匙數；左下：開發者模式開關
     const kt = G.Team.dev ? '∞' : String(G.Team.keys()), kw = 22 + G.cnW(kt);
     H().box(c, uw - I.r - kw, I.t, kw, 14, 0, 13); H().icon(c, 'i_key', uw - I.r - kw + 9, I.t + 7); G.cn(c, kt, uw - I.r - 4, I.t + 1, 13, 1);
@@ -569,7 +616,7 @@ G.Menus = (() => {
       const bw = 60, by = y + h - 22;
       btnSecondary(c, 'rsNo', Math.round(x + w / 2 - bw - 4), by, bw, 16, '取消', () => { resetAsk = false; });
       const ox = Math.round(x + w / 2 + 4), oo = pr('rsYes') ? 1 : 0; H().key(c, ox, by + oo, bw, 16, oo, 15, 10); G.cn(c, '清除', ox + bw / 2, by + 2 + oo, 9, 0.5);
-      tap('rsYes', ox, by, bw, 16, () => { try { localStorage.removeItem('leafwar_team'); localStorage.removeItem('leafwar_dev'); } catch (e) { } G.Team.v = null; G.Team.dev = false; G.Team.get(); cars.team.inited = false; resetAsk = false; G.Audio.play('level'); });
+      tap('rsYes', ox, by, bw, 16, () => { try { localStorage.removeItem('leafwar_team'); localStorage.removeItem('leafwar_dev'); } catch (e) { } G.Team.v = null; G.Team.dev = false; G.Team.get(); cars.team.inited = false; resetAsk = false; if (G.Rank) G.Rank.forget(); G.Audio.play('level'); });
     }
     if (devAsk) {                                        // 開發者密碼：數字鍵盤（也可以直接用鍵盤輸入）
       H().btn('dvBg', 0, 0, uw, uh, null, () => { devAsk = null; });
@@ -858,16 +905,17 @@ G.Menus = (() => {
 
   // ---------- 圖鑑：同樣的舞台轉盤 ----------
   let btab = 0;
-  let bpot = 0;                                          // v2.5 圖鑑上方切換：0 敵人／1 藥水
-  M._btab = i => { if (i === 5) bpot = 1; else { bpot = 0; btab = i; } };   // 測試用
+  // v2.8.4 圖鑑：拿掉「敵人／藥水」大類，藥水直接放進下方分類條（第 6 格）
+  M._btab = i => { btab = i; binfo = null; };   // 測試用
+  M._binfo = k => { binfo = k ? { k, nm: sel.enemy, tab: btab === 3 ? 'wild' : 'book', cta: null } : null; };   // 測試用
   M.book = c => {
     tick(); bg(c); car = cars.book;
     const y0 = header(c, '圖鑑'), I = R.ins, L = I.l, Rr = R.uw - I.r, B = R.uh - I.b, LD = land();
     const WK = Object.keys(G.WILD);
-    const lists = [G.ROSTER.bosses, G.ROSTER.smalls, G.ROSTER.towers, WK.map(k => G.WILD[k].unit), G.ROSTER.hunters], list = lists[btab];
+    const lists = [G.ROSTER.bosses, G.ROSTER.smalls, G.ROSTER.towers, WK.map(k => G.WILD[k].unit), G.ROSTER.hunters], list = lists[Math.min(btab, 4)];
     const colW = LD ? Math.min(200, Math.round((Rr - L) * 0.52)) : Rr - L;
-    tabs(c, L + 64, R.ins.t, Math.min(120, Rr - L - 70), ['敵人', '藥水'], bpot, i => { if (i === bpot) return; bpot = i; G.Audio.play('tick'); }, 'bk');   // 標題列：敵人／藥水
-    let y = bpot ? y0 : tabs(c, L, y0, LD ? colW : Math.min(colW, 220), ['BOSS', '小怪', '塔', '野怪', '獵手'], btab, i => { if (i === btab) return; btab = i; sel.enemy = lists[i][0]; car.pos = car.tgt = 0; car.settled = true; sbKey = ''; skillSel = -1; G.Audio.play('tick'); });
+    const bpot = btab === 5;
+    let y = tabsS(c, L, y0, LD ? colW : Math.min(colW, 220), ['BOSS', '小怪', '塔', '野怪', '獵手', '藥水'], btab, i => { if (i === btab) return; btab = i; if (i < 5) { sel.enemy = lists[i][0]; car.pos = car.tgt = 0; car.settled = true; } sbKey = ''; skillSel = -1; G.Audio.play('tick'); }, 'tab', 'book');
     if (bpot) {                                         // v2.5 藥水一覽：圖示、名稱、價格、效果（可捲動）
       const w = Math.min(Rr - L, LD ? 420 : 300), x = Math.round(L + (Rr - L) / 2 - w / 2), cols = LD && w >= 360 ? 2 : 1, cw = Math.floor((w - (cols - 1) * 6) / cols);
       scrollDetail(c, x, y + 2, w, B - y - 4, 'potions', top => {
@@ -896,15 +944,20 @@ G.Menus = (() => {
     if (car.settled && G.Ach) G.Ach.on('book', sel.enemy);
     const nm = sel.enemy, side = G.ORIG.towers[nm] && /player|mushroom/.test(nm) ? 0 : 1;
     y = nameplate(c, L, y + ch + 3, colW, nm, 'book');
-    const bw = Math.min(colW - 16, 110), bx = Math.round(L + colW / 2 - bw / 2), o = pr('demo') ? 1 : 0;
+    // v2.8.4 技能展示＋右邊正方形小按鈕（鑰匙＝掉落機率、驚嘆號＝角色說明），整排置中
+    const kTab = btab === 3 ? 'wild' : 'book', hasKey = G.keyRateOf(nm, kTab) > 0, wdNow = btab === 3 ? WILD_OF(nm) : btab === 4, sq = [hasKey && 'key', wdNow && 'info'].filter(Boolean);
+    const bw = 80, gw = bw + sq.length * 20, bx = Math.round(L + colW / 2 - gw / 2), o = pr('demo') ? 1 : 0;
     H().key(c, bx, y + o, bw, 16, o, 7); G.cn(c, '技能展示', bx + bw / 2, y + 2 + o, 9, 0.5);
     tap('demo', bx, y, bw, 16, () => openDemo(nm, side, null));
+    sq.forEach((k, i) => { const id = 'bi_' + k, sx = bx + bw + 4 + i * 20, so = pr(id) ? 1 : 0;
+      H().key(c, sx, y + so, 16, 16, so, k === 'key' ? 13 : 7); H().icon(c, k === 'key' ? 'i_key' : 'i_excl', sx + 8, y + 8 + so);
+      tap(id, sx, y, 16, 16, () => { binfo = { k, nm, tab: kTab, cta: null }; G.Audio.play('open'); }); });
     y += 22;
     let dx = L, dy = y, dw = Rr - L;
     if (LD) { dx = L + colW + 10; dy = y0; dw = Rr - dx; }
     const wd = btab === 3 ? WILD_OF(nm) : btab === 4 ? { n: '敵方獵手', d: G.HUNTER_INFO, ic: 'i_attack', col: 14, kind: 'hunter', respawn: G.TUNE.jungle.respawn } : null;
     // 野怪：獎勵說明卡
-    const cta = wd ? (x, cy, w) => {
+    const cta = wd ? (c, x, cy, w) => {
       const kind = wd.kind === 'wboss' ? '野生首領' : wd.kind === 'hunter' ? '打野' : '野區小怪', two = G.cnW(wd.n) + G.cnW(kind) + 32 > w, ex = two ? 13 : 0;   // 名稱與類別放不下 → 類別換到下一行
       const lines = G.cnWrap(wd.d, w - 26), hh = 18 + ex + lines.length * 13 + (wd.kind === 'hunter' ? 4 : 15);
       H().box(c, x, cy, w, hh, 0, wd.col, false);
@@ -914,8 +967,9 @@ G.Menus = (() => {
       if (wd.kind !== 'hunter') G.cn(c, '重生 ' + wd.respawn + ' 秒', x + 21, cy + 18 + ex + lines.length * 13 + 1, 4);
       return cy + hh + 6;
     } : null;
-    scrollDetail(c, dx, dy, dw - 6, B - dy, btab + nm, yy => detail(c, dx, yy, dw - 6, nm, side, cta, btab === 3 ? 'wild' : 'book'));
-    demoPanel(c);
+    if (binfo && binfo.nm !== nm) binfo = null; if (binfo && binfo.k === 'info') binfo.cta = cta; if (binfo && binfo.k === 'info' && !cta) binfo = null;
+    scrollDetail(c, dx, dy, dw - 6, B - dy, btab + nm, yy => detail(c, dx, yy, dw - 6, nm, side, null, null));
+    demoPanel(c); bookInfo(c);
   };
 
   // ---------- 教學 ----------
@@ -1427,84 +1481,7 @@ G.Menus = (() => {
         }
       ]
     },
-    {
-      name: '英雄', pages: [
-        {
-          t: '召喚物', m: '{死靈召喚力夫}的技能會產生{p:召喚物}（紫色外框），會自動{跟著他}一起戰鬥',
-          draw(c, x, y, w, h, t) {
-            const T = t % 4, gy = Math.round(y + h * 0.64), mv = T > 0.4 && T < 3.3, X = k => lerp(x + w * 0.34, x + w * 0.74, k);
-            const sm = [['leafblower', -24, -9, 0.12], ['peasniper', -34, 6, 0.24], ['leafmuscle', -15, 11, 0.36]];
-            const one = ([n, dx, dy, d]) => sumU(c, n, X(ss(seg(T, 0.4 + d, 3.3 + d))) + dx, gy + dy, null, T > 0.4 + d && T < 3.3 + d);
-            sm.filter(e => e[2] < 0).forEach(one); unit(c, 'necroleafy', X(ss(seg(T, 0.4, 3.3))), gy, mv); sm.filter(e => e[2] >= 0).forEach(one);
-            G.cn(c, '紫色外框＝召喚物', x + w / 2, y + 2, 17, 0.5);
-          }
-        },
-        {
-          t: '犧牲召喚', m: '獻祭身邊的{我方小兵}，換成同樣數量的{隨機小兵}（{含還沒解鎖的角色}）',
-          draw(c, x, y, w, h, t) {
-            const T = t % 5, gy = Math.round(y + h * 0.64), hx = x + w * 0.28, cast = T > 0.9 && T < 1.5;
-            const pos = [[0.52, -8], [0.66, 7], [0.8, -6]], olds = ['leafblower', 'potatoblower', 'seedshooter'];
-            const NEW = [['iceshooter', 'flametree', 'vampireflower'], ['sunshooter', 'treestun', 'leaftanker'], ['poisonshooter', 'elitepeasniper', 'fruitpult']][((t / 5) | 0) % 3];
-            if (cast) { const k = seg(T, 0.9, 1.5); G.pxEllipse(c, hx, gy, 12 + k * 70, (12 + k * 70) * 0.36, 17); }
-            unit(c, 'necroleafy', hx, gy, false, 1, cast && ((t * 12) | 0) % 2 === 0);
-            pos.forEach(([fx, dy], i) => {
-              const px = x + w * fx, py = gy + dy, out = 1 - seg(T, 1.2, 1.6), inn = seg(T, 1.7, 2.2);
-              if (out > 0) unitA(c, olds[i], px, py, out, false, -1);
-              if (T > 1.2 && T < 2.0) G.glow(c, px, py - 8, 7 + Math.sin(T * 20) * 2, 17, 0.8 * (1 - Math.abs(T - 1.6) / 0.4));
-              if (inn > 0) sumU(c, NEW[i], px, py, null, false, -1, inn);
-            });
-            G.cn(c, T < 1.5 ? '獻祭身邊的小兵' : '換成隨機小兵', x + w / 2, y + 2, 17, 0.5);
-          }
-        },
-        {
-          t: '血祭控制', m: '犧牲{r:目前一半的血量}，把身邊的{敵人變成召喚物}；{塔與獵手除外}',
-          draw(c, x, y, w, h, t) {
-            const T = t % 5, gy = Math.round(y + h * 0.64), hx = x + w * 0.28, hp = 1 - 0.5 * ss(seg(T, 1.0, 1.4)), on = T > 1.5;
-            const foes = [['bear', 0.58, -7], ['boar', 0.7, 8], ['babybear', 0.82, -4]];
-            unit(c, 'necroleafy', hx, gy, false, 1, T > 1.0 && T < 1.4 && ((t * 12) | 0) % 2 === 0);
-            hpBar(c, Math.round(hx - 9), gy - 26, 18, hp, 10);
-            if (T > 1.0 && T < 1.6) for (let i = 0; i < 4; i++) { const q = (T * 3 + i * 0.27) % 1; c.fillStyle = P[10]; c.fillRect(Math.round(hx - 6 + i * 4), Math.round(gy - 18 + q * 14), 1, 2); }
-            foes.forEach(([n, fx, dy]) => {
-              const px = x + w * fx - (on ? ss(seg(T, 2.0, 3.2)) * 16 : 0), py = gy + dy;
-              if (T > 1.3 && T < 1.8) { c.fillStyle = P[17]; G.pxLine(c, hx + 4, gy - 10, px, py - 8, 1); G.glow(c, px, py - 8, 6, 17, 0.7); }
-              if (on) sumU(c, n, px, py, 'necro', T > 2.0 && T < 3.2, -1); else unit(c, n, px, py, false, -1);
-            });
-            G.cn(c, T < 1.5 ? (T > 0.9 ? '犧牲一半血量' : '') : '敵人變成召喚物', x + w / 2, y + 2, T < 1.5 ? 10 : 17, 0.5);
-          }
-        },
-        {
-          t: '複製法術', m: '每隻召喚物{各複製一隻}；複製體{只有 1 點血}，但{攻擊力一樣}',
-          draw(c, x, y, w, h, t) {
-            const T = t % 5, gy = Math.round(y + h * 0.62), hx = x + w * 0.24, k = seg(T, 1.1, 1.7);
-            const sm = [['leafblower', 0.46, -8], ['peasniper', 0.6, 6], ['leafmuscle', 0.74, -6]];
-            unit(c, 'necroleafy', hx, gy, false, 1, T > 0.9 && T < 1.2 && ((t * 12) | 0) % 2 === 0);
-            if (T > 0.9 && T < 1.5) { const r = 8 + seg(T, 0.9, 1.5) * 26; G.pxEllipse(c, hx, gy, r, r * 0.36, 12); }
-            sm.forEach(([n, fx, dy]) => {
-              const px = x + w * fx, py = gy + dy;
-              sumU(c, n, px, py, null, false);
-              if (k > 0) { const cx2 = px + 9 * ss(k), cy2 = py + 9 * ss(k); sumU(c, n, cx2, cy2, 'clone', false, 1, Math.min(1, k * 1.5)); if (k >= 1) { c.fillStyle = P[0]; c.fillRect(Math.round(cx2 - 6), cy2 + 3, 12, 3); c.fillStyle = P[10]; c.fillRect(Math.round(cx2 - 5), cy2 + 4, 1, 1); } }
-              if (T > 1.0 && T < 1.8) G.glow(c, px + 5, py - 8, 6, 12, 0.6 * (1 - seg(T, 1.0, 1.8)));
-            });
-            G.cn(c, T < 1.1 ? '' : '複製體：1 點血、攻擊一樣', x + w / 2, y + 2, 12, 0.5);
-          }
-        },
-        {
-          t: '替罪', m: '{p:被動}：身邊有召喚物時，一部分傷害改由{血最多的那隻}召喚物承受',
-          draw(c, x, y, w, h, t) {
-            const T = t % 4, gy = Math.round(y + h * 0.66), hx = x + w * 0.42, ex = x + w * 0.84;
-            const sm = [['leafblower', -22, -8, 0.5], ['peasniper', -30, 8, 1], ['leafmuscle', -14, 12, 0.7]];
-            unit(c, 'bear', ex, gy, false, -1, T > 1 && ((t * 8) | 0) % 4 === 0);
-            const hit = T > 1 && ((T * 2) % 1) < 0.4;
-            sm.filter(e => e[2] < 0).forEach(([n, dx, dy]) => sumU(c, n, hx + dx, gy + dy, null, false));
-            unit(c, 'necroleafy', hx, gy, false);
-            sm.filter(e => e[2] >= 0).forEach(([n, dx, dy]) => sumU(c, n, hx + dx, gy + dy, null, false));
-            sm.forEach(([, dx, dy, f], i) => hpBar(c, Math.round(hx + dx - 6), gy + dy - 20, 12, i === 1 && T > 1 ? Math.max(0.3, f - (T - 1) * 0.2) : f, 9));
-            if (hit) { const [, dx, dy] = sm[1]; c.fillStyle = P[17]; G.pxLine(c, hx, gy - 10, hx + dx, gy + dy - 6, 1); G.glow(c, hx + dx, gy + dy - 6, 5, 17, 0.7); }
-            G.cn(c, T > 1 ? '傷害轉給血最多的召喚物' : '身邊有召喚物時', x + w / 2, y + 2, 17, 0.5);
-          }
-        }
-      ]
-    },
+    // v2.8.4 拿掉「英雄」分類：個別英雄的招式看「隊伍 → 技能展示」，教學只放通用說明
     {
       name: '地圖', pages: [
         {
@@ -1851,14 +1828,14 @@ G.Menus = (() => {
         },
         {
           // v2.8 線上排行榜
-          t: '排行榜', m: '存檔取名後會{自動參加排行}；首頁「{排行}」看 9 類的{前 20 名}，每 30 秒更新',
+          t: '排行榜', m: '存檔取名後會{自動上榜}；首頁「{排行}」看 9 類的{前 20 名}，按{跳至自己}找到你的名次',
           draw(c, x, y, w, h, t) {
             const ct = [['總傷害', ['葉子王', '小派', '阿明'], ['9.2萬', '5.0萬', '3.1萬']], ['勝率', ['小派', '阿明', '葉子王'], ['80.0%', '66.7%', '50.0%']], ['成就數', ['阿明', '葉子王', '小派'], ['32 個', '27 個', '20 個']]][((t / 2) | 0) % 3];
             const lw = Math.min(150, w - 16), lx = Math.round(x + w / 2 - lw / 2); let yy = y + 8;
             G.cn(c, ct[0], lx, yy, 13); yy += 15;
             ct[1].forEach((nm, i) => {
-              const mine = nm === '小派'; H().box(c, lx, yy, lw, 14, 1, mine ? 13 : [13, 7, 14][i], false);
-              c.fillStyle = P[0]; c.fillRect(lx + 3, yy + 1, 13, 12); c.fillStyle = P[[13, 7, 14][i]]; c.fillRect(lx + 4, yy + 2, 11, 10); G.text(c, String(i + 1), lx + 10, yy + 5, 0, 0.5);
+              const mine = nm === '小派', RU = G.RankUI; H().box(c, lx, yy, lw, 14, mine ? 2 : 1, 3, false);   // v2.8.4 和排行榜畫面同一套：金銀銅外框＋獎盃，自己＝左側黃色標記
+              RU.frame(c, lx, yy, lw, 14, RU.TIER[i]); if (mine) { c.fillStyle = P[13]; c.fillRect(lx + 1, yy + 2, 2, 10); } RU.badge(c, lx + 3, yy + 1, i + 1);
               G.cn(c, nm, lx + 19, yy + 1, mine ? 13 : 9); G.cn(c, ct[2][i], lx + lw - 4, yy + 1, mine ? 13 : 9, 1); yy += 16;
             });
           }
@@ -1924,7 +1901,7 @@ G.Menus = (() => {
     });
     // 分類頁籤
     const land = uw > uh * 1.15, tbw = Math.min(Rr - L, 240);
-    const ty = tabs(c, Math.round(uw / 2 - tbw / 2), y0, tbw, CATS.map(k => k.name), cat, i => { cat = i; page = 0; gt = 0; });
+    const ty = tabsS(c, Math.round(uw / 2 - tbw / 2), y0, tbw, CATS.map(k => k.name), cat, i => { cat = i; page = 0; gt = 0; }, 'tab', 'guide');
     const ps = pagesOf(cat); page = Math.min(page, ps.length - 1);
     const sl = ps[page];
     if (G.Ach) G.Ach.on('guide', CATS[cat].name + '/' + sl.t);
@@ -2005,6 +1982,7 @@ G.Menus = (() => {
   // 給其他模組（成就、存檔、開場動畫）共用的元件
   M.ui = { resetCars: () => { cars.team.inited = false; cars.book.inited = false; }, tick: () => tick(), pr, tap, bg, header, btnPrimary, btnSecondary, tabs, scrollDetail, SM, gt: () => gt, land, sprFit, go: s2 => go(s2) };
   M.guidePageCount = () => CATS.reduce((a, k, i) => a + pagesOf(i).length, 0);
+  M.guideKeys = () => CATS.flatMap((k, i) => pagesOf(i).map(p => k.name + '/' + p.t));   // v2.8.4 成就「好學生」只算現在還有的頁面
   M.store = c => { tick(); bg(c); const y0 = header(c, '商店'); G.Store.draw(c, y0, M.dt, gt); };
   return M;
 })();
