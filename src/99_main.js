@@ -35,9 +35,10 @@ G.boot = function () {
     G.Render.updateCam(W, dt);
     if (!(G.Menus && G.Menus.covers(U.screen))) G.Render.draw(W, U.paused ? 1 : acc / STEP, now / 1000);
     // 背景音樂：依目前畫面選曲（開場動畫無音樂；多人、存檔、教學沿用首頁曲；從戰鬥暫停打開教學則維持戰場曲；結算時戰場曲降低音量）
-    { const sc = U.screen, M = sc === 'intro' || sc === 'tap' ? null : sc === 'battle' ? 'battle' : (sc === 'team' || sc === 'book') ? 'team' : sc === 'store' ? 'shop' : sc === 'ach' ? 'ach' : sc === 'guide' && U.guideBack ? 'battle' : 'menu';
+    { const sc = U.screen, M = sc === 'intro' || sc === 'tap' ? null : sc === 'battle' ? 'battle' : (sc === 'team' || sc === 'book') ? 'team' : sc === 'store' ? 'shop' : sc === 'ach' || sc === 'rank' ? 'ach' : sc === 'guide' && U.guideBack ? 'battle' : 'menu';
       G.Audio.music(M, sc === 'battle' && W.over ? 0.45 : 1); G.Audio.musicUpdate(dt); }
     if (G.FreeChest && U.screen !== 'intro' && U.screen !== 'tap') G.FreeChest.tick();
+    if (G.Rank) G.Rank.tick();
     U.draw(dt);
     G.Render.blitUI();
     requestAnimationFrame(frame);

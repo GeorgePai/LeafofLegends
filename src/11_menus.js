@@ -325,12 +325,12 @@ G.Menus = (() => {
 
   // ---------- 首頁 ----------
   const ITEMS = [['單人', 'SOLO', 'i_play', () => U().start()], ['多人', 'MULTI', 'i_users', () => { modal = 2.2; }], ['隊伍', 'TEAM', 'i_tree', () => go('team')], ['商店', 'SHOP', 'i_key', () => go('store')],
-    ['成就', 'TROPHY', 'i_trophy', () => go('ach')], ['圖鑑', 'BOOK', 'i_book', () => go('book')], ['教學', 'GUIDE', 'i_guide', () => M.openGuide(false)], ['存檔', 'SAVE', 'i_save', () => go('save')], ['設定', 'SETTING', 'i_gear', () => { setOpen = true; }]];
+    ['成就', 'TROPHY', 'i_trophy', () => go('ach')], ['排行', 'RANK', 'i_rank', () => go('rank')], ['圖鑑', 'BOOK', 'i_book', () => go('book')], ['教學', 'GUIDE', 'i_guide', () => M.openGuide(false)], ['存檔', 'SAVE', 'i_save', () => go('save')], ['設定', 'SETTING', 'i_gear', () => { setOpen = true; }]];
   // 執行首頁選項：會切換畫面的先播轉場（按鈕撥開 → 光圈展開）；多人、設定是彈窗，直接開
   const runItem = i => { if (G.Trans.busy()) return; const it = ITEMS[i]; if (it[0] === '多人' || it[0] === '設定') it[3](); else G.Trans.start(it[3]); };
   const mw = G.UI.wheel();                                 // 首頁滾輪
   M.menuWheel = mw;
-  function go(s) { U().screen = s; sbKey = ''; skillSel = -1; picker = null; info = null; demo = null; if (s === 'save' && G.SaveUI) G.SaveUI.reset(); if (s === 'ach' && G.AchUI) G.AchUI.reset(); }
+  function go(s) { U().screen = s; sbKey = ''; skillSel = -1; picker = null; info = null; demo = null; if (s === 'save' && G.SaveUI) G.SaveUI.reset(); if (s === 'ach' && G.AchUI) G.AchUI.reset(); if (s === 'rank' && G.RankUI) G.RankUI.reset(); }
   let menuT = 0, resetAsk = false, setOpen = false, devAsk = null; const leaves = [];
   // v2.4 開發者模式密碼鎖：只存雜湊值（FNV-1a），原文不寫在程式裡
   const devHash = s => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h; };
@@ -1847,6 +1847,30 @@ G.Menus = (() => {
           }
         },
         {
+          // v2.8 線上排行榜
+          t: '排行榜', m: '存檔取名後會{自動參加排行}；首頁「{排行}」看 9 類的{前 20 名}，每 30 秒更新',
+          draw(c, x, y, w, h, t) {
+            const ct = [['總傷害', ['葉子王', '小派', '阿明'], ['9.2萬', '5.0萬', '3.1萬']], ['勝率', ['小派', '阿明', '葉子王'], ['80.0%', '66.7%', '50.0%']], ['成就數', ['阿明', '葉子王', '小派'], ['32 個', '27 個', '20 個']]][((t / 2) | 0) % 3];
+            const lw = Math.min(150, w - 16), lx = Math.round(x + w / 2 - lw / 2); let yy = y + 8;
+            G.cn(c, ct[0], lx, yy, 13); yy += 15;
+            ct[1].forEach((nm, i) => {
+              const mine = nm === '小派'; H().box(c, lx, yy, lw, 14, 1, mine ? 13 : [13, 7, 14][i], false);
+              c.fillStyle = P[0]; c.fillRect(lx + 3, yy + 1, 13, 12); c.fillStyle = P[[13, 7, 14][i]]; c.fillRect(lx + 4, yy + 2, 11, 10); G.text(c, String(i + 1), lx + 10, yy + 5, 0, 0.5);
+              G.cn(c, nm, lx + 19, yy + 1, mine ? 13 : 9); G.cn(c, ct[2][i], lx + lw - 4, yy + 1, mine ? 13 : 9, 1); yy += 16;
+            });
+          }
+        },
+        {
+          t: '排行通知', m: '你有任何一項{衝進前三名}會跳出通知；有人{登上第 1 名}，大家都看得到',
+          draw(c, x, y, w, h, t) {
+            const T = t % 4, k = Math.min(1, T / 0.25), cx = x + w / 2, gy = y + h - 10;
+            [[-1, 7, 18, '2'], [0, 13, 28, '1'], [1, 14, 12, '3']].forEach(([d, col, hh, n]) => { const bx = Math.round(cx + d * 26 - 12); c.fillStyle = P[0]; c.fillRect(bx - 1, gy - hh - 1, 26, hh + 1); c.fillStyle = P[col]; c.fillRect(bx, gy - hh, 24, hh); G.text(c, n, bx + 12, gy - hh + 3, 0, 0.5); });
+            const s = T < 2 ? '登上總傷害第 1 名！' : '阿明 登上勝率第 1 名！', col = T < 2 ? 13 : 12, bw = Math.min(w - 8, G.cnW(s) + 24), bx = Math.round(cx - bw / 2), by = Math.round(y + 4 - (1 - k) * 6);
+            H().box(c, bx, by, bw, 16, 1, col, false); H().icon(c, 'i_rank', bx + 9, by + 8); G.cn(c, s, bx + 18, by + 2, col);
+            const f = G.SPR.leafy[((gt * 6) | 0) % G.SPR.leafy.length]; c.drawImage(f.n, Math.round(cx - f.w / 2), Math.round(gy - 28 - f.h - Math.abs(Math.sin(gt * 5)) * 3));
+          }
+        },
+        {
           t: '戰鬥結算', m: '戰鬥結束會顯示{評價（S～D）}、擊殺數據、{拿到的鑰匙與新成就}',
           draw(c, x, y, w, h, t) {
             const T = t % 4.4, cx = x + w / 2;
@@ -1974,7 +1998,7 @@ G.Menus = (() => {
     if (s === 'menu' && !resetAsk && !setOpen && modal <= 0 && !(G.SaveUI && G.SaveUI.welcome)) { if (k === 'arrowdown' || k === 's') mw.step(1); if (k === 'arrowup' || k === 'w') mw.step(-1); if (k === 'enter' || k === ' ') runItem(mw.idx()); if (k === '1') U().start(); }
     if (s === 'guide') { if (k === 'arrowright') M.guideTurn(1); if (k === 'arrowleft') M.guideTurn(-1); }
   };
-  M.covers = s => s === 'team' || s === 'book' || s === 'guide' || s === 'store' || s === 'ach' || s === 'save' || s === 'intro' || s === 'tap';
+  M.covers = s => s === 'team' || s === 'book' || s === 'guide' || s === 'store' || s === 'ach' || s === 'rank' || s === 'save' || s === 'intro' || s === 'tap';
   // 給其他模組（成就、存檔、開場動畫）共用的元件
   M.ui = { resetCars: () => { cars.team.inited = false; cars.book.inited = false; }, tick: () => tick(), pr, tap, bg, header, btnPrimary, btnSecondary, tabs, scrollDetail, SM, gt: () => gt, land, sprFit, go: s2 => go(s2) };
   M.guidePageCount = () => CATS.reduce((a, k, i) => a + pagesOf(i).length, 0);

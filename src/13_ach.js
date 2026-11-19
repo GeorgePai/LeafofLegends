@@ -161,6 +161,7 @@ G.Ach = (() => {
     const hr = new Date().getHours(); if (hr < 5) P.night++; if (hr >= 5 && hr < 8) P.morning++;
     G.Team.save();
     A.check({ win, st: W.stats, pts: W.loadPts }, W);
+    if (G.Rank) G.Rank.submit();                     // v2.8 戰鬥結束上傳排行
   };
   return A;
 })();
@@ -250,15 +251,17 @@ G.Ach.queueBanner = b => { if (G.Ach.banner) G.Ach.bq.push(b); else G.Ach.banner
 G.Ach.drawBanner = c => {
   const b = G.Ach.banner; if (!b || G.UI.screen === 'battle' || G.UI.screen === 'intro' || G.UI.screen === 'tap') return;
   const dt = G.Menus.dt || 1 / 60; b.t += dt;
-  const T = b.free ? 3.5 : 2.8, inK = Math.min(1, b.t / 0.25), outK = Math.max(0, (b.t - T) / 0.3); if (outK >= 1) { G.Ach.banner = G.Ach.bq.shift() || null; return; }
+  const nL = b.rk ? G.cnWrap(b.rk.s, G.Render.uw - 32).length : 1;
+  const T = b.rk ? 2.2 * nL : b.free ? 3.5 : 2.8, inK = Math.min(1, b.t / 0.25), outK = Math.max(0, (b.t - T) / 0.3); if (outK >= 1) { G.Ach.banner = G.Ach.bq.shift() || null; return; }
   // 整條橫跨畫面頂端（蓋住標題列，不和下面的文字交錯）
   // v2.7：底框一出現就整條蓋住標題列（不再從上方滑下，避免滑動途中和標題文字交錯），裡面的字淡入淡出
-  const R = G.Render, P = G.PAL, h = R.ins.t + 17, y = 0, s = b.free ? '賭徒寶箱可以免費開了！' : '成就達成：' + b.a.n, w = R.uw, x = 0, col = b.free ? 11 : 13;
+  // v2.8 排行通知（b.rk）：一行放不下就分段輪流顯示（底框維持一行高，不蓋到下面的字）
+  const R = G.Render, P = G.PAL, rk = b.rk, s = rk ? rk.s : b.free ? '賭徒寶箱可以免費開了！' : '成就達成：' + b.a.n, col = rk ? rk.col : b.free ? 11 : 13, ic = rk ? 'i_rank' : b.free ? 'i_key' : 'i_trophy';
+  const ls = G.cnWrap(s, R.uw - 32), h = R.ins.t + 17, y = 0, li = Math.min(ls.length - 1, Math.floor(b.t / (T / ls.length))), w = R.uw, x = 0;
   G.UI.h.box(c, -2, y - 2, R.uw + 4, h + 2, 1, col, false);
-  const tw = G.cnW(s) + 16, tx = Math.round(R.uw / 2 - tw / 2), al = Math.min(inK, 1 - outK), dy = Math.round((1 - inK) * -4 + outK * -4);
+  const al = Math.min(inK, 1 - outK), dy = Math.round((1 - inK) * -4 + outK * -4);
   c.globalAlpha = al;
-  G.UI.h.icon(c, b.free ? 'i_key' : 'i_trophy', tx + 5, y + R.ins.t + 8 + dy);
-  G.cn(c, s, tx + 16, y + R.ins.t + 2 + dy, col);
+  { const l = ls[li], tw = G.cnW(l) + 16, tx = Math.round(R.uw / 2 - tw / 2); G.UI.h.icon(c, ic, tx + 5, y + R.ins.t + 8 + dy); G.cn(c, l, tx + 16, y + R.ins.t + 2 + dy, col); }
   c.globalAlpha = 1;
-  G.UI.h.btn('achBn', x, y, w, h, null, () => { G.Ach.banner = G.Ach.bq.shift() || null; G.Menus.ui.go(b.free ? 'store' : 'ach'); });
+  G.UI.h.btn('achBn', x, y, w, h, null, () => { G.Ach.banner = G.Ach.bq.shift() || null; G.Menus.ui.go(rk ? 'rank' : b.free ? 'store' : 'ach'); });
 };

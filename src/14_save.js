@@ -136,7 +136,7 @@ G.SaveUI = (() => {
   };
   const centerTitle = (c, x, w, y, t, sub) => { G.cn(c, t, x + w / 2, y, 13, 0.5); y += 15; if (sub) { const ls = G.cnWrap(sub, w); ls.forEach((l, i) => G.cn(c, l, x + w / 2, y + i * 13, 6, 0.5)); y += ls.length * 13; } return y + 4; };
   async function makeCode() {
-    busy = true; code = await G.SaveCode.make(); busy = false; step = 'code'; copied = 0; msg = null; G.Ach.on('code');
+    busy = true; code = await G.SaveCode.make(); busy = false; step = 'code'; copied = 0; msg = null; G.Ach.on('code'); if (G.Rank) G.Rank.autoJoin();
     const e = G.Dom.get('code', 'textarea'); e.value = code; e.scrollTop = 0;
   }
   async function copyCode() {

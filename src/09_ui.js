@@ -878,7 +878,7 @@ G.UI = (() => {
       const b = hitBtn(ux, uy);
       if (b) { p.mode = 'ui'; p.btn = b; if (b.down) b.down(ux, uy); if (G.Menus && G.Menus.scrollHold) G.Menus.scrollHold(); return; }
       if (U.screen === 'guide') { p.mode = 'swipe'; return; }
-      if (U.screen === 'team' || U.screen === 'book' || U.screen === 'ach') { p.mode = 'mdrag'; if (G.Menus.scrollHold) G.Menus.scrollHold(); return; }
+      if (U.screen === 'team' || U.screen === 'book' || U.screen === 'ach' || U.screen === 'rank') { p.mode = 'mdrag'; if (G.Menus.scrollHold) G.Menus.scrollHold(); return; }
       if (U.screen !== 'battle' || U.paused || (W.over)) return;
       if (e.pointerType === 'mouse' && e.button === 2 && U.aim && U.aim.on) { U.aimCancel(); p.mode = 'none'; return; }   // 右鍵取消瞄準
       if (e.pointerType === 'mouse' && e.button !== 0) { p.mode = 'pan'; R.cam.follow = false; return; }
@@ -911,7 +911,7 @@ G.UI = (() => {
         R.cam.vx = G.lerp(R.cam.vx || 0, G.clamp(wx / mdt, -900, 900), 0.4); R.cam.vy = G.lerp(R.cam.vy || 0, G.clamp(wy / mdt, -900, 900), 0.4); p.lastMove = now;
       }
       else if ((p.mode === 'mdrag' || (p.mode === 'ui' && (U.screen === 'team' || U.screen === 'book'))) && G.Menus && G.Menus.inCar(p.sx / R.uiS, p.sy / R.uiS) && Math.abs(x - p.sx) > 4 * R.dpr && Math.abs(x - p.sx) >= Math.abs(y - p.sy)) { p.mode = 'car'; p.btn = null; p.lx = p.sx; G.Menus.carGrab(); }
-      else if ((p.mode === 'mdrag' || (p.mode === 'ui' && !(p.btn && p.btn.wheel) && (U.screen === 'team' || U.screen === 'book' || U.screen === 'ach'))) && Math.abs(y - p.sy) > 7 * R.dpr) { p.mode = 'mscroll'; p.btn = null; p.ly = p.sy; }
+      else if ((p.mode === 'mdrag' || (p.mode === 'ui' && !(p.btn && p.btn.wheel) && (U.screen === 'team' || U.screen === 'book' || U.screen === 'ach' || U.screen === 'rank'))) && Math.abs(y - p.sy) > 7 * R.dpr) { p.mode = 'mscroll'; p.btn = null; p.ly = p.sy; }
       if (p.mode === 'vw') { p.wh.dragBy((y - p.ly) / R.uiS); p.ly = y; }
       if (p.mode === 'car') { G.Menus.carDrag((x - p.lx) / R.uiS); p.lx = x; }
       else if (p.mode === 'mscroll' && G.Menus) { const d = (p.ly - y) / R.uiS, now = performance.now(), mdt = Math.max(8, now - (p.lmt || now)) / 1000; p.lmt = now; p.svy = G.lerp(p.svy || 0, d / mdt, 0.5); G.Menus.scroll(d, p.sx / R.uiS, p.sy / R.uiS); p.ly = y; }
@@ -945,7 +945,7 @@ G.UI = (() => {
       { const [ux, uy] = evXY(e).map(v => v / R.uiS); for (let i = U.btns.length - 1; i >= 0; i--) { const b = U.btns[i]; if (b.wheel && ux >= b.x && ux < b.x + b.w && uy >= b.y && uy < b.y + b.h) { const now = performance.now(); if (now - (U.wheelT || 0) > 90) { U.wheelT = now; b.wheel.step(Math.sign(e.deltaY || e.deltaX)); } return; } } }
       if (G.Menus && G.Menus.hscroll && (Math.abs(e.deltaX) > Math.abs(e.deltaY) || e.shiftKey) && G.Menus.hscroll(e.shiftKey && !e.deltaX ? e.deltaY * 0.5 : e.deltaX * 0.5, ...evXY(e).map(v => v / R.uiS))) return;   // v2.7 表格左右滑動
       if ((U.screen === 'team' || U.screen === 'book') && G.Menus && G.Menus.inCar(...evXY(e).map(v => v / R.uiS))) { const now = performance.now(); if (now - (U.wheelT || 0) > 90) { U.wheelT = now; G.Menus.carStep(Math.sign(e.deltaY || e.deltaX)); } return; }
-      if ((U.screen === 'team' || U.screen === 'book' || U.screen === 'ach') && G.Menus) { G.Menus.scroll(e.deltaY * 0.25, ...evXY(e).map(v => v / R.uiS)); return; }
+      if ((U.screen === 'team' || U.screen === 'book' || U.screen === 'ach' || U.screen === 'rank') && G.Menus) { G.Menus.scroll(e.deltaY * 0.25, ...evXY(e).map(v => v / R.uiS)); return; }
       if (U.screen === 'battle' && !U.paused) R.setZoom(R.cam.zoom * Math.exp(-e.deltaY * 0.0012));   // 只有戰鬥中能縮放（首頁背景固定）
     }, { passive: false });
     // 鍵盤

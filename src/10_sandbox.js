@@ -171,7 +171,7 @@ G.Team = {
   ownedCount(list) { return list.filter(n => this.owns(n)).length; },
   keys() { return this.dev ? Infinity : this.get().keys; },
   spend(k) { if (this.dev) return true; const v = this.get(); if (v.keys < k) return false; v.keys -= k; this.save(); return true; },
-  addKeys(k) { if (this.dev) return; this.get().keys += k; this.save(); },
+  addKeys(k, net) { if (this.dev) return; this.get().keys += k; if (G.Ach) { const p = G.Ach.P(); p.keysTot = (p.keysTot || 0) + Math.max(0, net == null ? k : net); } this.save(); },   // v2.8 keysTot：累積拿到的鑰匙（排行用；賭徒寶箱只算賺到的）
   grant(n) { if (this.dev) return; const v = this.get(), arr = G.HEROES.some(h => h.name === n) ? v.owned.h : v.owned.m; if (!arr.includes(n)) { arr.push(n); (v.nw = v.nw || []).push(n); if (G.SaveUI) G.SaveUI.bump(); } this.save(); },
   // v2.6 NEW 標記：寶箱新拿到的角色在隊伍轉盤上標 NEW；在聚光燈下看過、再滾走後消失
   isNew(n) { const v = this.get(); return !!(v.nw && v.nw.includes(n)); },

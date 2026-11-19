@@ -1,0 +1,9 @@
+name = "lol-rank"
+main = "worker.js"
+compatibility_date = "2026-11-01"
+workers_dev = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "lol-rank"
+database_id = "14a81692-ff47-4e03-986d-f9162049500f"
