@@ -1,8 +1,8 @@
 # Leaf of Legends（原名 LEAF WAR）— 交接筆記
 
-> 新 session 只要讀這份。**做任何新設計前，先對照第 8 節「設計守則」**。
+> 新 session 只要讀這份。排行榜相關再看 `LEADERBOARD.md`。**做任何新設計前，先對照第 8 節「設計守則」**。
 > 各版完成內容在 `CHANGELOG.md`、暫定數值在 `VALUES.md`，需要時用 grep 找到段落再讀，不要整份讀。
-> 最後更新：2026-11-19，版本 **v2.7**
+> 最後更新：2026-11-19，版本 **v2.8.2**
 
 ## 1. 專案是什麼
 - Pai 的 HTML5 瀏覽器遊戲，仿 Gamevil《Plants War》（三路推塔＋英雄操作＋小兵兵線）
@@ -17,6 +17,7 @@
 | 遊戲（GitHub Pages） | https://georgepai.github.io/LeafofLegends/ ← repo `GeorgePai/LeafofLegends` 的 **main** 分支（根目錄 `index.html`＋`.nojekyll`＋`audio/`） |
 | **原始碼（雲端接手來源）** | 同一個 repo 的 **source** 分支：`src/`、`assets/`、`audio/`、`build.py`、`shell.html`、`tools/`、`setup.sh`、本檔、`CHANGELOG.md`、`VALUES.md`。注意：repo 是公開的（遊戲本身已經包含全部 JS，所以沒有多公開什麼） |
 | Mac 備份 | `/Users/paiju/Desktop/Claude/LeafofLegends/`：`LeafofLegends.html`（可直接玩，旁邊的 `audio/` 是音樂）、`source/`、`versions/LeafofLegends_v*.zip`（舊版 `LeafWar_v*.zip`）、`bgm/`（Pai 給的原始 BGM）、本檔 |
+| **排行榜伺服器** | https://lol-rank.leafoflegends.workers.dev（Cloudflare Worker `lol-rank`＋D1 `lol-rank`，帳號用 Apple ID 登入）。程式在 source 分支的 `leaderboard/`；**推 source 就會由 Cloudflare Workers Builds 自動部署**（根目錄 /leaderboard、`npx wrangler deploy`），資料表由 Worker 自己建立／升級。細節見 `LEADERBOARD.md` |
 | 測試工具 | `tools/`：`tc_all.sh`（平行文字檢查＋摘要）、`textcheck.py`＋`tc_scenes.py`、`shot.py`（截圖）、`sheet.py`（多張截圖拼成一張）、`vfxsheet.py`（技能特效總覽）、`guideshot.py`（教學頁截圖） |
 
 ## 3. 接手步驟（約 2 分鐘，不需要 Mac）
@@ -60,6 +61,7 @@
 | 13_ach | **成就（v1.7）**：`G.ACH`（43 個定義：c 分類、t 等級 1～4、g 目標、v 取值、hint 隱藏提示）、`G.Ach`（`P()` 檔案、`check/commit/tick/final/on/claim`、`recent`、`banner`）、`G.AchUI` 成就畫面、`G.Ach.drawBanner` |
 | 14_save | **存檔碼（v1.7）**：`G.SaveCode`（`make/read/clean/apply/summary`）、`G.Dom`（疊在 canvas 上的 input/textarea，每幀 `place`，沒用到自動隱藏）、`G.SaveUI`（存檔畫面 home/name/code/load/confirm、`drawWelcome` 歡迎回來、`drawGreet` 開啟問候） |
 | 15_intro | **開場動畫（v1.7）**：`G.Intro`（`draw/skip/reset/drawFlash`），約 2.45 秒＋白光淡出 |
+| 16_rank | **線上排行榜（v2.8）**：`G.RANK_URL`、`G.RANK_CATS`（9 分類）、`G.Rank`（poll/submit/join/leave/autoJoin、通知 diff/news、管理 admLoad/admAct、測試 `_mock/_set`）、`G.RankUI`（分類滾輪 `cw`、清單、底部名次列、管理玩家 `admin()`）。身分 `P.rk={id,tok}`、累積鑰匙 `P.keysTot` |
 | 99_main | 啟動與主迴圈（啟動後先進 `intro` 畫面） |
 
 ## 5. 版本摘要（細節見 CHANGELOG.md）
@@ -73,6 +75,8 @@
 - v2.6：數值條補間、戰場自然配色（G.NAT）＋聖樹上色、寶箱「前往隊伍」＋NEW、17 個新成就、神話稀有度（七彩）、DEV 開局滿級、新英雄死靈召喚力夫（召喚物系統）
 - v2.6.1：聲音加固（iPhone 靜音開關／中斷後恢復／被擋的音樂在下一次點擊補播），**待 Pai 在 iPhone 確認**
 - v2.7：初始鑰匙 8、教學重點上色＋「英雄」分類、技能數值表左右滑動、同陣營站開、道路再 ×1.5（聖所附近維持原寬）
+- v2.8：開寶箱演出重做（敲擊→光一階一階升級→分級爆開、剪影揭曉、11 個新音效）＋教學「開箱光色」；**線上排行榜**（9 分類、存檔自動參加、每 30 秒刷新、前三名通知、全服第 1 名跑馬燈）
+- v2.8.1～2.8.2：排行分類改上下滾輪、名字「…」截斷（Pai 指定例外）、開發者模式「管理玩家」（隱藏／復原／刪除，權限＝開發者密碼，猜錯 5 次鎖 1 小時）；伺服器改 Cloudflare 連 GitHub 自動部署
 - v2.4：敵塔範圍＋鎖定警示、道路 ×1.5、結算放慢＋鎖值＋音效、新藥水 5 種＋全部藥水特效、DEV 密碼、技能範圍顯示＋指定施放（拖曳／取消）、LOGO 改版、塔射程 190/210
 
 ## 6. 待 Pai 決定
@@ -83,13 +87,16 @@
 - （v2.4）首頁 RESET 要不要也加密碼鎖？隕石等範圍技仍可在塔射程外打到塔（目前視為合理技能消耗），要不要禁止？
 - （v2.5）重生時間、塔成長／升溫、野怪脫戰規則等暫定數值待確認（VALUES.md 6h）
 - （v2.6）死靈召喚力夫的 MP、成長、解鎖等級、召喚上限 12、血祭可控對象、神話機率 3% 等待確認（VALUES.md 6i）。犧牲召喚可獻祭 1 血複製體換滿血小兵的連招：Pai 決定先保留試強度（2026-11-19），太強再平衡
+- （v2.8）開箱節奏與排行榜暫定數值（VALUES.md 6k）待確認；排行榜還沒經過 Pai 實機完整測試「管理玩家」（測試存檔「GM」等他自己處理）
+- （v2.8）排行榜可考慮第二階段：本週榜、好友榜（LEADERBOARD.md）
 - DEV 密碼只有 Pai 知道（程式內只有雜湊）；要改密碼請 Pai 提供新密碼，重算 `DEV_H`
 
 ## 7. 工作規則
 **每次更新流程**：改 src → build → `bash /home/claude/tools/tc_all.sh`（背景跑，0 筆才可交付）→ 只截有改到的畫面，用 `sheet.py` 拼成一張看 → 發佈 artifact（先 `get_artifact` 取 version，再 `publish_files`，index.html＝dist/index.html）→ 推 GitHub main（遊戲）＋ source（原始碼）→ 備份 Mac（`LeafofLegends.html`、`versions/LeafofLegends_v版本.zip`、有改到的 `source/` 檔案）→ 升版號
-- 版本號在 `src/11_menus.js`（`'V2.7'`）
+- 版本號在 `src/11_menus.js`（`'V2.8.2'`）
 - 推 main：clone 到 `/home/claude/leafoflegends` → 複製 `dist/index.html` 成根目錄 `index.html`（保留 `.nojekyll`；音樂有改才更新 `audio/`）→ commit → `git -c push.negotiate=true push origin HEAD:main`，約 1～2 分鐘生效。備援：Pai 在 Mac Terminal 執行 `bash ~/Desktop/Claude/LeafofLegends/deploy_github.sh`
 - 推 source：在 `/home/claude/leafwar` commit（dist/ 已在 .gitignore）→ `git -c push.negotiate=true push origin HEAD:source`
+- **排行榜伺服器**（Pai 要求全自動，不要叫他跑指令）：改 `leaderboard/worker.js` → 本機先測（`cd leaderboard && npm i wrangler@4`，用 `wrangler dev --local` 加假的 database_id 設定檔，curl 測 /board /submit /admin）→ 推 source 即自動部署。新欄位加在 worker.js 的 `SCHEMA`／`UPGRADES`。雲端 shell 連不到 Cloudflare 和 workers.dev：要確認部署就用桌面 App 內建瀏覽器（`mcp__remote-devices__Claude_Browser__*`，已登入 Cloudflare）開 lol-rank → Deployments，或開 /board。**不要用錯的密碼測管理 API**（猜錯 5 次會把 Pai 家的 IP 鎖 1 小時）
 - 長時間指令（文字檢查等）一律用 Bash 的 `run_in_background`，不要用 nohup／`&` 丟著（回合結束會被砍掉），也不要用長 sleep 輪詢；文字檢查（4 支 Chrome 平行）跑的時候不要同時截圖，會逾時
 - 測試：Playwright＋`/usr/bin/google-chrome`；裝置 n（360 寬手機）、m（390 手機）、L（手機橫屏）、d（1280×720）、w/u/t（大視窗／超寬／偏方）。可直接 `G.UI.screen='team'/'book'/'guide'`、`G.UI.start()` 進各畫面；`localStorage.clear()` 模擬新玩家；新增畫面時把場景加進 `tc_scenes.py`
 - 快速驗證：`python3 /home/claude/tools/probe.py "JS"`（在遊戲裡執行並印出結果，比截圖省很多）
@@ -104,6 +111,7 @@
 - 截圖只截改到的畫面，拼成一張再看；不要每個裝置每個畫面都單獨看
 - 一個對話大約 2～3 個版本就建議 Pai「交接」，避免對話太長、每一輪越來越貴
 - 回覆 Pai：繁中、結論先講、附作品連結、列出暫定數值
+- 給 Pai 的東西要簡單：能自動就自動；真的需要他動手時只給「一個步驟」，不要設計需要他複製金鑰之類的流程（v2.8.2 教訓）
 
 ## 8. 設計守則（Pai 的要求，所有新設計都要遵守）
 > 從 v0.9～v1.1 的回饋整理而來。做完新東西，先用這份逐條自我檢查再交付。
@@ -149,7 +157,7 @@
 ## 9. 交接 SOP（Pai 說「交接」時）
 1. 更新本檔（版本、第 5 節摘要加一行、第 6 節待決、規則有變就改）；把該版細節寫進 `CHANGELOG.md`、新暫定數值寫進 `VALUES.md`。
 2. 推 GitHub：source 分支（原始碼＋三份文件）、main 分支（遊戲）都確認是最新。
-3. 備份到 Mac 的 `/Users/paiju/Desktop/Claude/LeafofLegends/`：`LeafofLegends.html`、`audio/`、`source/`（含三份文件）、`versions/LeafofLegends_v版本.zip`、本檔。
+3. 備份到 Mac 的 `/Users/paiju/Desktop/Claude/LeafofLegends/`：`LeafofLegends.html`、`audio/`、`source/`（含三份文件＋LEADERBOARD.md）、`versions/LeafofLegends_v版本.zip`、本檔；`leaderboard/` 資料夾（worker.js 等；裡面的 admin_key.txt 是 Pai 的，不要動）。
 4. 回覆 Pai 一段「可直接貼上」的接手指令給下一個 session（範本如下）。
 5. **Session 命名**：Claude 沒有改對話標題的工具，請 Pai 手動改（對話標題旁的選單 → 重新命名）：目前這個 → `LeafofLegends (retired)`；下一個 → `LeafofLegends (on-going)`（接手指令第一行寫明；接手的 session 回報就緒時再提醒一次）。
 
@@ -160,7 +168,7 @@
 add_repo(GeorgePai, LeafofLegends, push) →
 git clone -q -b source --depth 1 https://github.com/GeorgePai/LeafofLegends /home/claude/leafwar && bash /home/claude/leafwar/setup.sh
 讀 /home/claude/leafwar/HANDOFF.md（只讀這份；CHANGELOG.md、VALUES.md 需要時再查）。
-作品：https://claude.ai/artifact/8vvJWeebvgfkNQDrYWXHAB（目前 V○○）；遊戲：https://georgepai.github.io/LeafofLegends/
+作品：https://claude.ai/artifact/8vvJWeebvgfkNQDrYWXHAB（目前 V○○）；排行榜伺服器：https://lol-rank.leafoflegends.workers.dev；遊戲：https://georgepai.github.io/LeafofLegends/
 設計前對照第 8 節；更新照第 7 節；我說「交接」照第 9 節。
 準備好後用一句話回報版本與狀態，提醒我改名，然後等我的新需求。
 ```
