@@ -46,8 +46,8 @@ G.FbUI = (() => {
     if (!Kk.on()) { G.cn(c, '伺服器準備中，敬請期待', x + W / 2, y0 + 20, 6, 0.5); return; }
     // ---- 玩家還沒上榜：先去存檔 ----
     if (!dev && !Kk.joined()) {
-      const ls = G.cnWrap('先存檔取個名字，就能寫信給開發者', W - 20); ls.forEach((l, i) => G.cn(c, l, x + W / 2, y0 + 16 + i * 13, 9, 0.5));
-      M.btnPrimary(c, 'fbSave', Math.round(x + W / 2 - 40), y0 + 24 + ls.length * 13, 80, 18, '前往存檔', () => M.go('save'));
+      const ls = G.cnWrap('先取個玩家名稱，就能寫信給開發者', W - 20); ls.forEach((l, i) => G.cn(c, l, x + W / 2, y0 + 16 + i * 13, 9, 0.5));
+      M.btnPrimary(c, 'fbSave', Math.round(x + W / 2 - 40), y0 + 24 + ls.length * 13, 80, 18, '前往帳號', () => M.go('save'));
       return;
     }
     if (dev && !Kk.admKey()) { G.cnWrap('請重新開啟開發者模式（輸入密碼）才能讀信', W - 20).forEach((l, i) => G.cn(c, l, x + W / 2, y0 + 16 + i * 13, 10, 0.5)); return; }
@@ -98,7 +98,7 @@ G.FbUI = (() => {
       const j = dev ? await Kk.fbAdmAct('fbreply', cur.id, body) : await Kk.fbSend(body); sending = false;
       if (j.ok) { if (!dev) e.value = ''; say(dev ? '已回覆' : '已送出！開發者回覆後會通知你', 11); G.Audio.play('coin'); return; }
       G.Audio.play('deny');
-      say(j.err === 'wait' ? '太快了，請 ' + (j.s || 60) + ' 秒後再送' : j.err === 'many' ? '還有 5 封等待回覆，請等開發者回覆後再寫' : j.err === 'len' ? '內容太長或是空的' : j.err === 'busy' ? '今天送太多封了，明天再試' : j.err === 'nouser' ? '請先存檔上榜' : j.err === 'quota' ? '今天的額度用完了' : '連不上伺服器，請稍後再試', 10);
+      say(j.err === 'wait' ? '太快了，請 ' + (j.s || 60) + ' 秒後再送' : j.err === 'many' ? '還有 5 封等待回覆，請等開發者回覆後再寫' : j.err === 'len' ? '內容太長或是空的' : j.err === 'busy' ? '今天送太多封了，明天再試' : j.err === 'nouser' ? '請先取玩家名稱' : j.err === 'quota' ? '今天的額度用完了' : '連不上伺服器，請稍後再試', 10);
     });
   };
   return S;

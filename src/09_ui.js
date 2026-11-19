@@ -266,13 +266,13 @@ G.UI = (() => {
   };
   function buffCard(c, key, ax, ay) {
     const b = W.hero.tb && W.hero.tb[key]; if (!b) return;
-    const inf = G.buffInfo(key), w = Math.min(150, R.uw - R.ins.l - R.ins.r - 8), lines = G.cnWrap(inf.d, w - 12), h = 22 + lines.length * 13 + 18;
+    const inf = G.buffInfo(key), w = Math.min(150, R.uw - R.ins.l - R.ins.r - 8), lines = G.cnWrapRich(inf.d, w - 12), h = 22 + lines.length * 13 + 18;
     const x = Math.round(G.clamp(ax, R.ins.l + 2, R.uw - R.ins.r - w - 2)), y = Math.round(G.clamp(ay, R.ins.t + 2, R.uh - h - 2));
     dim(c, 0.6);
     box(c, x, y, w, h, 1, b.col != null ? b.col : 7);
     icon(c, b.ic, x + 11, y + 10);
     G.cn(c, inf.n, x + 22, y + 3, 9);
-    let yy = y + 20; lines.forEach(l => { G.cn(c, l, x + 6, yy, 7); yy += 13; });
+    let yy = y + 20; lines.forEach(l => { G.cnRich(c, l, x + 6, yy, 7); yy += 13; });
     const f = b.t / b.max; c.fillStyle = P[0]; c.fillRect(x + 6, yy + 5, w - 60, 3); c.fillStyle = P[b.t < 8 ? 10 : 9]; c.fillRect(x + 6, yy + 6, Math.max(1, Math.round((w - 60) * f)), 1);
     G.cn(c, '剩 ' + Math.ceil(b.t) + ' 秒', x + w - 6, yy, b.t < 8 ? 10 : 13, 1);
   }
@@ -603,9 +603,9 @@ G.UI = (() => {
     const uw = R.uw, uh = R.uh, I = R.ins, cols = 4, gap = 4, chh = 40, cw = Math.min(38, Math.floor((uw - I.l - I.r - 8 - 12 - gap * 3) / 4));
     const gw = cols * cw + (cols - 1) * gap + 12, rowsN = Math.ceil(G.SHOP.length / cols), it = G.SHOP_BY[U.shopSel] || G.SHOP[0], bw = 40;
     // v2.8.6 畫面不夠高（橫屏／電腦）：說明改放在格子右邊，不再被切掉
-    const dl0 = G.cnWrap(it.d.replace('，', '\n'), gw - 12 - bw - 8), side = 22 + rowsN * (chh + gap) + Math.max(34, 17 + dl0.length * 13 + 4) > uh - I.t - I.b - 4 && uw - I.l - I.r - 8 >= gw + 100;
+    const dl0 = G.cnWrapRich(it.d.replace('，', '\n'), gw - 12 - bw - 8), side = 22 + rowsN * (chh + gap) + Math.max(34, 17 + dl0.length * 13 + 4) > uh - I.t - I.b - 4 && uw - I.l - I.r - 8 >= gw + 100;
     const dw = side ? Math.min(150, uw - I.l - I.r - 8 - gw) : 0, pw = gw + dw;
-    const dl = side ? G.cnWrap(it.d.replace('，', '\n'), dw - 10) : dl0, dh = side ? 0 : Math.max(34, 17 + dl.length * 13 + 4);
+    const dl = side ? G.cnWrapRich(it.d.replace('，', '\n'), dw - 10) : dl0, dh = side ? 0 : Math.max(34, 17 + dl.length * 13 + 4);
     const ph = side ? Math.max(22 + rowsN * (chh + gap) + 2, 22 + 18 + dl.length * 13 + 30) : 22 + rowsN * (chh + gap) + dh;
     const px = Math.round(uw / 2 - pw / 2), py = Math.round(G.clamp(uh / 2 - ph / 2 - (side ? 0 : 8), I.t + 2, Math.max(I.t + 2, uh - I.b - ph - (side ? 2 : 30))));
     btn('shopBg', 0, 0, uw, uh, null, () => { U.shop = false; });
@@ -630,7 +630,7 @@ G.UI = (() => {
     if (side) {                                                                  // 右欄：名稱、說明、購買鈕在最下面
       const sx = px + gw - 2, can = W.gold >= it.cost, o = U.press.buy > 0 ? 1 : 0, by2 = py + ph - 24;
       c.fillStyle = P[3]; c.fillRect(sx, py + 20, 1, ph - 26);
-      G.cn(c, it.n, sx + 6, py + 20, 9); dl.forEach((l, i) => G.cn(c, l, sx + 6, py + 36 + i * 13, 6));
+      G.cn(c, it.n, sx + 6, py + 20, 9); dl.forEach((l, i) => G.cnRich(c, l, sx + 6, py + 36 + i * 13, 6));
       box(c, sx + 6, by2 + o, dw - 10, 18, o ? 3 : can ? 13 : 2, can ? 9 : 4);
       G.cn(c, '購買', sx + 6 + (dw - 10) / 2, by2 + 3 + o, can ? 0 : 5, 0.5);
       btn('buy', sx + 6, by2, dw - 10, 18, () => { U.press.buy = 0.12; }, () => doBuy(it));
@@ -638,7 +638,7 @@ G.UI = (() => {
     }
     const dy = py + ph - dh + 3, can = W.gold >= it.cost;
     c.fillStyle = P[3]; c.fillRect(px + 6, dy - 3, pw - 12, 1);
-    G.cn(c, it.n, px + 6, dy, 9); dl.forEach((l, i) => G.cn(c, l, px + 6, dy + 14 + i * 13, 6));
+    G.cn(c, it.n, px + 6, dy, 9); dl.forEach((l, i) => G.cnRich(c, l, px + 6, dy + 14 + i * 13, 6));
     const bx = px + pw - bw - 6, by2 = Math.round(dy + (dh - 6) / 2 - 9), o = U.press.buy > 0 ? 1 : 0;
     box(c, bx, by2 + o, bw, 18, o ? 3 : can ? 13 : 2, can ? 9 : 4);
     G.cn(c, '購買', bx + bw / 2, by2 + 3 + o, can ? 0 : 5, 0.5);

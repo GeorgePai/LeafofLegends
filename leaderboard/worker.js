@@ -5,6 +5,7 @@
 // 管理（需要 ADMIN_KEY）：GET /admin/list?key=…、POST /admin/hide {key,id,h}（隱藏／復原）、POST /admin/del {key,id}（永久刪除）
 // v2.8.1：players.hidden＝1 的玩家不出現在排行（可復原）
 // v2.8.4：POST /admin/purge {key, days} 清除 days 天沒上線的帳號（至少 7 天）
+// v2.8.7：一帳號同時一台裝置。players.sess＝目前登入那台的工作階段；POST /claim {id,tok,ss} 換成這台，其他台下次連線收到 err:'moved'（/ping 帶 id+ss 時回 moved:1）
 // v2.8.2：管理權限＝遊戲的開發者密碼（key 傳 8 位數密碼，和遊戲用同一個雜湊檢查）；猜錯會被擋：同一個 IP 每小時 5 次、全部合計每小時 30 次
 const CATS = ['heroes', 'minions', 'games', 'wr', 'kda', 'keys', 'dmg', 'time', 'ach'];
 const QUAL = { wr: 'games >= 10', kda: 'games >= 10' };          // 勝率、KDA 至少 10 場才上榜
@@ -44,11 +45,21 @@ async function ranks(env, p) {
   CATS.forEach((k, i) => { out[k] = qs[i] ? rs[j++].results[0].n + 1 : 0; });
   return out;
 }
-async function auth(env, id, tok) {
+const okSS = ss => /^[0-9a-f]{16}$/.test(ss);
+async function auth(env, id, tok, ss) {
   if (!/^[0-9a-f]{16}$/.test(id) || !/^[0-9a-f]{32}$/.test(tok)) return [null, J({ err: 'bad' }, 400)];
   const old = await env.DB.prepare('SELECT * FROM players WHERE id = ?').bind(id).first();
   if (old && old.tok !== await sha(tok + id)) return [null, J({ err: 'auth' }, 403)];
+  if (old && old.sess && okSS(ss) && ss !== old.sess) return [null, J({ err: 'moved' }, 409)];   // v2.8.7 另一台登入了（沒帶 ss 的舊版不擋）
   return [old, null];
+}
+// v2.8.7 這台登入：把帳號的工作階段換成這台（讀存檔碼、第一次更新到新版時）
+async function claim(req, env) {
+  let b; try { b = await req.json(); } catch (e) { return J({ err: 'bad' }, 400); }
+  const id = String(b.id || ''), ss = String(b.ss || ''); if (!okSS(ss)) return J({ err: 'bad' }, 400);
+  const [old, bad] = await auth(env, id, String(b.tok || '')); if (bad) return bad;
+  if (old) await env.DB.prepare('UPDATE players SET sess = ? WHERE id = ?').bind(ss, id).run();
+  return J({ ok: 1 });
 }
 async function submit(req, env) {
   let b; try { b = await req.json(); } catch (e) { return J({ err: 'bad' }, 400); }
@@ -58,7 +69,7 @@ async function submit(req, env) {
   for (const f of FIELDS) { const x = Number(s[f]); if (!isInt(x, MAX[f])) return J({ err: 'value', f }, 422); v[f] = x; }
   if (v.wins > v.games) return J({ err: 'value', f: 'wins' }, 422);
   if (v.dmg > (v.time + 60) * DMG_PS) return J({ err: 'value', f: 'dmg' }, 422);
-  const [old, bad] = await auth(env, id, tok); if (bad) return bad;
+  const [old, bad] = await auth(env, id, tok, String(b.ss || '')); if (bad) return bad;
   const ih = (await sha((req.headers.get('cf-connecting-ip') || '') + '|lol')).slice(0, 16);
   if (old) {
     if (now - old.updated < GAP_S) return J({ err: 'wait', wait: GAP_S - (now - old.updated) }, 429);
@@ -70,9 +81,9 @@ async function submit(req, env) {
   }
   const p = { ...v, wr: v.games ? Math.round(v.wins / v.games * 1000) / 10 : 0, kda: Math.round((v.kills + v.assists) / Math.max(1, v.deaths) * 100) / 100, created: old ? old.created : now, hidden: old ? old.hidden : 0 };
   const before = await board(env);
-  await env.DB.prepare(`INSERT INTO players (id, tok, name, ip, ${FIELDS.join(', ')}, wr, kda, created, updated) VALUES (?1, ?2, ?3, ?4, ${FIELDS.map((_, i) => '?' + (i + 5)).join(', ')}, ?16, ?17, ?18, ?19)
-    ON CONFLICT(id) DO UPDATE SET name = excluded.name, ${FIELDS.map(f => f + ' = excluded.' + f).join(', ')}, wr = excluded.wr, kda = excluded.kda, updated = excluded.updated`)
-    .bind(id, await sha(tok + id), name, ih, ...FIELDS.map(f => p[f]), p.wr, p.kda, p.created, now).run();
+  await env.DB.prepare(`INSERT INTO players (id, tok, name, ip, ${FIELDS.join(', ')}, wr, kda, created, updated, sess) VALUES (?1, ?2, ?3, ?4, ${FIELDS.map((_, i) => '?' + (i + 5)).join(', ')}, ?16, ?17, ?18, ?19, ?20)
+    ON CONFLICT(id) DO UPDATE SET sess = COALESCE(players.sess, excluded.sess), name = excluded.name, ${FIELDS.map(f => f + ' = excluded.' + f).join(', ')}, wr = excluded.wr, kda = excluded.kda, updated = excluded.updated`)
+    .bind(id, await sha(tok + id), name, ih, ...FIELDS.map(f => p[f]), p.wr, p.kda, p.created, now, okSS(b.ss) ? b.ss : null).run();
   const rk = await ranks(env, p), news = CATS.filter(k => rk[k] === 1 && !(before.cats[k][0] && before.cats[k][0][0] === id));
   if (news.length) {
     await env.DB.batch(news.map(k => env.DB.prepare('INSERT INTO news (t, pid, name, cat) VALUES (?, ?, ?, ?)').bind(now, id, name, k))
@@ -83,7 +94,7 @@ async function submit(req, env) {
 }
 async function leave(req, env) {
   let b; try { b = await req.json(); } catch (e) { return J({ err: 'bad' }, 400); }
-  const [old, bad] = await auth(env, String(b.id || ''), String(b.tok || '')); if (bad) return bad;
+  const [old, bad] = await auth(env, String(b.id || ''), String(b.tok || ''), String(b.ss || '')); if (bad) return bad;
   if (old) { await env.DB.batch([env.DB.prepare('DELETE FROM players WHERE id = ?').bind(old.id), env.DB.prepare('DELETE FROM fb WHERE pid = ?').bind(old.id)]); cache = null; }
   return J({ ok: 1 });
 }
@@ -100,7 +111,9 @@ async function ping(req, env) {
     await env.DB.batch(qs);
   }
   if (Date.now() - onT > 15000) { const r = await env.DB.prepare('SELECT COUNT(*) AS n FROM pres WHERE t > ?').bind(now - 120).first(); onN = r.n; onT = Date.now(); }
-  return J({ ok: 1, n: Math.max(1, onN) });
+  let moved = 0;                                                                     // v2.8.7 帶了帳號：順便看是不是被別台登入了（1 列讀取）
+  if (/^[0-9a-f]{16}$/.test(String(b.id || '')) && okSS(String(b.ss || ''))) { const r = await env.DB.prepare('SELECT sess FROM players WHERE id = ?').bind(b.id).first(); moved = r && r.sess && r.sess !== b.ss ? 1 : 0; }
+  return J({ ok: 1, n: Math.max(1, onN), moved });
 }
 // ---- v2.8.6 反饋信箱：玩家寫信給開發者、開發者回信 ----
 // 玩家：POST /fb/send {id,tok,body}（1～300 字；同一人 60 秒 1 封、未回覆最多 5 封；同 IP 每天 30 封）
@@ -109,7 +122,7 @@ async function ping(req, env) {
 const cleanBody = (s, max) => { const t = String(s || '').replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, '').replace(/\n{3,}/g, '\n\n').trim(); const a = [...t]; return a.length && a.length <= max ? t : null; };
 async function fb(req, env, url) {
   let b; try { b = await req.json(); } catch (e) { return J({ err: 'bad' }, 400); }
-  const [old, bad] = await auth(env, String(b.id || ''), String(b.tok || '')); if (bad) return bad;
+  const [old, bad] = await auth(env, String(b.id || ''), String(b.tok || ''), String(b.ss || '')); if (bad) return bad;
   if (!old) return J({ err: 'nouser' }, 403);                                         // 要先上榜（有存檔名稱）才能寫信
   const now = Math.floor(Date.now() / 1000);
   if (url.pathname === '/fb/send') {
@@ -166,7 +179,7 @@ const SCHEMA = [
   'CREATE TABLE IF NOT EXISTS pres (sid TEXT PRIMARY KEY, t INTEGER)',
   'CREATE INDEX IF NOT EXISTS i_pres_t ON pres (t)'
 ];
-const UPGRADES = ['ALTER TABLE players ADD COLUMN hidden INTEGER DEFAULT 0'];   // 已經有這欄就會報錯，略過即可
+const UPGRADES = ['ALTER TABLE players ADD COLUMN hidden INTEGER DEFAULT 0', 'ALTER TABLE players ADD COLUMN sess TEXT'];   // 已經有這欄就會報錯，略過即可
 async function migrate(env) {
   if (migrated) return;
   await env.DB.batch(SCHEMA.map(q => env.DB.prepare(q)));
@@ -183,6 +196,7 @@ export default {
       if (url.pathname === '/submit' && req.method === 'POST') return await submit(req, env);
       if (url.pathname === '/leave' && req.method === 'POST') return await leave(req, env);
       if (url.pathname === '/ping' && req.method === 'POST') return await ping(req, env);
+      if (url.pathname === '/claim' && req.method === 'POST') return await claim(req, env);
       if (url.pathname.startsWith('/fb/') && req.method === 'POST') return await fb(req, env, url);
       if (url.pathname.startsWith('/admin/')) return await admin(req, env, url);
       if (url.pathname === '/') return J({ ok: 1, app: 'Leaf of Legends leaderboard' });

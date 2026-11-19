@@ -1,5 +1,5 @@
 'use strict';
-G.VERSION = 'V2.8.6';                                  // 版本號（唯一來源；setup.sh 也從這行讀）
+G.VERSION = 'V2.8.7';                                  // 版本號（唯一來源；setup.sh 也從這行讀）
 /* =========================================================
    選單：首頁 / 隊伍 / 圖鑑 / 教學
    版面：直屏上下堆疊，橫屏左右分欄
@@ -373,7 +373,7 @@ G.Menus = (() => {
 
   // ---------- 首頁 ----------
   const ITEMS = [['單人', 'SOLO', 'i_play', () => U().start()], ['多人', 'MULTI', 'i_users', () => { modal = 2.2; }], ['隊伍', 'TEAM', 'i_tree', () => go('team')], ['商店', 'SHOP', 'i_key', () => go('store')],
-    ['成就', 'TROPHY', 'i_trophy', () => go('ach')], ['排行', 'RANK', 'i_rank', () => go('rank')], ['圖鑑', 'BOOK', 'i_book', () => go('book')], ['教學', 'GUIDE', 'i_guide', () => M.openGuide(false)], ['存檔', 'SAVE', 'i_save', () => go('save')], ['設定', 'SETTING', 'i_gear', () => { setOpen = true; }], ['反饋', 'MAIL', 'i_mail', () => go('fb')], ['關於', 'ABOUT', 'i_info', () => go('about')]];
+    ['成就', 'TROPHY', 'i_trophy', () => go('ach')], ['排行', 'RANK', 'i_rank', () => go('rank')], ['圖鑑', 'BOOK', 'i_book', () => go('book')], ['教學', 'GUIDE', 'i_guide', () => M.openGuide(false)], ['帳號', 'ACCOUNT', 'i_save', () => go('save')], ['設定', 'SETTING', 'i_gear', () => { setOpen = true; }], ['反饋', 'MAIL', 'i_mail', () => go('fb')], ['關於', 'ABOUT', 'i_info', () => go('about')]];
   // 執行首頁選項：會切換畫面的先播轉場（按鈕撥開 → 光圈展開）；多人、設定是彈窗，直接開
   const runItem = i => { if (G.Trans.busy()) return; const it = ITEMS[i]; if (it[0] === '多人' || it[0] === '設定') it[3](); else G.Trans.start(it[3]); };
   const mw = G.UI.wheel();                                 // 首頁滾輪
@@ -555,7 +555,10 @@ G.Menus = (() => {
       const cy = by0 + 7 + vis * step + Math.round(bh / 2), off = Math.round((1 - appear) * (1 - appear) * 30), top = by0 + 7, bot = top + step * (vis * 2 + 1);
       c.globalAlpha = appear;
       // 中央聚光：一道淡淡的亮帶
-      c.fillStyle = P[9]; c.globalAlpha = appear * 0.06; c.fillRect(bx - 18, cy - 13 + off, bw + 36, 26); c.globalAlpha = appear;
+      // v2.8.7 中央聚光改成橢圓柔光：中間最亮、往四周慢慢淡掉，看不到長方形的邊
+      { const rx = bw / 2 + 30, ry = 17, cx0 = bx + bw / 2, cy0 = cy + off; c.save(); c.translate(cx0, cy0); c.scale(rx / ry, 1);
+        const gr = c.createRadialGradient(0, 0, 0, 0, 0, ry); gr.addColorStop(0, 'rgba(255,255,255,0.085)'); gr.addColorStop(0.55, 'rgba(255,255,255,0.045)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+        c.globalAlpha = appear; c.fillStyle = gr; c.fillRect(-ry, -ry, ry * 2, ry * 2); c.restore(); c.globalAlpha = appear; }
       H().wheelBtn(mw, bx - 14, top, bw + 28, bot - top);
       c.save(); c.beginPath(); c.rect(bx - 20, top, bw + 40, bot - top); c.clip();
       const order = ITEMS.map((q, i) => i).sort((p2, q) => Math.abs(q - mw.pos) - Math.abs(p2 - mw.pos));
@@ -564,7 +567,7 @@ G.Menus = (() => {
         const po = G.Trans.part(), xo = Math.round((i % 2 ? 1 : -1) * po * po * uw * 0.8);       // 轉場：按鈕左右交錯撥開
         const ctr = ad < 0.5, w2 = bw - Math.round(Math.min(ad, 2) * 10), x = Math.round(bx + (bw - w2) / 2) + xo, id = 'm' + i, p = pr(id) ? 1 : 0;
         const y = Math.round(cy - bh / 2 + d * step + off - (ctr ? Math.round(mw.bump) : 0));
-        if (ctr && mw.settled) softGlow(c, x, y + p, w2, bh, gt);                         // v2.8.6 柔和光暈（取代閃爍的黃橘方框）
+        if (ctr && mw.settled) { c.fillStyle = P[(Math.sin(gt * 4) > 0) ? 13 : 14]; c.fillRect(x - 1, y - 1 + p, w2 + 2, bh + 2); }   // v2.8.7 改回黃橘外框（Pai 指定）
         H().key(c, x, y + p, w2, bh, p, ctr ? 13 : 5, ctr ? 2 : 1);
         H().icon(c, ic, x + 12, y + 9 + p, ad > 1.5);
         G.cn(c, cn, x + 26, y + 3 + p, ctr ? 9 : 7);
@@ -612,7 +615,7 @@ G.Menus = (() => {
     if (resetAsk) {
       H().btn('rsBg', 0, 0, uw, uh, null, () => { resetAsk = false; });
       H().dim(c, 0.7);
-      const w = Math.min(uw - 16, 190), ls = G.cnWrap('角色、鑰匙、隊伍、成就、存檔名稱都會回到初始狀態。', w - 16), h = 52 + ls.length * 13, x = Math.round(uw / 2 - w / 2), y = Math.round(uh / 2 - h / 2);
+      const w = Math.min(uw - 16, 190), ls = G.cnWrap('角色、鑰匙、隊伍、成就、玩家名稱都會回到初始狀態。', w - 16), h = 52 + ls.length * 13, x = Math.round(uw / 2 - w / 2), y = Math.round(uh / 2 - h / 2);
       H().box(c, x, y, w, h, 1, 10); H().btn('rsIn', x, y, w, h, null, null);
       G.cn(c, '清除所有進度？', x + w / 2, y + 6, 9, 0.5);
       ls.forEach((l, i) => G.cn(c, l, x + w / 2, y + 22 + i * 13, 6, 0.5));
@@ -801,7 +804,7 @@ G.Menus = (() => {
           c.globalAlpha = 1 - dark * 0.6; c.fillStyle = P[0]; c.fillRect(bx - 1, by - 1, bw2 + 2, 9); c.fillStyle = P[13]; c.fillRect(bx, by, bw2, 7); G.text(c, lab, bx + 2, by + 1, 0); c.globalAlpha = 1;
         }
       }
-      if (!centre && Math.abs(d) < 2.6) tap('car' + i, Math.round(px - 14), y + 8, 28, h - 12, () => { car.tgt = i; car.settled = false; });
+      if (!centre && Math.abs(d) < 2.6) tap('car' + i, Math.round(px - 14), y + 8, 28, h - 12, () => { car.tgt = i; car.settled = false; })
     }
     // 兩側暗角
     for (let k = 0; k < 26; k += 2) { const a = (1 - k / 26) * 0.55; c.fillStyle = G.pat(c, 0, a); c.fillRect(x + k, y, 2, h); c.fillRect(x + w - k - 2, y, 2, h); }
@@ -924,7 +927,7 @@ G.Menus = (() => {
     if (bpot) {                                         // v2.5 藥水一覽：圖示、名稱、價格、效果（可捲動）
       const w = Math.min(Rr - L, LD ? 420 : 300), x = Math.round(L + (Rr - L) / 2 - w / 2), cols = LD && w >= 360 ? 2 : 1, cw = Math.floor((w - (cols - 1) * 6) / cols);
       scrollDetail(c, x, y + 2, w, B - y - 4, 'potions', top => {
-        const rows = G.SHOP.map(it => ({ it, ls: G.cnWrap(it.d, cw - 30) })), hs = rows.map(r => 18 + r.ls.length * 13 + 3);
+        const rows = G.SHOP.map(it => ({ it, ls: G.cnWrapRich(it.d, cw - 30) })), hs = rows.map(r => 18 + r.ls.length * 13 + 3);
         let yy = top;
         for (let i = 0; i < rows.length; i += cols) {
           const rh = Math.max(...hs.slice(i, i + cols)), vis = yy + rh > y + 2 && yy < B - 2;   // 只畫看得到的列
@@ -933,7 +936,7 @@ G.Menus = (() => {
             H().box(c, bx, yy, cw, rh, 0, 4, false); H().icon(c, it.ic, bx + 12, yy + 12);
             const inV = ty => ty >= y + 1 && ty + 12 <= B - 2;   // 捲到一半被裁掉的字不畫
             if (inV(yy + 3)) { G.cn(c, it.n, bx + 24, yy + 3, 9); H().icon(c, 'i_gold', bx + cw - 30, yy + 9); G.text(c, it.cost, bx + cw - 25, yy + 7, 13, 1); }
-            ls.forEach((l, k) => { if (inV(yy + 17 + k * 13)) G.cn(c, l, bx + 24, yy + 17 + k * 13, 6); });
+            ls.forEach((l, k) => { if (inV(yy + 17 + k * 13)) G.cnRich(c, l, bx + 24, yy + 17 + k * 13, 6); });
           }
           yy += rh + 4;
         }
@@ -964,11 +967,11 @@ G.Menus = (() => {
     // 野怪：獎勵說明卡
     const cta = wd ? (c, x, cy, w) => {
       const kind = wd.kind === 'wboss' ? '野生首領' : wd.kind === 'hunter' ? '打野' : '野區小怪', two = G.cnW(wd.n) + G.cnW(kind) + 32 > w, ex = two ? 13 : 0;   // 名稱與類別放不下 → 類別換到下一行
-      const lines = G.cnWrap(wd.d, w - 26), hh = 18 + ex + lines.length * 13 + (wd.kind === 'hunter' ? 4 : 15);
+      const lines = G.cnWrapRich(wd.d, w - 26), hh = 18 + ex + lines.length * 13 + (wd.kind === 'hunter' ? 4 : 15);
       H().box(c, x, cy, w, hh, 0, wd.col, false);
       H().icon(c, wd.ic, x + 10, cy + 10);
       G.cn(c, wd.n, x + 21, cy + 3, 9); if (two) G.cn(c, kind, x + 21, cy + 16, wd.col); else G.cn(c, kind, x + w - 5, cy + 3, wd.col, 1);
-      lines.forEach((l, i) => G.cn(c, l, x + 21, cy + 18 + ex + i * 13, 7));
+      lines.forEach((l, i) => G.cnRich(c, l, x + 21, cy + 18 + ex + i * 13, 7));
       if (wd.kind !== 'hunter') G.cn(c, '重生 ' + wd.respawn + ' 秒', x + 21, cy + 18 + ex + lines.length * 13 + 1, 4);
       return cy + hh + 6;
     } : null;
@@ -993,17 +996,6 @@ G.Menus = (() => {
   // 四周壓暗，讓視線集中在中間
   function vign(c, x, y, w, h) { H().dither(c, x, y, w, 3, 0, 0.5); H().dither(c, x, y + h - 4, w, 4, 0, 0.45); H().dither(c, x, y, 3, h, 0, 0.35); H().dither(c, x + w - 3, y, 3, h, 0, 0.35); }
   function key(c, k, x, y, on) { H().box(c, x, y + (on ? 1 : 0), 13, 13, on ? 13 : 1, on ? 13 : 6); G.text(c, k, x + 7, y + 4 + (on ? 1 : 0), on ? 0 : 9, 1, null, 0.5); }
-  // v2.8.6 選中按鈕的柔光：外圍 3 圈、越外越淡、圓角（四角不畫）、慢慢呼吸
-  function softGlow(c, x, y, w, h, t, col = '#ffd84a') {
-    const a = 0.38 + 0.14 * Math.sin(t * 2.6);
-    c.fillStyle = col;
-    [[1, 1], [2, 0.55], [3, 0.25]].forEach(([d, k]) => {
-      c.globalAlpha = a * k;
-      c.fillRect(x - d + d, y - d, w, 1); c.fillRect(x, y + h - 1 + d, w, 1);
-      c.fillRect(x - d, y - d + d, 1, h); c.fillRect(x + w - 1 + d, y, 1, h);
-    });
-    c.globalAlpha = 1;
-  }
   function hand(c, x, y, down) { if (down) G.pxEllipse(c, x, y, 6, 3, 13); c.drawImage(G.SPR.hand.n, x - 4, y - 1 + (down ? 1 : 0)); }
   function cursor(c, x, y, down) { if (down) G.pxEllipse(c, x, y, 5, 2, 13); c.drawImage(G.SPR.cursor.n, x - 1, y - 1); }
   function shadow(c, x, y, r) { G.pxDisc(c, x, y, r, r * 0.42, 0, 0.55); }
@@ -1771,7 +1763,7 @@ G.Menus = (() => {
             items.forEach(([ic, n], i) => {
               const d = i - pos, ad = Math.abs(d); if (ad > 2.6) return;
               const ctr = ad < 0.5, w2 = bw - Math.round(Math.min(ad, 2) * 8), xx = Math.round(cx - w2 / 2), yy = Math.round(cy - bh / 2 + d * step) + (ctr && press ? 1 : 0);
-              if (ctr) softGlow(c, xx, yy, w2, bh, gt);
+              if (ctr) { c.fillStyle = P[Math.sin(gt * 4) > 0 ? 13 : 14]; c.fillRect(xx - 1, yy - 1, w2 + 2, bh + 2); }
               H().box(c, xx, yy, w2, bh, ctr ? 2 : 1, ctr ? 13 : 5); H().icon(c, ic, xx + 9, yy + 7); G.cn(c, n, xx + 19, yy + 1, ctr ? 9 : 7);
               if (!ctr) { c.fillStyle = 'rgba(12,12,12,' + Math.min(0.5, ad * 0.24).toFixed(3) + ')'; c.fillRect(xx, yy, w2, bh); }
             });
@@ -1809,11 +1801,11 @@ G.Menus = (() => {
           }
         },
         {
-          t: '存檔碼', m: '首頁「{存檔}」→「{產生存檔碼}」，取個名字後按「{複製}」保存',
+          t: '存檔碼', m: '首頁「{帳號}」→「{產生存檔碼}」，取個玩家名稱後按「{複製}」保存',
           draw(c, x, y, w, h, t, dk) {
             const T = t % 4.4, cx = x + 10, cw = w - 20;
             if (T < 1.8) {
-              G.cn(c, '幫存檔取個名字', x + w / 2, y + 8, 13, 0.5);
+              G.cn(c, '取個玩家名稱', x + w / 2, y + 8, 13, 0.5);
               const nm = 'Pai'.slice(0, Math.floor(seg(T, 0.2, 0.9) * 3.99)); H().box(c, cx, y + 26, cw, 18, 0, 13, false); G.cn(c, nm + (((gt * 3) | 0) % 2 ? '|' : ''), cx + 5, y + 29, 9);
               yBtn(c, x + w / 2 - 30, y + 54, 60, 16, '下一步'); if (T > 1.0) ptr(dk)(c, x + w / 2, y + 62, T > 1.3 && T < 1.6);
             } else {
@@ -1844,7 +1836,7 @@ G.Menus = (() => {
         },
         {
           // v2.8 線上排行榜
-          t: '排行榜', m: '存檔取名後會{自動上榜}；首頁「{排行}」看 9 類的{前 20 名}，按{跳至自己}找到你的名次',
+          t: '排行榜', m: '取好玩家名稱就會{自動上榜}；首頁「{排行}」看 9 類的{前 20 名}，按{跳至自己}找到你的名次',
           draw(c, x, y, w, h, t) {
             const ct = [['總傷害', ['葉子王', '小派', '阿明'], ['9.2萬', '5.0萬', '3.1萬']], ['勝率', ['小派', '阿明', '葉子王'], ['80.0%', '66.7%', '50.0%']], ['成就數', ['阿明', '葉子王', '小派'], ['32 個', '27 個', '20 個']]][((t / 2) | 0) % 3];
             const lw = Math.min(150, w - 16), lx = Math.round(x + w / 2 - lw / 2); let yy = y + 8;

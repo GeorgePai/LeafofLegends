@@ -17,19 +17,19 @@ G.skillReq = (sd, lv) => sd['lv' + lv] || 1;
 // k：效果種類；v：數值；t：持續秒數（0 = 立即）
 G.SHOP = [
   // e：道具欄顯示的效果短標（比名稱直覺）
-  { id: 'hp', n: 'HP藥水', e: '+HP', ic: 'i_hp', cost: 60, k: 'hp', v: 150, t: 0, d: '立即回復 150 HP' },
-  { id: 'mp', n: 'MP藥水', e: '+MP', ic: 'i_mp', cost: 60, k: 'mp', v: 150, t: 0, d: '立即回復 150 MP' },
-  { id: 'spd', n: '攻速藥水', e: '+攻速', ic: 'p_spd', cost: 150, k: 'del', v: 30, t: 60, d: '攻速 +30%，60 秒' },
-  { id: 'crit', n: '爆擊藥水', e: '+爆擊', ic: 'p_crit', cost: 150, k: 'crit', v: 15, t: 60, d: '爆擊率 +15%，60 秒' },
-  { id: 'arm', n: '防禦藥水', e: '+防禦', ic: 'p_arm', cost: 150, k: 'arm', v: 6, t: 60, d: '防禦 +6，60 秒' },
-  { id: 'pow', n: '攻擊藥水', e: '+攻擊', ic: 'p_pow', cost: 180, k: 'pow', v: 25, t: 60, d: '攻擊力 +25%，60 秒' },
-  { id: 'move', n: '跑速藥水', e: '+跑速', ic: 'p_move', cost: 100, k: 'spd', v: 25, t: 60, d: '跑速 +25%，60 秒' },
+  { id: 'hp', n: 'HP藥水', e: '+HP', ic: 'i_hp', cost: 60, k: 'hp', v: 150, t: 0, d: '立即回復 {r:150 HP}' },
+  { id: 'mp', n: 'MP藥水', e: '+MP', ic: 'i_mp', cost: 60, k: 'mp', v: 150, t: 0, d: '立即回復 {g:150 MP}' },
+  { id: 'spd', n: '攻速藥水', e: '+攻速', ic: 'p_spd', cost: 150, k: 'del', v: 30, t: 60, d: '{攻速 +30%}，60 秒' },
+  { id: 'crit', n: '爆擊藥水', e: '+爆擊', ic: 'p_crit', cost: 150, k: 'crit', v: 15, t: 60, d: '{o:爆擊率 +15%}，60 秒' },
+  { id: 'arm', n: '防禦藥水', e: '+防禦', ic: 'p_arm', cost: 150, k: 'arm', v: 6, t: 60, d: '{防禦 +6}，60 秒' },
+  { id: 'pow', n: '攻擊藥水', e: '+攻擊', ic: 'p_pow', cost: 180, k: 'pow', v: 25, t: 60, d: '{攻擊力 +25%}，60 秒' },
+  { id: 'move', n: '跑速藥水', e: '+跑速', ic: 'p_move', cost: 100, k: 'spd', v: 25, t: 60, d: '{跑速 +25%}，60 秒' },
   // v2.4 新藥水（暫定數值）
-  { id: 'cdr', n: '冷卻藥水', e: '−冷卻', ic: 'p_cdr', cost: 160, k: 'cdr', v: 20, t: 60, d: '技能冷卻 −20%，60 秒' },
-  { id: 'xp', n: '經驗藥水', e: '+經驗', ic: 'p_xp', cost: 120, k: 'xp', v: 50, t: 60, d: '獲得經驗 +50%，60 秒' },
-  { id: 'wave', n: '小兵藥水', e: '+出兵', ic: 'p_wave', cost: 200, k: 'wave', v: 50, t: 60, d: '我方出兵速度 +50%，60 秒' },
-  { id: 'inv', n: '無敵藥水', e: '無敵', ic: 'p_inv', cost: 280, k: 'inv', v: 0, t: 2.5, d: '無敵 2.5 秒：不受傷害與控制' },
-  { id: 'rev', n: '復活藥水', e: '復活', ic: 'p_rev', cost: 350, k: 'rev', v: 50, t: 0, d: '先買好放在背包，陣亡時自動使用：原地復活並回復 50% HP（陣亡後才買，要等下次陣亡）' }
+  { id: 'cdr', n: '冷卻藥水', e: '−冷卻', ic: 'p_cdr', cost: 160, k: 'cdr', v: 20, t: 60, d: '{技能冷卻 −20%}，60 秒' },
+  { id: 'xp', n: '經驗藥水', e: '+經驗', ic: 'p_xp', cost: 120, k: 'xp', v: 50, t: 60, d: '{獲得經驗 +50%}，60 秒' },
+  { id: 'wave', n: '小兵藥水', e: '+出兵', ic: 'p_wave', cost: 200, k: 'wave', v: 50, t: 60, d: '我方{出兵速度 +50%}，60 秒' },
+  { id: 'inv', n: '無敵藥水', e: '無敵', ic: 'p_inv', cost: 280, k: 'inv', v: 0, t: 2.5, d: '{無敵 2.5 秒}：不受傷害與控制' },
+  { id: 'rev', n: '復活藥水', e: '復活', ic: 'p_rev', cost: 350, k: 'rev', v: 50, t: 0, d: '先買好放在背包，陣亡時{自動使用}：原地復活並{r:回復 50% HP}（陣亡後才買，要等下次陣亡）' }
 ];
 G.SHOP_BY = Object.fromEntries(G.SHOP.map(s => [s.id, s]));
 G.TUNE.gold = { start: 150, perSec: 2, last: 16, near: 5, boss: 120, tower: 150, camp: 60, wild: 250 };
@@ -39,18 +39,18 @@ G.TUNE.bagIdle = 1.5;                               // 道具欄沒碰幾秒後�
 // ---------- 野區 ----------
 // kind: 'camp'（小怪，打死給增益/經驗）或 'wboss'（野生首領，打死變成我方戰友去推塔）
 G.WILD = {
-  red: { unit: 'gorilla', kind: 'camp', lv: 3, hpMul: 0.65, pMul: 0.4, aMul: 0.5, respawn: 60, buff: 'red', n: '紅莓猩猩', d: '擊敗獲得「狂暴之力」：攻擊力 +25%，90 秒', ic: 'i_rage', col: 10 },
-  blue: { unit: 'hippo', kind: 'camp', lv: 3, hpMul: 0.65, pMul: 0.4, aMul: 0.5, respawn: 60, buff: 'blue', n: '藍泉河馬', d: '擊敗獲得「智慧之泉」：MP 回復 +5/秒、冷卻 −20%，90 秒', ic: 'i_mp', col: 12 },
-  exp: { unit: 'crocodile', kind: 'camp', lv: 3, hpMul: 0.6, pMul: 0.4, aMul: 0.5, respawn: 50, buff: 'exp', n: '沼澤鱷魚', d: '擊敗獲得大量經驗值與 60 金幣', ic: 'i_book', col: 13 },
-  frost: { unit: 'polarbear', kind: 'wboss', lv: 6, hpMul: 2, pMul: 0.7, aMul: 0.6, respawn: 150, n: '冰原霸主', d: '野生首領。擊敗後加入我方，沿最近的路線推塔', ic: 'i_ice', col: 12 },
-  blaze: { unit: 'firebear', kind: 'wboss', lv: 6, hpMul: 2, pMul: 0.7, aMul: 0.6, respawn: 150, n: '熔岩霸主', d: '野生首領。擊敗後加入我方，沿最近的路線推塔', ic: 'i_fire', col: 14 }
+  red: { unit: 'gorilla', kind: 'camp', lv: 3, hpMul: 0.65, pMul: 0.4, aMul: 0.5, respawn: 60, buff: 'red', n: '紅莓猩猩', d: '擊敗獲得「狂暴之力」：{攻擊力 +25%}，90 秒', ic: 'i_rage', col: 10 },
+  blue: { unit: 'hippo', kind: 'camp', lv: 3, hpMul: 0.65, pMul: 0.4, aMul: 0.5, respawn: 60, buff: 'blue', n: '藍泉河馬', d: '擊敗獲得「智慧之泉」：{g:MP 回復 +5/秒}、{冷卻 −20%}，90 秒', ic: 'i_mp', col: 12 },
+  exp: { unit: 'crocodile', kind: 'camp', lv: 3, hpMul: 0.6, pMul: 0.4, aMul: 0.5, respawn: 50, buff: 'exp', n: '沼澤鱷魚', d: '擊敗獲得{大量經驗值}與 {60 金幣}', ic: 'i_book', col: 13 },
+  frost: { unit: 'polarbear', kind: 'wboss', lv: 6, hpMul: 2, pMul: 0.7, aMul: 0.6, respawn: 150, n: '冰原霸主', d: '野生首領。擊敗後{加入我方}，沿最近的路線推塔', ic: 'i_ice', col: 12 },
+  blaze: { unit: 'firebear', kind: 'wboss', lv: 6, hpMul: 2, pMul: 0.7, aMul: 0.6, respawn: 150, n: '熔岩霸主', d: '野生首領。擊敗後{加入我方}，沿最近的路線推塔', ic: 'i_fire', col: 14 }
 };
 // ---------- 敵方獵手（打野）----------
 // 新角色「獵狼」：開場 90 秒從敵方聖所出發，專門清我方野區的怪變強；附近有我方單位就先打
 G.ORIG.units.hunter = Object.assign({}, G.ORIG.units.madwolf, { id: 9001, type: 'enemy', jungler: true, hp: 280, grow_hp: 30, power: 24, grow_power: 3, armor: 3, grow_armor: 0.6, speed: 95, delay: 700, critical: 8, exp: 300, weapon_name: 'return_body', weapon_option: 10 });
 G.BESTIARY.hunter = { w: 19, h: 14, draw(P, f) { G.quad(P, f, { bx: 8, by: 8, brx: 6.5, bry: 3.5, hx: 14, hy: 6, hr: 3, legs: [4, 11, 5, 12], ly: 10, ll: 4, ear: 'p', snout: 3, tail: [4, 4], eye: 14 }); P.l(11, 8, 13, 10, 10); P.px(12, 11, 10); P.px(13, 11, 15); P.l(13, 3, 15, 5, 6); for (let x = 4; x < 11; x += 3) P.px(x, 5, 3); } };
 G.TUNE.jungle = { first: 90, respawn: 75, bossLv: 7, bossTime: 300, maxLv: 10, gold: 100 };
-G.HUNTER_INFO = '・開場 90 秒出動，倒下 75 秒後再來\n・清野怪變強：紅營加攻擊、藍營回血加防禦、鱷魚營升級\n・開場 5 分鐘後、Lv7 以上會搶野生首領\n・擊倒可得 100 金幣';
+G.HUNTER_INFO = '・開場 {90 秒}出動，倒下 {75 秒}後再來\n・清野怪變強：紅營{加攻擊}、藍營{回血加防禦}、鱷魚營{升級}\n・開場 {5 分鐘}後、{Lv7} 以上會搶野生首領\n・擊倒可得 {100 金幣}';
 // ---------- 鑰匙掉落（%：英雄親手擊倒；友軍擊倒減半）----------
 G.KEY_RATE = { creep: 2, camp: 8, boss: 15, hunter: 25, towerOut: 30, wboss: 35, towerMid: 40, towerIn: 50, towerMain: 60, holy: 100 };
 // 主塔數值（原著要塞太強，改成合理值；雙方共用）
@@ -69,8 +69,8 @@ G.TUNE.vision = { hero: 290, creep: 190, boss: 220, jungler: 220, tower: 300, ho
 // ---------- 友方塔傳送 ----------
 G.TUNE.tp = { channel: 3, cd: 30, minDist: 110, ask: 2.2 };   // ask：第一下之後幾秒內再點一下才傳送
 G.JBUFF = {
-  red: { n: '狂暴之力', d: '攻擊力 +25%', ic: 'i_rage', col: 10, t: 90, fx: { pow: 25 } },
-  blue: { n: '智慧之泉', d: 'MP 回復 +5/秒、技能冷卻 −20%', ic: 'i_mp', col: 12, t: 90, fx: { mpReg: 5, cdr: 20 } }
+  red: { n: '狂暴之力', d: '{攻擊力 +25%}', ic: 'i_rage', col: 10, t: 90, fx: { pow: 25 } },
+  blue: { n: '智慧之泉', d: '{g:MP 回復 +5/秒}、{技能冷卻 −20%}', ic: 'i_mp', col: 12, t: 90, fx: { mpReg: 5, cdr: 20 } }
 };
 
 Object.assign(G.World.prototype, {

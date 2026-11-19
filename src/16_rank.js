@@ -5,6 +5,8 @@
 // - 上傳：存檔、每場戰鬥結束、開遊戲時；v2.8.3 起數據有變（開箱、領成就…）也自動上傳；同一人 30 秒最多 1 次（伺服器也會擋）
 // - 刷新：v2.8.3 開著排行榜畫面每 10 秒、其他選單畫面每 30 秒（順便收全服「登上第 1 名」消息）；戰鬥中、背景不連線
 // - DEV 模式不上傳
+// - v2.8.7 一帳號同時一台：這台的工作階段 ss 只存在本機（leafwar_rk_ss，不進存檔碼）；讀存檔碼／更新到新版時 /claim 換成這台，
+//   另一台下次連線（/ping 每 60 秒或任何上傳）收到 moved → 帳號畫面「此帳號已在其他裝置登入」→ 登出
 // ============================================================
 G.RANK_URL = 'https://lol-rank.leafoflegends.workers.dev';                    // 部署後填入 https://lol-rank.<子網域>.workers.dev
 G.RANK_GAP = 30;                      // 上傳間隔＆一般刷新間隔（秒）
@@ -30,6 +32,9 @@ G.Rank = (() => {
   K.age = () => board ? Math.max(0, Math.round((Date.now() - boardT) / 1000)) : -1;
   K.next = () => busy ? 0 : Math.max(0, Math.ceil((lastPoll + (G.UI.screen === 'rank' ? G.RANK_FAST : G.RANK_GAP) * 1000 - Date.now()) / 1000));   // v2.8.3 距離下次刷新幾秒（倒數）
   K.ranks = () => ranks || ls('ranks') || {};
+  K.ss = () => ls('ss') || '';                                                 // v2.8.7 這台的工作階段
+  K.moved = false;                                                             // v2.8.7 被別台登入了（等離開戰鬥再處理）
+  const isMoved = j => { if (j && (j.err === 'moved' || j.moved)) { K.moved = true; return true; } return false; };
   K.fmt = (k, v) => {
     v = +v || 0;
     if (k === 'wr') return v.toFixed(1) + '%';
@@ -88,14 +93,15 @@ G.Rank = (() => {
   };
   // ---- 上傳自己的數據 ----
   K.submit = async () => {
-    if (!K.on() || G.Team.dev || !K.joined()) return;
+    if (!K.on() || G.Team.dev || !K.joined() || K.moved || !K.ss()) return;
     if (busy || Date.now() - lastSub < (G.RANK_GAP + 1) * 1000) { pend = true; return; }
     busy = 1; pend = false; lastSub = Date.now();
-    const me = K.me(), st = K.stats(), j = await req('/submit', { id: me.id, tok: me.tok, name: K.name(), s: st }); busy = 0;
+    const me = K.me(), st = K.stats(), j = await req('/submit', { id: me.id, tok: me.tok, ss: K.ss(), name: K.name(), s: st }); busy = 0;
+    if (isMoved(j)) return;
     if (j.ok) { sig = K.name() + JSON.stringify(st); diff(j.ranks || {}); lastPoll = -1e12; return; }                 // 上傳後馬上刷新排行
     if (j.err === 'wait') { pend = true; lastSub = Date.now() - (G.RANK_GAP - (j.wait || 5)) * 1000; return; }
     if (j.err === 'auth') { P().rk = null; G.Team.save(); ranks = {}; ls('ranks', {}); pend = true; return; }   // 身分失效：下一輪自動用新身分加入
-    if (j.err === 'name') { banner('這個名字不能上排行，請到存檔改名', 10); return; }
+    if (j.err === 'name') { banner('這個名字不能上排行，請到帳號改名', 10); return; }
     if (j.err === 'value') return;                                              // 數據不合理：不上傳
     pend = true; state = errState(j);
   };
@@ -103,23 +109,33 @@ G.Rank = (() => {
   K.join = () => {
     if (!K.name()) return false;
     P().rkOff = 0;
-    if (!K.me()) { P().rk = { id: hex(16), tok: hex(32) }; G.Team.save(); }
+    if (!K.me()) { P().rk = { id: hex(16), tok: hex(32) }; G.Team.save(); ls('ss', hex(16)); }   // v2.8.7 新帳號：這台就是登入的那台
     lastSub = -1e12; K.submit(); return true;
   };
   // v2.8.4 帳號：刪除＝把自己從排行榜永久移除（本機進度由存檔畫面清空）
   K.remove = async () => {
     const me = K.me(); if (!me) return { ok: 1 };
-    const j = await req('/leave', { id: me.id, tok: me.tok }); if (j.err === 'net' || j.err === 'server' || j.err === 'quota') return j;
+    const j = await req('/leave', { id: me.id, tok: me.tok, ss: K.ss() }); if (j.err === 'net' || j.err === 'server' || j.err === 'quota') return j;
     return { ok: 1 };
   };
-  K.forget = () => { ranks = {}; ls('ranks', {}); sig = ''; pend = true; lastPoll = -1e12; K.fb.list = null; K.fb.unread = 0; K.fb.t = -1e12; };   // 登出／刪除後：本機的名次紀錄清掉
+  K.forget = () => { ls('ss', ''); K.moved = false; claiming = 0; ranks = {}; ls('ranks', {}); sig = ''; pend = true; lastPoll = -1e12; K.fb.list = null; K.fb.unread = 0; K.fb.t = -1e12; };   // 登出／刪除後：本機的名次紀錄清掉
+  // v2.8.7 這台登入：產生新的工作階段，伺服器記成這台（另一台就會被登出）
+  let claiming = 0;
+  K.claim = async () => {
+    const me = K.me(); if (!K.on() || !me || claiming || K.moved) return; claiming = 1;
+    const ss = hex(16), j = await req('/claim', { id: me.id, tok: me.tok, ss });
+    if (j.ok) ls('ss', ss);
+    else if (j.err === 'auth') { P().rk = null; G.Team.save(); }               // 身分失效：之後自動用新身分加入
+    setTimeout(() => { claiming = 0; }, j.ok ? 0 : 30000);                      // 連不上就 30 秒後再試
+  };
   K.uid = () => { const m = K.me(); return m ? m.id.slice(0, 8).toUpperCase() : ''; };
   // ---- v2.8.6 即時在線人數：每台開著遊戲的裝置（含戰鬥中）每 60 秒回報一次，伺服器算最近 2 分鐘有回報的裝置 ----
   K.online = { n: null, t: -1e12, busy: 0 };
   const sid = () => { let s = null; try { s = localStorage.getItem('leafwar_sid'); if (!s) { s = hex(16); localStorage.setItem('leafwar_sid', s); } } catch (e) { s = s || hex(16); } return s; };
   const ping = async () => {
     K.online.busy = 1; K.online.t = Date.now();
-    const j = await req('/ping', { sid: sid() }); K.online.busy = 0;
+    const me = K.me(), ss = K.ss(), j = await req('/ping', me && ss && !G.Team.dev ? { sid: sid(), id: me.id, ss } : { sid: sid() }); K.online.busy = 0;
+    isMoved(j);
     if (j.ok) K.online.n = j.n; else if (j.err === 'net') K.online.n = null;
   };
   addEventListener('visibilitychange', () => { if (!document.hidden) K.online.t = -1e12; });
@@ -128,6 +144,8 @@ G.Rank = (() => {
     if (!document.hidden && !K.online.busy && Date.now() - K.online.t > 60000) ping();
     const sc = G.UI.screen; if (sc === 'battle' || sc === 'intro' || sc === 'tap' || document.hidden) return;
     const now = Date.now();
+    if (K.moved) { if (G.SaveUI && G.SaveUI.kicked) G.SaveUI.kicked(); return; }   // v2.8.7 被別台登入：到帳號畫面登出（戰鬥中先不打斷）
+    if (K.me() && !K.ss() && !G.Team.dev) { K.claim(); return; }                 // v2.8.7 這台還沒登入（讀了存檔碼、剛更新到新版）
     if (K.name() && !K.me() && !G.Team.dev && !busy) { K.join(); return; }
     if (K.joined() && !G.Team.dev && now - K.fb.t > 600000 && G.UI.screen !== 'fb') K.fbLoad(false);   // v2.8.6 每 10 分鐘看有沒有開發者回信（首頁「反饋」紅點）        // v2.8.4 強制參加：有名字就自動加入（舊版退出過的也會回來）
     if (!pend && sig && K.joined() && !G.Team.dev && now - sigT > 2000) { sigT = now; if (K.name() + JSON.stringify(K.stats()) !== sig) pend = true; }   // v2.8.3 數據有變（開箱、領成就、改名…）就排隊上傳
@@ -139,13 +157,14 @@ G.Rank = (() => {
   K.fb = { list: null, unread: 0, busy: 0, err: '', t: -1e12 };
   K.fbLoad = async seen => {
     const me = K.me(); if (!K.on() || !me || K.fb.busy) return;
-    K.fb.busy = 1; K.fb.t = Date.now(); const j = await req('/fb/mine', { id: me.id, tok: me.tok, seen: seen ? 1 : 0 }); K.fb.busy = 0;
+    K.fb.busy = 1; K.fb.t = Date.now(); const j = await req('/fb/mine', { id: me.id, tok: me.tok, ss: K.ss(), seen: seen ? 1 : 0 }); K.fb.busy = 0;
+    if (isMoved(j)) return;
     if (j.ok) { K.fb.list = j.list; K.fb.err = ''; K.fb.unread = seen ? 0 : j.list.filter(m => m.reply && !m.seen).length; }
     else K.fb.err = j.err === 'net' ? '連不上伺服器' : j.err === 'quota' ? '今天的額度用完了' : '讀取失敗';
   };
   K.fbSend = async body => {
     const me = K.me(); if (!me) return { err: 'nouser' };
-    const j = await req('/fb/send', { id: me.id, tok: me.tok, body }); if (j.ok) await K.fbLoad(true); return j;
+    const j = await req('/fb/send', { id: me.id, tok: me.tok, ss: K.ss(), body }); isMoved(j); if (j.ok) await K.fbLoad(true); return j;
   };
   K.fbA = { list: null, busy: 0, err: '' };
   K.fbAdmLoad = async () => {
@@ -300,7 +319,7 @@ G.RankUI = (() => {
     let lines, btn = null, col = 3;
     if (G.Team.dev) { lines = ['開發者模式', '不上傳排行']; if (Kk.on()) btn = ['rkAdm', '管理玩家', () => { adm = true; askDel = null; askPurge = 0; Kk.admLoad(); G.Audio.play('open'); }]; }
     else if (!Kk.on()) lines = ['排行榜準備中'];
-    else if (!Kk.joined()) { if (Kk.name()) lines = ['正在加入排行…', Kk.name()]; else { lines = ['先存檔取個名字', '就會自動上榜']; btn = ['rkSave', '前往存檔', () => M.go('save'), 1]; } }
+    else if (!Kk.joined()) { if (Kk.name()) lines = ['正在加入排行…', Kk.name()]; else { lines = ['先取個玩家名稱', '就會自動上榜']; btn = ['rkSave', '前往帳號', () => M.go('save'), 1]; } }
     else {
       col = 13; const r = Kk.ranks()[k] || 0, my = Kk.mine(k), g = Kk.stats().games;
       if ((k === 'wr' || k === 'kda') && g < 10) lines = ['你：還沒上榜', '還差 ' + (10 - g) + ' 場才上榜'];

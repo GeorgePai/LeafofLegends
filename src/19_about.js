@@ -5,7 +5,7 @@
 // ============================================================
 G.About = (() => {
   const S = {}, R = G.Render, H = () => G.UI.h, ui = () => G.Menus.ui;
-  const SPD = 15, HOLD = 4.5, FADE = 1.4, BACK = 1.1;          // 捲動速度（每秒幾格）、結尾停留、淡出、回首頁淡入（秒）
+  const SPD = 19, HOLD = 4.5, FADE = 1.4, BACK = 1.1;          // 捲動速度（每秒幾格）、結尾停留、淡出、回首頁淡入（秒）
   const PINK = '#f7a8c0', CREAM = '#f3e6c8', SOFT = '#bfb3c9', GOLD = '#f7d23c';
   let t = 0, off = 0, fast = false, end = -1, out = -1, petals = [], back = 0;
   const tc = new Map();                                          // 任意顏色的中文字（白字＋上色，快取）

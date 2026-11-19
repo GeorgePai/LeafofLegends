@@ -96,8 +96,10 @@ G.SaveUI = (() => {
   let step = 'home', msg = null, code = '', pend = null, copied = 0, busy = false, copiedOnce = false, askDel = 0, working = false;
   S.welcome = null; S.greet = null;
   S.reset = () => { step = 'home'; msg = null; pend = null; copied = 0; busy = false; askDel = 0; working = false; };
-  S.go = st => { step = st; msg = null; if (st === 'out') prepOut(); };   // 測試用
-  S.esc = () => { if (step === 'home') return false; step = step === 'confirm' ? 'load' : (step === 'out' || step === 'del') ? 'acct' : 'home'; msg = null; return true; };
+  S.go = st => { step = st; msg = null; if (st === 'out' || st === 'kick') prepOut(); };   // 測試用
+  // v2.8.7 一帳號同時一台：被別台登入 → 帶到帳號畫面，先給這台的存檔碼（萬一這台進度比較新），再登出
+  S.kicked = () => { if (step === 'kick' && G.UI.screen === 'save') return; G.Menus.ui.go('save'); step = 'kick'; msg = null; pend = null; prepOut(); G.Audio.play('deny'); };   // go('save') 會 reset，所以先切畫面再設 step
+  S.esc = () => { if (step === 'kick') return true; if (step === 'home') return false; step = step === 'confirm' ? 'load' : (step === 'out' || step === 'del') ? 'acct' : 'home'; msg = null; return true; };
   const say = (s, col = 10) => { msg = { s, col, t: 0 }; };
   // iPhone／iPad 用 Safari 開（還沒加到主畫面）時，提醒「加入主畫面」：Safari 7 天沒玩會清掉網站資料，主畫面版不受影響
   S.forceIos = false;
@@ -111,10 +113,10 @@ G.SaveUI = (() => {
   }
   // 存檔資訊卡：名稱＋數據列
   function infoCard(c, x, y, w, name, rows) {
-    const nm = name || '尚未設定', two = G.cnW('存檔名稱') + G.cnW(nm) + 16 > w, ex = two ? 13 : 0;   // 名字放不下 → 換到下一行
+    const nm = name || '尚未設定', two = G.cnW('玩家名稱') + G.cnW(nm) + 16 > w, ex = two ? 13 : 0;   // 名字放不下 → 換到下一行
     const cols = w >= 220 ? 2 : 1, nr = Math.ceil(rows.length / cols), hh = 22 + ex + nr * 13 + 4;
     H().box(c, x, y, w, hh, 0, 4, false);
-    G.cn(c, '存檔名稱', x + 5, y + 3, 6); G.cn(c, nm, two ? x + 5 : x + w - 5, y + 3 + ex, name ? 13 : 4, two ? 0 : 1);
+    G.cn(c, '玩家名稱', x + 5, y + 3, 6); G.cn(c, nm, two ? x + 5 : x + w - 5, y + 3 + ex, name ? 13 : 4, two ? 0 : 1);
     c.fillStyle = P[2]; c.fillRect(x + 4, y + 18 + ex, w - 8, 1);
     const cw = Math.floor((w - 10 - (cols - 1) * 10) / cols);
     rows.forEach(([k, v], i) => { const col = (i / nr) | 0, r = i % nr, rx = x + 5 + col * (cw + 10), ry = y + 21 + ex + r * 13; G.cn(c, k, rx, ry, 6); G.cn(c, v, rx + cw, ry, 9, 1); });
@@ -198,7 +200,7 @@ G.SaveUI = (() => {
   }
   S.draw = c => {
     const M = ui(); M.tick(); M.bg(c);
-    const y0 = M.header(c, '存檔'), I = R.ins, L = I.l, Rr = R.uw - I.r, B = R.uh - I.b, LD = M.land(), dt = G.Menus.dt || 1 / 60;
+    const y0 = M.header(c, '帳號'), I = R.ins, L = I.l, Rr = R.uw - I.r, B = R.uh - I.b, LD = M.land(), dt = G.Menus.dt || 1 / 60;
     copied = Math.max(0, copied - dt); if (msg) msg.t += dt;
     const W = Math.min(Rr - L, LD ? 420 : 300), x = Math.round((L + Rr) / 2 - W / 2), v = G.Team.get();
     let y = y0;
@@ -222,7 +224,7 @@ G.SaveUI = (() => {
         if (S.iosTip()) iosCard(c, x, y + fl.length * 13 + 6, W);
       }
     } else if (step === 'name') {
-      y = centerTitle(c, x, W, y + 2, '幫存檔取個名字', '讀取存檔時，會用這個名字跟你打招呼');
+      y = centerTitle(c, x, W, y + 2, '取個玩家名稱', '排行榜和打招呼都會用這個名字');
       H().box(c, x, y, W, 22, 0, 13, false);
       const e = G.Dom.place('name', 'input', x + 1, y + 1, W - 2, 20, { ph: '最多 8 個字', max: 8 });
       const n = [...(e.value || '')].length; G.text(c, n + '/8', x + W, y + 26, n ? 6 : 4, 1, null, 1);
@@ -234,7 +236,7 @@ G.SaveUI = (() => {
       }]);
       y += 24;
     } else if (step === 'code') {
-      y = centerTitle(c, x, W, y + 2, '存檔碼', '存檔名稱：' + (v.name || ''));
+      y = centerTitle(c, x, W, y + 2, '存檔碼', '玩家名稱：' + (v.name || ''));
       const th = LD ? Math.max(40, Math.min(70, B - y - 58)) : 78;
       H().box(c, x, y, W, th + 2, 0, 13, false);
       const e = G.Dom.place('code', 'textarea', x + 1, y + 1, W - 2, th, { ro: true }); if (e.value !== code) e.value = code;
@@ -250,6 +252,15 @@ G.SaveUI = (() => {
       y = actCard(c, 'svOut', x, y, W, 'i_out', '登出', '回到新玩家。之後用存檔碼就能登入回來', () => { step = 'out'; msg = null; prepOut(); }) + 6;
       y = actCard(c, 'svDel', x, y, W, 'i_trash', '刪除帳號', '從排行榜永久移除，並清空這台裝置的進度', () => { step = 'del'; msg = null; askDel = 0; }, 10) + 8;
       ui().btnSecondary(c, 'svAcBk', Math.round(x + W / 2 - 40), y, 80, 18, '返回', () => { step = 'home'; msg = null; });
+      y += 22;
+    } else if (step === 'kick') {                                                              // v2.8.7 被別台登入：一定要登出，存檔碼給他留著
+      y = centerTitle(c, x, W, y + 2, '此帳號已在其他裝置登入', '同一個帳號同時只能在一台裝置玩，這台要登出了。');
+      const th = LD ? Math.max(30, Math.min(50, B - y - 96)) : 56;
+      H().box(c, x, y, W, th + 2, 0, 13, false);
+      const e = G.Dom.place('code', 'textarea', x + 1, y + 1, W - 2, th, { ro: true }); if (e.value !== code) e.value = code;
+      y += th + 6;
+      y = keepCard(c, x, y, W, '如果這台的進度比較新，先複製這台的存檔碼，之後讀取就能接回來') + 6;
+      btnRow(c, x, y, W, ['svCopy', copied > 0 ? '已複製！' : '複製存檔碼', () => copyCode()], ['svKickGo', '登出', () => { if (busy) return; wipe('已登出'); }]);
       y += 22;
     } else if (step === 'out') {                                                               // 登出：先複製存檔碼才能登出
       y = centerTitle(c, x, W, y + 2, '登出前，先保存存檔碼', '登出後這台裝置會回到新玩家。想回來時，在「讀取存檔碼」貼上就好。');

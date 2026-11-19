@@ -100,7 +100,7 @@ G.cnWrap = (s, maxW) => {
     let line = '';
     for (const ch of para) {
       if (G.cnW(line + ch) > maxW && line) {
-        if (NO_START.includes(ch)) { const a = [...line], last = a.pop(); if (a.length) { out.push(a.join('')); line = last + ch; } else line += ch; }   // 標點不放行首，也不超出寬度：把前一個字一起帶下去
+        if (NO_START.includes(ch)) { const a = [...line]; let carry = ch; do { carry = a.pop() + carry; } while (a.length > 1 && NO_START.includes([...carry][0])); if (a.length) { out.push(a.join('')); line = carry; } else line += ch; }   // v2.8.7 連續標點（」：）也不放行首   // 標點不放行首，也不超出寬度：把前一個字一起帶下去
         else {
           const m = /[A-Za-z0-9%.+\-]$/.test(ch) && line.match(/[A-Za-z0-9%.+\-]+$/);       // v2.8.6 英數字（50%、HP、V2.8）不從中間拆開
           if (m && m[0].length < [...line].length) { out.push(line.slice(0, -m[0].length)); line = m[0] + ch; }
@@ -123,20 +123,18 @@ G.cnParse = (s, hi = 13) => {           // → [[字, 顏色或 null]...]（\n �
   return out;
 };
 // 有重點的換行：寬度只算字本身；回傳每行 [[文字, 顏色或 null]...] 片段
-G.cnWrapRich = (s, maxW, hi = 13) => {
-  const lines = [];
-  for (const para of (() => { const ps = [[]]; for (const e of G.cnParse(s, hi)) e[0] === '\n' ? ps.push([]) : ps[ps.length - 1].push(e); return ps; })()) {
-    let line = [];
-    const str = a => a.map(e => e[0]).join('');
-    for (const e of para) {
-      if (G.cnW(str(line) + e[0]) > maxW && line.length) {
-        if (NO_START.includes(e[0]) && line.length > 1) { const last = line.pop(); lines.push(line); line = [last, e]; }
-        else { lines.push(line); line = e[0].trim() ? [e] : []; }
-      } else line.push(e);
+G.cnWrapRich = (s, maxW, hi = 13) => {     // v2.8.7 換行規則和 G.cnWrap 完全一樣（標點不放行首、英數字不拆），再把顏色對回去
+  const ent = G.cnParse(s, hi), lines = G.cnWrap(ent.map(e => e[0]).join(''), maxW), out = []; let k = 0;
+  for (const ln of lines) {
+    const seg = [];
+    for (const ch of ln) {
+      while (k < ent.length && ent[k][0] !== ch) k++;     // 換行時被丟掉的空白／換行字元
+      const c = k < ent.length ? ent[k][1] : null; k++;
+      const t = seg[seg.length - 1]; if (t && t[1] === c) t[0] += ch; else seg.push([ch, c]);
     }
-    lines.push(line);
+    out.push(seg);
   }
-  return lines.map(l => { const seg = []; for (const [ch, c] of l) { const t = seg[seg.length - 1]; if (t && t[1] === c) t[0] += ch; else seg.push([ch, c]); } return seg; });
+  return out;
 };
 // 畫一行有重點的字（align 0 靠左、0.5 置中）；回傳寬度
 G.cnRich = (ctx, seg, x, y, col = 8, align = 0) => {
@@ -144,7 +142,9 @@ G.cnRich = (ctx, seg, x, y, col = 8, align = 0) => {
   seg.forEach((s, i) => { G.cn(ctx, s[0], xx, y, s[1] == null ? col : s[1]); xx += ws[i]; });
   return W;
 };
-G.cnBlock = (ctx, s, x, y, maxW, col = 7, lh = 13, maxLines = 9) => { const ls = G.cnWrap(s, maxW).slice(0, maxLines); ls.forEach((l, i) => G.cn(ctx, l, x, y + i * lh, col)); return ls.length * lh; };
+G.cnBlock = (ctx, s, x, y, maxW, col = 7, lh = 13, maxLines = 9) => {   // v2.8.7 支援 {重點} 上色
+  if (String(s).includes('{')) { const ls = G.cnWrapRich(s, maxW).slice(0, maxLines); ls.forEach((l, i) => G.cnRich(ctx, l, x, y + i * lh, col)); return ls.length * lh; }
+  const ls = G.cnWrap(s, maxW).slice(0, maxLines); ls.forEach((l, i) => G.cn(ctx, l, x, y + i * lh, col)); return ls.length * lh; };
 
 // ---------- 隊伍（存在瀏覽器本機） ----------
 G.TUNE.plantPoints = 12;            // 隊伍點數上限（取原著後期關卡的 12 點）

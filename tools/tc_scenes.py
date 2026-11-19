@@ -53,6 +53,7 @@ S.append(['save-welcome',up('svYes'),900])
 S.append(['save-welcome-x',"G.SaveUI.welcome=null",100])
 # v2.8.4 帳號管理
 S.append(['acct',"G.Menus.ui.go('save');G.SaveUI.go('acct')",300])
+S.append(['kick',"G.Menus.ui.go('save');G.SaveUI.go('kick')",400]); S.append(['kick-x',"G.SaveUI.reset();G.Menus.ui.go('menu');G.UI.goMenu()",100])   # v2.8.7 被別台登入
 S.append(['acct-out',"G.SaveUI.go('out')",700]); S.append(['acct-out-deny',"G.UI.btns.find(b=>b.id==='svOutGo')&&G.UI.btns.find(b=>b.id==='svOutGo').up()",200])
 S.append(['acct-del',"G.SaveUI.go('del')",300]); S.append(['acct-del-ask',"G.UI.btns.find(b=>b.id==='svDelGo')&&G.UI.btns.find(b=>b.id==='svDelGo').up()",200])
 S.append(['acct-x',"G.SaveUI.go('home')",100])
