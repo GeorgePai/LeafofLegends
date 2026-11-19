@@ -92,11 +92,27 @@ async function admin(req, env, url) {
   if (url.pathname === '/admin/del' && isPost) { const r = await env.DB.prepare('DELETE FROM players WHERE id = ? OR name = ?').bind(String(b.id || ''), String(b.name || '\u0000')).run(); await env.DB.prepare('DELETE FROM news WHERE pid = ?').bind(String(b.id || '')).run(); cache = null; return J({ ok: 1, deleted: r.meta.changes }); }
   return J({ err: 'nf' }, 404);
 }
+// 資料表自動建立／升級（每個執行個體第一次收到請求時跑一次；部署不用另外執行 SQL）
+let migrated = false;
+const SCHEMA = [
+  `CREATE TABLE IF NOT EXISTS players (id TEXT PRIMARY KEY, tok TEXT NOT NULL, name TEXT NOT NULL, ip TEXT, heroes INTEGER DEFAULT 0, minions INTEGER DEFAULT 0, games INTEGER DEFAULT 0, wins INTEGER DEFAULT 0, kills INTEGER DEFAULT 0, deaths INTEGER DEFAULT 0, assists INTEGER DEFAULT 0, keys INTEGER DEFAULT 0, dmg INTEGER DEFAULT 0, time INTEGER DEFAULT 0, ach INTEGER DEFAULT 0, wr REAL DEFAULT 0, kda REAL DEFAULT 0, created INTEGER, updated INTEGER, hidden INTEGER DEFAULT 0)`,
+  ...['heroes', 'minions', 'games', 'wr', 'kda', 'keys', 'dmg', 'time', 'ach'].map(k => `CREATE INDEX IF NOT EXISTS i_${k} ON players (${k} DESC, created)`),
+  'CREATE INDEX IF NOT EXISTS i_ip ON players (ip, created)',
+  'CREATE TABLE IF NOT EXISTS news (id INTEGER PRIMARY KEY AUTOINCREMENT, t INTEGER, pid TEXT, name TEXT, cat TEXT)'
+];
+const UPGRADES = ['ALTER TABLE players ADD COLUMN hidden INTEGER DEFAULT 0'];   // 已經有這欄就會報錯，略過即可
+async function migrate(env) {
+  if (migrated) return;
+  await env.DB.batch(SCHEMA.map(q => env.DB.prepare(q)));
+  for (const q of UPGRADES) { try { await env.DB.prepare(q).run(); } catch (e) { } }
+  migrated = true;
+}
 export default {
   async fetch(req, env) {
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
     const url = new URL(req.url);
     try {
+      await migrate(env);
       if (url.pathname === '/board' && req.method === 'GET') return J(await board(env));
       if (url.pathname === '/submit' && req.method === 'POST') return await submit(req, env);
       if (url.pathname === '/leave' && req.method === 'POST') return await leave(req, env);
