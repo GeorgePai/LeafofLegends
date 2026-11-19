@@ -101,7 +101,11 @@ G.cnWrap = (s, maxW) => {
     for (const ch of para) {
       if (G.cnW(line + ch) > maxW && line) {
         if (NO_START.includes(ch)) { const a = [...line], last = a.pop(); if (a.length) { out.push(a.join('')); line = last + ch; } else line += ch; }   // 標點不放行首，也不超出寬度：把前一個字一起帶下去
-        else { out.push(line); line = ch.trim() ? ch : ''; }
+        else {
+          const m = /[A-Za-z0-9%.+\-]$/.test(ch) && line.match(/[A-Za-z0-9%.+\-]+$/);       // v2.8.6 英數字（50%、HP、V2.8）不從中間拆開
+          if (m && m[0].length < [...line].length) { out.push(line.slice(0, -m[0].length)); line = m[0] + ch; }
+          else { out.push(line); line = ch.trim() ? ch : ''; }
+        }
       } else line += ch;
     }
     out.push(line);

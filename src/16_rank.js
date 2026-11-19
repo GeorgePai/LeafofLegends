@@ -112,18 +112,48 @@ G.Rank = (() => {
     const j = await req('/leave', { id: me.id, tok: me.tok }); if (j.err === 'net' || j.err === 'server' || j.err === 'quota') return j;
     return { ok: 1 };
   };
-  K.forget = () => { ranks = {}; ls('ranks', {}); sig = ''; pend = true; lastPoll = -1e12; };   // 登出／刪除後：本機的名次紀錄清掉
+  K.forget = () => { ranks = {}; ls('ranks', {}); sig = ''; pend = true; lastPoll = -1e12; K.fb.list = null; K.fb.unread = 0; K.fb.t = -1e12; };   // 登出／刪除後：本機的名次紀錄清掉
   K.uid = () => { const m = K.me(); return m ? m.id.slice(0, 8).toUpperCase() : ''; };
+  // ---- v2.8.6 即時在線人數：每台開著遊戲的裝置（含戰鬥中）每 60 秒回報一次，伺服器算最近 2 分鐘有回報的裝置 ----
+  K.online = { n: null, t: -1e12, busy: 0 };
+  const sid = () => { let s = null; try { s = localStorage.getItem('leafwar_sid'); if (!s) { s = hex(16); localStorage.setItem('leafwar_sid', s); } } catch (e) { s = s || hex(16); } return s; };
+  const ping = async () => {
+    K.online.busy = 1; K.online.t = Date.now();
+    const j = await req('/ping', { sid: sid() }); K.online.busy = 0;
+    if (j.ok) K.online.n = j.n; else if (j.err === 'net') K.online.n = null;
+  };
+  addEventListener('visibilitychange', () => { if (!document.hidden) K.online.t = -1e12; });
   K.tick = () => {
     if (!K.on()) return;
+    if (!document.hidden && !K.online.busy && Date.now() - K.online.t > 60000) ping();
     const sc = G.UI.screen; if (sc === 'battle' || sc === 'intro' || sc === 'tap' || document.hidden) return;
     const now = Date.now();
-    if (K.name() && !K.me() && !G.Team.dev && !busy) { K.join(); return; }        // v2.8.4 強制參加：有名字就自動加入（舊版退出過的也會回來）
+    if (K.name() && !K.me() && !G.Team.dev && !busy) { K.join(); return; }
+    if (K.joined() && !G.Team.dev && now - K.fb.t > 600000 && G.UI.screen !== 'fb') K.fbLoad(false);   // v2.8.6 每 10 分鐘看有沒有開發者回信（首頁「反饋」紅點）        // v2.8.4 強制參加：有名字就自動加入（舊版退出過的也會回來）
     if (!pend && sig && K.joined() && !G.Team.dev && now - sigT > 2000) { sigT = now; if (K.name() + JSON.stringify(K.stats()) !== sig) pend = true; }   // v2.8.3 數據有變（開箱、領成就、改名…）就排隊上傳
     if (pend && K.joined() && !G.Team.dev && now - lastSub > (G.RANK_GAP + 1) * 1000) { K.submit(); return; }
     K.poll();
   };
   // ---- 管理（開發者模式）：隱藏／復原／永久刪除；v2.8.2 權限＝開發者密碼（開啟開發者模式時記在這台裝置 leafwar_adm），不進存檔碼 ----
+  // ---- v2.8.6 反饋信箱 ----
+  K.fb = { list: null, unread: 0, busy: 0, err: '', t: -1e12 };
+  K.fbLoad = async seen => {
+    const me = K.me(); if (!K.on() || !me || K.fb.busy) return;
+    K.fb.busy = 1; K.fb.t = Date.now(); const j = await req('/fb/mine', { id: me.id, tok: me.tok, seen: seen ? 1 : 0 }); K.fb.busy = 0;
+    if (j.ok) { K.fb.list = j.list; K.fb.err = ''; K.fb.unread = seen ? 0 : j.list.filter(m => m.reply && !m.seen).length; }
+    else K.fb.err = j.err === 'net' ? '連不上伺服器' : j.err === 'quota' ? '今天的額度用完了' : '讀取失敗';
+  };
+  K.fbSend = async body => {
+    const me = K.me(); if (!me) return { err: 'nouser' };
+    const j = await req('/fb/send', { id: me.id, tok: me.tok, body }); if (j.ok) await K.fbLoad(true); return j;
+  };
+  K.fbA = { list: null, busy: 0, err: '' };
+  K.fbAdmLoad = async () => {
+    if (K.fbA.busy || !K.admKey()) return; K.fbA.busy = 1;
+    const j = await req('/admin/fb', { key: K.admKey() }); K.fbA.busy = 0;
+    if (j.ok) { K.fbA.list = j.list; K.fbA.err = ''; } else K.fbA.err = j.err === 'auth' ? '密碼錯誤' : j.err === 'locked' ? '嘗試太多次，1 小時後再試' : '連不上伺服器';
+  };
+  K.fbAdmAct = async (act, mid, reply) => { const j = await req('/admin/' + act, { key: K.admKey(), mid, reply }); if (j.ok) await K.fbAdmLoad(); return j; };
   K.admKey = () => { try { return localStorage.getItem('leafwar_adm') || ''; } catch (e) { return ''; } };
   K.adm = { list: null, busy: 0, err: '' };
   K.admLoad = async key => {

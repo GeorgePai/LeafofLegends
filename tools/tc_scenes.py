@@ -133,5 +133,16 @@ S.append(['upd-menu',"G.Update._set('V9.9.9',[{v:'V9.9.9',d:'12/31',n:['新增�
 S.append(['upd-card',"G.Update._open(true)",300])
 S.append(['upd-card-long',"G.Update._set('V9.9.9',Array.from({length:12},(_, i)=>({v:'V9.9.'+(9-i),n:['更新內容第 '+i+' 項，說明文字比較長一點，測試換行']})))",300])
 S.append(['upd-x',"G.Update._open(false);G.Update._set(null,[])",100])
+# v2.8.6 反饋、關於、在線人數
+FB="[{id:3,body:'排行榜可以加好友功能嗎？想跟朋友比一比，最好可以看到對方的隊伍和成就',t:1795100000,reply:'好主意！已經記下來了，下個版本試試看。謝謝你寫信來，有任何想法都歡迎再寫給我',rt:1795103600,seen:1},{id:2,body:'WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW',t:1795000000},{id:1,body:'第三關的 BOSS 好難打',t:1794000000}]"
+S.append(['fb-none',"G.Team.setDev(false);G.Ach.P().rk=null;G.Team.get().name='';G.Menus.ui.go('fb')",300])
+S.append(['fb-me',"G.Rank._mock();G.Team.get().name='八個字的名字喔';G.Menus.ui.go('fb');G.Rank.fb.t=Date.now()+9e9;G.Rank.fb.list="+FB,400])
+S.append(['fb-msg',"G.FbUI._say('還有 5 封等待回覆，請等開發者回覆後再寫',10)",200])
+S.append(['fb-empty',"G.Rank.fb.list=[]",200])
+S.append(['fb-dev',"localStorage.setItem('leafwar_adm','12345678');G.Team.setDev(true);G.Menus.ui.go('fb');G.Rank.fbA.t=Date.now()+9e9;G.Rank.fbA.list="+FB.replace("{id:","{name:'八個字的名字喔',id:"),400])
+S.append(['fb-dev-sel',"G.FbUI._sel(2)",300]); S.append(['fb-dev-x',"G.Team.setDev(false);G.Menus.ui.go('menu');G.UI.goMenu()",200])
+S.append(['menu-online',"G.Rank.online.t=Date.now()+9e9;G.Rank.online.n=1234;G.Rank.fb.unread=3;G.Team.get().name='八個字的名字喔'",400])
+for k in [3, 15, 30, 45, 60]: S.append([f'about-{k}',f"G.Menus.ui.go('about');G.About._skip({k},false)",250])
+S.append(['about-end',"G.Menus.ui.go('about');G.About._end()",250]); S.append(['about-x',"G.Menus.ui.go('menu');G.UI.goMenu()",100])
 
 json.dump(S,open('/tmp/tc.json','w'))

@@ -601,10 +601,13 @@ G.UI = (() => {
   // ---------- 商店 ----------
   function shopPanel(c) {
     const uw = R.uw, uh = R.uh, I = R.ins, cols = 4, gap = 4, chh = 40, cw = Math.min(38, Math.floor((uw - I.l - I.r - 8 - 12 - gap * 3) / 4));
-    const pw = cols * cw + (cols - 1) * gap + 12, rowsN = Math.ceil(G.SHOP.length / cols);
-    const it = G.SHOP_BY[U.shopSel] || G.SHOP[0], bw = 40, dl = G.cnWrap(it.d.replace('，', '\n'), pw - 12 - bw - 8), dh = Math.max(34, 17 + dl.length * 13 + 4);
-    const ph = 22 + rowsN * (chh + gap) + dh;
-    const px = Math.round(uw / 2 - pw / 2), py = Math.round(G.clamp(uh / 2 - ph / 2 - 8, I.t + 2, uh - I.b - ph - 30));
+    const gw = cols * cw + (cols - 1) * gap + 12, rowsN = Math.ceil(G.SHOP.length / cols), it = G.SHOP_BY[U.shopSel] || G.SHOP[0], bw = 40;
+    // v2.8.6 畫面不夠高（橫屏／電腦）：說明改放在格子右邊，不再被切掉
+    const dl0 = G.cnWrap(it.d.replace('，', '\n'), gw - 12 - bw - 8), side = 22 + rowsN * (chh + gap) + Math.max(34, 17 + dl0.length * 13 + 4) > uh - I.t - I.b - 4 && uw - I.l - I.r - 8 >= gw + 100;
+    const dw = side ? Math.min(150, uw - I.l - I.r - 8 - gw) : 0, pw = gw + dw;
+    const dl = side ? G.cnWrap(it.d.replace('，', '\n'), dw - 10) : dl0, dh = side ? 0 : Math.max(34, 17 + dl.length * 13 + 4);
+    const ph = side ? Math.max(22 + rowsN * (chh + gap) + 2, 22 + 18 + dl.length * 13 + 30) : 22 + rowsN * (chh + gap) + dh;
+    const px = Math.round(uw / 2 - pw / 2), py = Math.round(G.clamp(uh / 2 - ph / 2 - (side ? 0 : 8), I.t + 2, Math.max(I.t + 2, uh - I.b - ph - (side ? 2 : 30))));
     btn('shopBg', 0, 0, uw, uh, null, () => { U.shop = false; });
     dim(c, 0.6);
     box(c, px, py, pw, ph, 1, 7);
@@ -624,6 +627,15 @@ G.UI = (() => {
       btn(id, x, y, cw, chh, () => { U.press[id] = 0.1; }, () => { if (U.shopSel === it.id) doBuy(it); else { U.shopSel = it.id; G.Audio.play('tick'); } });
     });
     // 選中項目的說明 + 購買
+    if (side) {                                                                  // 右欄：名稱、說明、購買鈕在最下面
+      const sx = px + gw - 2, can = W.gold >= it.cost, o = U.press.buy > 0 ? 1 : 0, by2 = py + ph - 24;
+      c.fillStyle = P[3]; c.fillRect(sx, py + 20, 1, ph - 26);
+      G.cn(c, it.n, sx + 6, py + 20, 9); dl.forEach((l, i) => G.cn(c, l, sx + 6, py + 36 + i * 13, 6));
+      box(c, sx + 6, by2 + o, dw - 10, 18, o ? 3 : can ? 13 : 2, can ? 9 : 4);
+      G.cn(c, '購買', sx + 6 + (dw - 10) / 2, by2 + 3 + o, can ? 0 : 5, 0.5);
+      btn('buy', sx + 6, by2, dw - 10, 18, () => { U.press.buy = 0.12; }, () => doBuy(it));
+      return;
+    }
     const dy = py + ph - dh + 3, can = W.gold >= it.cost;
     c.fillStyle = P[3]; c.fillRect(px + 6, dy - 3, pw - 12, 1);
     G.cn(c, it.n, px + 6, dy, 9); dl.forEach((l, i) => G.cn(c, l, px + 6, dy + 14 + i * 13, 6));
@@ -878,7 +890,7 @@ G.UI = (() => {
       const b = hitBtn(ux, uy);
       if (b) { p.mode = 'ui'; p.btn = b; if (b.down) b.down(ux, uy); if (G.Menus && G.Menus.scrollHold) G.Menus.scrollHold(); return; }
       if (U.screen === 'guide') { p.mode = 'swipe'; return; }
-      if (U.screen === 'team' || U.screen === 'book' || U.screen === 'ach' || U.screen === 'rank') { p.mode = 'mdrag'; if (G.Menus.scrollHold) G.Menus.scrollHold(); return; }
+      if (U.screen === 'team' || U.screen === 'book' || U.screen === 'ach' || U.screen === 'rank' || U.screen === 'fb') { p.mode = 'mdrag'; if (G.Menus.scrollHold) G.Menus.scrollHold(); return; }
       if (U.screen !== 'battle' || U.paused || (W.over)) return;
       if (e.pointerType === 'mouse' && e.button === 2 && U.aim && U.aim.on) { U.aimCancel(); p.mode = 'none'; return; }   // 右鍵取消瞄準
       if (e.pointerType === 'mouse' && e.button !== 0) { p.mode = 'pan'; R.cam.follow = false; return; }
@@ -911,7 +923,7 @@ G.UI = (() => {
         R.cam.vx = G.lerp(R.cam.vx || 0, G.clamp(wx / mdt, -900, 900), 0.4); R.cam.vy = G.lerp(R.cam.vy || 0, G.clamp(wy / mdt, -900, 900), 0.4); p.lastMove = now;
       }
       else if ((p.mode === 'mdrag' || (p.mode === 'ui' && (U.screen === 'team' || U.screen === 'book'))) && G.Menus && G.Menus.inCar(p.sx / R.uiS, p.sy / R.uiS) && Math.abs(x - p.sx) > 4 * R.dpr && Math.abs(x - p.sx) >= Math.abs(y - p.sy)) { p.mode = 'car'; p.btn = null; p.lx = p.sx; G.Menus.carGrab(); }
-      else if ((p.mode === 'mdrag' || (p.mode === 'ui' && !(p.btn && p.btn.wheel) && (U.screen === 'team' || U.screen === 'book' || U.screen === 'ach' || U.screen === 'rank'))) && Math.abs(y - p.sy) > 7 * R.dpr) { p.mode = 'mscroll'; p.btn = null; p.ly = p.sy; }
+      else if ((p.mode === 'mdrag' || (p.mode === 'ui' && !(p.btn && p.btn.wheel) && (U.screen === 'team' || U.screen === 'book' || U.screen === 'ach' || U.screen === 'rank' || U.screen === 'fb'))) && Math.abs(y - p.sy) > 7 * R.dpr) { p.mode = 'mscroll'; p.btn = null; p.ly = p.sy; }
       if (p.mode === 'vw') { p.wh.dragBy((y - p.ly) / R.uiS); p.ly = y; }
       if (p.mode === 'car') { G.Menus.carDrag((x - p.lx) / R.uiS); p.lx = x; }
       else if (p.mode === 'mscroll' && G.Menus) { const d = (p.ly - y) / R.uiS, now = performance.now(), mdt = Math.max(8, now - (p.lmt || now)) / 1000; p.lmt = now; p.svy = G.lerp(p.svy || 0, d / mdt, 0.5); G.Menus.scroll(d, p.sx / R.uiS, p.sy / R.uiS); p.ly = y; }
@@ -945,7 +957,7 @@ G.UI = (() => {
       { const [ux, uy] = evXY(e).map(v => v / R.uiS); for (let i = U.btns.length - 1; i >= 0; i--) { const b = U.btns[i]; if (b.wheel && ux >= b.x && ux < b.x + b.w && uy >= b.y && uy < b.y + b.h) { const now = performance.now(); if (now - (U.wheelT || 0) > 90) { U.wheelT = now; b.wheel.step(Math.sign(e.deltaY || e.deltaX)); } return; } } }
       if (G.Menus && G.Menus.hscroll && (Math.abs(e.deltaX) > Math.abs(e.deltaY) || e.shiftKey) && G.Menus.hscroll(e.shiftKey && !e.deltaX ? e.deltaY * 0.5 : e.deltaX * 0.5, ...evXY(e).map(v => v / R.uiS))) return;   // v2.7 表格左右滑動
       if ((U.screen === 'team' || U.screen === 'book') && G.Menus && G.Menus.inCar(...evXY(e).map(v => v / R.uiS))) { const now = performance.now(); if (now - (U.wheelT || 0) > 90) { U.wheelT = now; G.Menus.carStep(Math.sign(e.deltaY || e.deltaX)); } return; }
-      if ((U.screen === 'team' || U.screen === 'book' || U.screen === 'ach' || U.screen === 'rank') && G.Menus) { G.Menus.scroll(e.deltaY * 0.25, ...evXY(e).map(v => v / R.uiS)); return; }
+      if ((U.screen === 'team' || U.screen === 'book' || U.screen === 'ach' || U.screen === 'rank' || U.screen === 'fb') && G.Menus) { G.Menus.scroll(e.deltaY * 0.25, ...evXY(e).map(v => v / R.uiS)); return; }
       if (U.screen === 'battle' && !U.paused) R.setZoom(R.cam.zoom * Math.exp(-e.deltaY * 0.0012));   // 只有戰鬥中能縮放（首頁背景固定）
     }, { passive: false });
     // 鍵盤

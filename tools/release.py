@@ -7,5 +7,6 @@ rel = json.load(open(src + '/release.json', encoding='utf-8'))
 lst = rel['list'][:10]
 if lst[0]['v'] != ver: sys.exit(f'release.json 最新一筆是 {lst[0]["v"]}，但遊戲版本是 {ver}：請先在 release.json 加上這版的更新內容')
 shutil.copy(src + '/dist/index.html', dst + '/index.html')
+for f in ('icon-180.png', 'icon-512.png', 'icon-32.png'): shutil.copy(src + '/assets/' + f, dst + '/' + f)   # v2.8.6 App 圖示
 json.dump({'v': ver, 'list': lst}, open(dst + '/version.json', 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
 print('已準備發佈', ver, '（index.html＋version.json）')

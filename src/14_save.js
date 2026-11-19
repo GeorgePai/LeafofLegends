@@ -295,6 +295,7 @@ G.SaveUI = (() => {
   S.bump = () => { if (G.Team.dev) return; const v = G.Team.get(); v.bk = v.bk || { n: 0, t: 0 }; v.bk.n++; G.Team.save(); };
   S.drawBackupTip = (c, menuT) => {
     const v = G.Team.get(), bk = v.bk; if (!bk || G.Team.dev || bk.n < 3 || Date.now() - bk.t < 20 * 60 * 1000 || menuT < 2.5 || S.welcome || S.greet) return;
+    if (G.Menus.pillPos && G.Update && G.Update.has()) return;   // v2.8.6 橫屏有新版本時，右下角讓給「點擊更新」（更新完再提醒備份）
     const M = ui();
     if (G.Menus.pillPos) {                              // 橫屏：小膠囊「要備份嗎？」＋關閉
       const [px, py, pw0] = G.Menus.pillPos, lab = '要備份嗎？', pw = Math.min(pw0, G.cnW(lab) + 34), a = Math.min(1, (menuT - 2.5) / 0.4), o = M.pr('bkGo') ? 1 : 0;

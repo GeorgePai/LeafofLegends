@@ -84,8 +84,53 @@ async function submit(req, env) {
 async function leave(req, env) {
   let b; try { b = await req.json(); } catch (e) { return J({ err: 'bad' }, 400); }
   const [old, bad] = await auth(env, String(b.id || ''), String(b.tok || '')); if (bad) return bad;
-  if (old) { await env.DB.prepare('DELETE FROM players WHERE id = ?').bind(old.id).run(); cache = null; }
+  if (old) { await env.DB.batch([env.DB.prepare('DELETE FROM players WHERE id = ?').bind(old.id), env.DB.prepare('DELETE FROM fb WHERE pid = ?').bind(old.id)]); cache = null; }
   return J({ ok: 1 });
+}
+// ---- v2.8.6 即時在線人數：POST /ping {sid} → {n}；同一台 50 秒內只寫一次（記憶體擋），人數快取 15 秒 ----
+const seenW = new Map(); let onN = 0, onT = 0;
+async function ping(req, env) {
+  let b; try { b = await req.json(); } catch (e) { return J({ err: 'bad' }, 400); }
+  const sid = String(b.sid || ''); if (!/^[0-9a-f]{16}$/.test(sid)) return J({ err: 'bad' }, 400);
+  const now = Math.floor(Date.now() / 1000);
+  if (!seenW.has(sid) || now - seenW.get(sid) >= 50) {
+    if (seenW.size > 5000) seenW.clear(); seenW.set(sid, now);
+    const qs = [env.DB.prepare('INSERT INTO pres (sid, t) VALUES (?, ?) ON CONFLICT(sid) DO UPDATE SET t = excluded.t').bind(sid, now)];
+    if (Math.random() < 0.02) qs.push(env.DB.prepare('DELETE FROM pres WHERE t < ?').bind(now - 3600));
+    await env.DB.batch(qs);
+  }
+  if (Date.now() - onT > 15000) { const r = await env.DB.prepare('SELECT COUNT(*) AS n FROM pres WHERE t > ?').bind(now - 120).first(); onN = r.n; onT = Date.now(); }
+  return J({ ok: 1, n: Math.max(1, onN) });
+}
+// ---- v2.8.6 反饋信箱：玩家寫信給開發者、開發者回信 ----
+// 玩家：POST /fb/send {id,tok,body}（1～300 字；同一人 60 秒 1 封、未回覆最多 5 封；同 IP 每天 30 封）
+//       POST /fb/mine {id,tok,seen}（自己最近 20 封＋回覆；seen=1 把回覆標成已讀）
+// 開發者：POST /admin/fb {key}（最近 200 封）、/admin/fbreply {key,mid,reply}、/admin/fbdel {key,mid}
+const cleanBody = (s, max) => { const t = String(s || '').replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, '').replace(/\n{3,}/g, '\n\n').trim(); const a = [...t]; return a.length && a.length <= max ? t : null; };
+async function fb(req, env, url) {
+  let b; try { b = await req.json(); } catch (e) { return J({ err: 'bad' }, 400); }
+  const [old, bad] = await auth(env, String(b.id || ''), String(b.tok || '')); if (bad) return bad;
+  if (!old) return J({ err: 'nouser' }, 403);                                         // 要先上榜（有存檔名稱）才能寫信
+  const now = Math.floor(Date.now() / 1000);
+  if (url.pathname === '/fb/send') {
+    const body = cleanBody(b.body, 300); if (!body) return J({ err: 'len' }, 422);
+    const ih = (await sha((req.headers.get('cf-connecting-ip') || '') + '|lol')).slice(0, 16);
+    const rs = await env.DB.batch([
+      env.DB.prepare('SELECT MAX(t) AS t, SUM(CASE WHEN reply IS NULL THEN 1 ELSE 0 END) AS open FROM fb WHERE pid = ?').bind(old.id),
+      env.DB.prepare('SELECT COUNT(*) AS n FROM fb WHERE ip = ? AND t > ?').bind(ih, now - 86400)]);
+    const me = rs[0].results[0] || {};
+    if (me.t && now - me.t < 60) return J({ err: 'wait', s: 60 - (now - me.t) }, 429);
+    if ((me.open || 0) >= 5) return J({ err: 'many' }, 429);
+    if (rs[1].results[0].n >= 30) return J({ err: 'busy' }, 429);
+    await env.DB.prepare('INSERT INTO fb (pid, name, ip, body, t) VALUES (?, ?, ?, ?, ?)').bind(old.id, old.name, ih, body, now).run();
+    return J({ ok: 1 });
+  }
+  if (url.pathname === '/fb/mine') {
+    if (b.seen) await env.DB.prepare('UPDATE fb SET seen = 1 WHERE pid = ? AND reply IS NOT NULL AND seen = 0').bind(old.id).run();
+    const r = await env.DB.prepare('SELECT id, body, t, reply, rt, seen FROM fb WHERE pid = ? ORDER BY id DESC LIMIT 20').bind(old.id).all();
+    return J({ ok: 1, list: r.results });
+  }
+  return J({ err: 'nf' }, 404);
 }
 async function admin(req, env, url) {
   const isPost = req.method === 'POST', b = isPost ? await req.json().catch(() => ({})) : {}, key = isPost ? b.key : url.searchParams.get('key');
@@ -100,6 +145,9 @@ async function admin(req, env, url) {
     await env.DB.prepare('DELETE FROM news WHERE pid IN (SELECT id FROM players WHERE updated < ?)').bind(cut).run();
     const r = await env.DB.prepare('DELETE FROM players WHERE updated < ?').bind(cut).run(); cache = null; return J({ ok: 1, deleted: r.meta.changes });
   }
+  if (url.pathname === '/admin/fb' && isPost) { const r = await env.DB.prepare('SELECT id, pid, name, body, t, reply, rt, seen FROM fb ORDER BY id DESC LIMIT 200').all(); return J({ ok: 1, list: r.results }); }
+  if (url.pathname === '/admin/fbreply' && isPost) { const rp = cleanBody(b.reply, 500); if (!rp) return J({ err: 'len' }, 422); const r = await env.DB.prepare('UPDATE fb SET reply = ?, rt = ?, seen = 0 WHERE id = ?').bind(rp, Math.floor(Date.now() / 1000), Number(b.mid) || 0).run(); return J({ ok: 1, changed: r.meta.changes }); }
+  if (url.pathname === '/admin/fbdel' && isPost) { const r = await env.DB.prepare('DELETE FROM fb WHERE id = ?').bind(Number(b.mid) || 0).run(); return J({ ok: 1, changed: r.meta.changes }); }
   if (url.pathname === '/admin/hide' && isPost) { const r = await env.DB.prepare('UPDATE players SET hidden = ? WHERE id = ?').bind(b.h ? 1 : 0, String(b.id || '')).run(); cache = null; return J({ ok: 1, changed: r.meta.changes }); }
   if (url.pathname === '/admin/del' && isPost) { const r = await env.DB.prepare('DELETE FROM players WHERE id = ? OR name = ?').bind(String(b.id || ''), String(b.name || '\u0000')).run(); await env.DB.prepare('DELETE FROM news WHERE pid = ?').bind(String(b.id || '')).run(); cache = null; return J({ ok: 1, deleted: r.meta.changes }); }
   return J({ err: 'nf' }, 404);
@@ -111,7 +159,12 @@ const SCHEMA = [
   ...['heroes', 'minions', 'games', 'wr', 'kda', 'keys', 'dmg', 'time', 'ach'].map(k => `CREATE INDEX IF NOT EXISTS i_${k} ON players (${k} DESC, created)`),
   'CREATE INDEX IF NOT EXISTS i_ip ON players (ip, created)',
   'CREATE TABLE IF NOT EXISTS news (id INTEGER PRIMARY KEY AUTOINCREMENT, t INTEGER, pid TEXT, name TEXT, cat TEXT)',
-  'CREATE TABLE IF NOT EXISTS fails (ip TEXT, t INTEGER)'
+  'CREATE TABLE IF NOT EXISTS fails (ip TEXT, t INTEGER)',
+  'CREATE TABLE IF NOT EXISTS fb (id INTEGER PRIMARY KEY AUTOINCREMENT, pid TEXT, name TEXT, ip TEXT, body TEXT, t INTEGER, reply TEXT, rt INTEGER, seen INTEGER DEFAULT 0)',
+  'CREATE INDEX IF NOT EXISTS i_fb_pid ON fb (pid, id)',
+  'CREATE INDEX IF NOT EXISTS i_fb_ip ON fb (ip, t)',
+  'CREATE TABLE IF NOT EXISTS pres (sid TEXT PRIMARY KEY, t INTEGER)',
+  'CREATE INDEX IF NOT EXISTS i_pres_t ON pres (t)'
 ];
 const UPGRADES = ['ALTER TABLE players ADD COLUMN hidden INTEGER DEFAULT 0'];   // 已經有這欄就會報錯，略過即可
 async function migrate(env) {
@@ -129,6 +182,8 @@ export default {
       if (url.pathname === '/board' && req.method === 'GET') return J(await board(env));
       if (url.pathname === '/submit' && req.method === 'POST') return await submit(req, env);
       if (url.pathname === '/leave' && req.method === 'POST') return await leave(req, env);
+      if (url.pathname === '/ping' && req.method === 'POST') return await ping(req, env);
+      if (url.pathname.startsWith('/fb/') && req.method === 'POST') return await fb(req, env, url);
       if (url.pathname.startsWith('/admin/')) return await admin(req, env, url);
       if (url.pathname === '/') return J({ ok: 1, app: 'Leaf of Legends leaderboard' });
       return J({ err: 'nf' }, 404);

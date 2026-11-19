@@ -2,7 +2,7 @@
 
 > 新 session 只要讀這份。排行榜相關再看 `LEADERBOARD.md`。**做任何新設計前，先對照第 8 節「設計守則」**。
 > 各版完成內容在 `CHANGELOG.md`、暫定數值在 `VALUES.md`，需要時用 grep 找到段落再讀，不要整份讀。
-> 最後更新：2026-11-19，版本 **v2.8.5**
+> 最後更新：2026-11-19，版本 **v2.8.6**
 
 ## 1. 專案是什麼
 - Pai 的 HTML5 瀏覽器遊戲，仿 Gamevil《Plants War》（三路推塔＋英雄操作＋小兵兵線）
@@ -63,6 +63,8 @@
 | 15_intro | **開場動畫（v1.7）**：`G.Intro`（`draw/skip/reset/drawFlash`），約 2.45 秒＋白光淡出 |
 | 16_rank | **線上排行榜（v2.8；v2.8.4 強制參加、跳至自己 `jmp`、`remove/forget/uid`、幽靈清除 `admPurge`）**：`G.RANK_URL`、`G.RANK_CATS`（9 分類）、`G.Rank`（poll/submit/join/leave/autoJoin、通知 diff/news、管理 admLoad/admAct、測試 `_mock/_set`）、`G.RankUI`（分類滾輪 `cw`、清單、底部名次列、管理玩家 `admin()`）。身分 `P.rk={id,tok}`、累積鑰匙 `P.keysTot` |
 | 17_update | **版本更新通知（v2.8.5）**：`G.Update`（check/tick/corner/card、`_set/_open/force` 測試用）、讀 `version.json` |
+| 18_feedback | **反饋信箱（v2.8.6）**：`G.FbUI`（玩家寫信／看回覆；開發者模式＝玩家信箱）；連線在 16_rank 的 `K.fb*` |
+| 19_about | **關於（v2.8.6）**：`G.About` 片尾名單＋櫻花、結尾淡出回首頁（`post` 在首頁最後畫淡入）|
 | 99_main | 啟動與主迴圈（啟動後先進 `intro` 畫面） |
 
 ## 5. 版本摘要（細節見 CHANGELOG.md）
@@ -80,6 +82,7 @@
 - v2.8.1～2.8.2：排行分類改上下滾輪、名字「…」截斷（Pai 指定例外）、開發者模式「管理玩家」（隱藏／復原／刪除，權限＝開發者密碼，猜錯 5 次鎖 1 小時）；伺服器改 Cloudflare 連 GitHub 自動部署
 - v2.8.3：排行畫面 10 秒刷新＋倒數、數據有變自動上傳、前三名獎盃＋光暈、首頁左上「嗨！名字」
 - v2.8.4：排行強制參加＋跳至自己、金銀銅外框固定、帳號管理（改名／登出／刪除）、存檔碼提醒、管理玩家幽靈帳號清除、教學拿掉英雄分類、圖鑑藥水併入分類條＋分頁式分類條＋資訊小按鈕
+- v2.8.6：反饋信箱（玩家↔開發者）、關於（片尾名單＋櫻花）、即時在線人數、商店橫屏不切、柔和選中光、App 圖示
 - v2.8.5：版本更新通知（version.json＋首頁右下「點擊更新」＋更新內容卡＋立即更新重新載入）
 - v2.4：敵塔範圍＋鎖定警示、道路 ×1.5、結算放慢＋鎖值＋音效、新藥水 5 種＋全部藥水特效、DEV 密碼、技能範圍顯示＋指定施放（拖曳／取消）、LOGO 改版、塔射程 190/210
 
@@ -97,7 +100,7 @@
 
 ## 7. 工作規則
 **每次更新流程**：改 src → build → `bash /home/claude/tools/tc_all.sh`（背景跑，0 筆才可交付）→ 只截有改到的畫面，用 `sheet.py` 拼成一張看 → 發佈 artifact（先 `get_artifact` 取 version，再 `publish_files`，index.html＝dist/index.html）→ 推 GitHub main（遊戲）＋ source（原始碼）→ 備份 Mac（`LeafofLegends.html`、`versions/LeafofLegends_v版本.zip`、有改到的 `source/` 檔案）→ 升版號
-- 版本號在 `src/11_menus.js` 第 2 行 `G.VERSION = 'V2.8.5'`
+- 版本號在 `src/11_menus.js` 第 2 行 `G.VERSION = 'V2.8.6'`
 - **更新內容（玩家看得到）**：每次發佈前在 `release.json` 的 list 最前面加一筆 `{v, d, n:[…]}`（短句、玩家口吻、不寫技術細節），版本號要和 G.VERSION 一樣
 - 推 main：clone 到 `/home/claude/leafoflegends` → `python3 /home/claude/leafwar/tools/release.py`（複製 index.html＋產生 version.json；保留 `.nojekyll`；音樂有改才更新 `audio/`）→ commit → `git -c push.negotiate=true push origin HEAD:main`，約 1～2 分鐘生效。備援：Pai 在 Mac Terminal 執行 `bash ~/Desktop/Claude/LeafofLegends/deploy_github.sh`
 - 推 source：在 `/home/claude/leafwar` commit（dist/ 已在 .gitignore）→ `git -c push.negotiate=true push origin HEAD:source`
