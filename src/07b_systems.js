@@ -42,8 +42,8 @@ G.WILD = {
   red: { unit: 'gorilla', kind: 'camp', lv: 3, hpMul: 0.65, pMul: 0.4, aMul: 0.5, respawn: 60, buff: 'red', n: '紅莓猩猩', d: '擊敗獲得「狂暴之力」：{攻擊力 +25%}，90 秒', ic: 'i_rage', col: 10 },
   blue: { unit: 'hippo', kind: 'camp', lv: 3, hpMul: 0.65, pMul: 0.4, aMul: 0.5, respawn: 60, buff: 'blue', n: '藍泉河馬', d: '擊敗獲得「智慧之泉」：{g:MP 回復 +5/秒}、{冷卻 −20%}，90 秒', ic: 'i_mp', col: 12 },
   exp: { unit: 'crocodile', kind: 'camp', lv: 3, hpMul: 0.6, pMul: 0.4, aMul: 0.5, respawn: 50, buff: 'exp', n: '沼澤鱷魚', d: '擊敗獲得{大量經驗值}與 {60 金幣}', ic: 'i_book', col: 13 },
-  frost: { unit: 'polarbear', kind: 'wboss', lv: 6, hpMul: 2, pMul: 0.7, aMul: 0.6, respawn: 150, n: '冰原霸主', d: '擊敗後{加入我方}，沿最近的路推塔', ic: 'i_ice', col: 12 },
-  blaze: { unit: 'firebear', kind: 'wboss', lv: 6, hpMul: 2, pMul: 0.7, aMul: 0.6, respawn: 150, n: '熔岩霸主', d: '擊敗後{加入我方}，沿最近的路推塔', ic: 'i_fire', col: 14 }
+  frost: { unit: 'polarbear', kind: 'wboss', lv: 6, hpMul: 2, pMul: 0.7, aMul: 0.6, respawn: 150, n: '冰原霸主', d: '擊敗後{加入我方}，沿著大路推塔', ic: 'i_ice', col: 12 },
+  blaze: { unit: 'firebear', kind: 'wboss', lv: 6, hpMul: 2, pMul: 0.7, aMul: 0.6, respawn: 150, n: '熔岩霸主', d: '擊敗後{加入我方}，沿著大路推塔', ic: 'i_fire', col: 14 }
 };
 // ---------- 敵方獵手（打野）----------
 // 新角色「獵狼」：開場 90 秒從敵方聖所出發，專門清我方野區的怪變強；附近有我方單位就先打

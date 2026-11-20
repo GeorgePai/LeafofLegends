@@ -62,7 +62,9 @@ G.Render = (() => {
     const c = R.cam, h = W.hero;
     if (c.zt != null) { c.zoom += (c.zt - c.zoom) * G.damp(12, dt); if (Math.abs(c.zt - c.zoom) < 0.002) { c.zoom = c.zt; c.zt = null; } }   // v3.2.4 按鈕縮放：平滑過去
     let tx = c.x, ty = c.y;
-    if (W.attract) { const t = W.time * 0.05; tx = W.M.ww * (0.5 + Math.sin(t) * 0.28); ty = W.M.wh * (0.5 - Math.sin(t) * 0.22); }
+    if (W.attract) { const t = W.time * 0.05, md = W.M.def, ln = md.one ? md.lanes[0].pts : null;
+      if (ln) { const f = G.clamp(0.5 + Math.sin(t) * 0.36, 0, 1) * (ln.length - 1), i = Math.min(ln.length - 2, f | 0), k = f - i; tx = (ln[i][0] + (ln[i + 1][0] - ln[i][0]) * k) * G.TILE; ty = (ln[i][1] + (ln[i + 1][1] - ln[i][1]) * k) * G.TILE; }   // v3.7 單路地圖：鏡頭沿著路來回
+      else { tx = W.M.ww * (0.5 + Math.sin(t) * 0.28); ty = W.M.wh * (0.5 - Math.sin(t) * 0.22); } }
     else if (c.follow) {
       if (h && h.alive) { tx = h.x + h.vx * 0.35; ty = h.y + h.vy * 0.35; }
       else if (W.over) { const t = W.holy[W.over.win ? 1 : 0]; tx = t.x; ty = t.y; }

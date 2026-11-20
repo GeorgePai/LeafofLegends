@@ -161,7 +161,6 @@ G.ROSTER = {
   towers: Object.keys(G.ORIG.towers)
 };
 G.Team = {
-  lane: 1,                                        // 加入小兵時的目標路線（0 上 / 1 中 / 2 下）
   get() {
     if (!this.v) {
       try { this.v = JSON.parse(localStorage.getItem('leafwar_team')); } catch (e) { }
@@ -199,8 +198,8 @@ G.Team = {
   cost: n => G.ORIG.units[n].unit_point || 4,         // 傭兵原著無點數，暫定 4
   used() { return this.get().loadout.reduce((a, e) => a + this.cost(e.n), 0); },
   count(n, l) { return this.get().loadout.filter(e => e.n === n && (l == null || e.l === l)).length; },
-  add(n) { if (!this.owns(n)) return false; if (this.used() + this.cost(n) > G.TUNE.plantPoints) return false; this.get().loadout.push({ n, l: this.lane }); this.save(); return true; },
-  remove(n) { const L = this.get().loadout; let i = -1; for (let k = L.length - 1; k >= 0; k--) if (L[k].n === n && L[k].l === this.lane) { i = k; break; } if (i < 0) for (let k = L.length - 1; k >= 0; k--) if (L[k].n === n) { i = k; break; } if (i < 0) return false; L.splice(i, 1); this.save(); return true; }
+  add(n) { if (!this.owns(n)) return false; if (this.used() + this.cost(n) > G.TUNE.plantPoints) return false; this.get().loadout.push({ n, l: 0 }); this.save(); return true; },   // v3.7 單路地圖：不再分路（l 欄位保留給舊存檔）
+  remove(n) { const L = this.get().loadout; let i = -1; for (let k = L.length - 1; k >= 0; k--) if (L[k].n === n) { i = k; break; } if (i < 0) return false; L.splice(i, 1); this.save(); return true; }
 };
 
 // ---------- 地面小圖（預覽/教學共用） ----------

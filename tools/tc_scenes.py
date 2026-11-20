@@ -176,7 +176,7 @@ S.append(['adm-x',"G.RankUI._det(null);G.RankUI.adm(false);localStorage.removeIt
 # v3.2.4 戰場縮放鈕、三路欄位固定高度、更新內容卡（捲動）、更新通知條
 S.append(['zoom-btn',"G.UI.start(0);G.W.followCount=()=>3;G.W.tp={cd:20};G.W.bag=G.SHOP.slice(0,4).map(d=>({id:d.id,n:2}))",600])
 S.append(['zoom-x',"G.W.followCount=()=>0;G.W.tp=null;G.W.bag=[];G.UI.goTitle()",200])
-S.append(['lane-full',"G.Team.setDev(true);const T=G.Team.get();T._bk=JSON.stringify(T.loadout);T.loadout=['leafblower','leafblower','leafblower','seedshooter','seedshooter','treeprotector','potatoblower','stemskewer','peasniper'].map(n=>({n,l:1}));G.Team.lane=1;G.Menus.focusTeam('leafblower')",500])
+S.append(['lane-full',"G.Team.setDev(true);const T=G.Team.get();T._bk=JSON.stringify(T.loadout);T.loadout=['leafblower','leafblower','leafblower','seedshooter','seedshooter','treeprotector','potatoblower','stemskewer','peasniper'].map(n=>({n,l:1}));G.Menus.focusTeam('leafblower')",500])
 S.append(['lane-x',"const T=G.Team.get();T.loadout=JSON.parse(T._bk);delete T._bk;G.Team.save();G.Team.setDev(false);G.UI.goTitle()",200])
 LONG="[{v:'V9.9.2',d:'12/2',n:['這是一條很長的更新說明，用來測試資訊卡在內容很多的時候會不會被裁切或顯示不完整','第二條','第三條比較長一點點的說明文字']},{v:'V9.9.1',d:'12/1',n:['這是一條很長的更新說明，用來測試資訊卡在內容很多的時候會不會被裁切或顯示不完整','第二條']}]"
 S.append(['upd2-card',"G.UI.goTitle();G.Update._set('V9.9.2',"+LONG+");G.Update._show('new')",400])

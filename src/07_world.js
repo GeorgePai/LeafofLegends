@@ -89,6 +89,7 @@ G.World = class {
       const u = this.add(new G.Unit(this, name, side, p[0] * T, p[1] * T, 1, 'tower')); u.lane = lane; u.tier = tier; this.towers[side].push(u);
       if (tier === 9) { const m = G.ORIG.towers.enemy_tower4; Object.assign(u.st, { hp: m.hp, power: m.power, armor: m.armor, range: m.range, delay: m.delay / 1000 }); u.hp = u.st.hp; u.main = true; }
       if (side === 1 && this.dif) { u.st.hp = Math.round(u.st.hp * this.dif.tower); u.hp = u.st.hp; }   // v3.0 敵塔血量倍率
+      if (md.one && G.TUNE.towerOne) { u.st.hp = Math.round(u.st.hp * G.TUNE.towerOne); u.hp = u.st.hp; }   // v3.7 單路地圖塔變少 → 塔血加厚（雙方都加）
     }));
     // 保護鏈：同一路前一層塔沒倒，後一層有護盾；任一路內塔倒了才能打主塔；主塔倒了才能打聖所
     for (let side = 0; side < 2; side++) {
@@ -285,7 +286,7 @@ G.World = class {
     this.moveDir(u, dx / l, dy / l, dt, mul); return false;
   }
   flowMove(u, dt) {
-    const li = u.lane ?? Math.min(1, this.nLanes - 1), d = this.M.flowDir(this.flow[u.side][li], u.x, u.y);
+    const li = Math.min(u.lane ?? 1, this.nLanes - 1), d = this.M.flowDir(this.flow[u.side][li], u.x, u.y);   // v3.7 單路地圖：超出路數的一律走第 0 路
     if (!d) { this.brake(u, dt); return; }
     // v3.2.5 小兵分散在路面上：沿著路的中心線走，維持出生時分到的橫向位置 u.lo（−1 左緣～1 右緣），不再全部貼著彎道內側排隊
     if (u.lo != null && this.nLanes > 1) {

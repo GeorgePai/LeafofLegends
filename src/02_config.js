@@ -7,7 +7,8 @@
 
 // ---------- 原著未在資料表中的值（標記為暫定） ----------
 G.TUNE = {
-  foeMul: 2, foeGap: 0.3, foeCap: 60,   // v3.4 Pai：敵方每波數量 ×2（小兵點數上限 24 之後敵方太弱）、同一路出兵間隔 0.45→0.3 秒、場上敵兵上限 40→60 — 暫定
+  foeMul: 3, foeGap: 0.25, foeCap: 60, towerOne: 2,   // v3.7 單路：三路的敵兵併成一路（×2→×3）、出兵間隔 0.25 秒、單路地圖塔血 ×2（塔從 10 座變 4 座）
+    // v3.4 Pai：敵方每波數量 ×2（小兵點數上限 24 之後敵方太弱）、同一路出兵間隔 0.45→0.3 秒、場上敵兵上限 40→60 — 暫定
   waveInterval: 20,        // 兵線間隔（秒）— 暫定
   firstAllyWave: 2,
   firstEnemyWave: 6,
@@ -207,11 +208,61 @@ G.MAPS.lanes5 = (() => {
   };
 })();
 
+// ---------- v3.7 單路地圖（72×54，點對稱）----------
+// 只寫「我方聖所 → 地圖中心」的半條路（控制點），自動：平滑成彎路、點對稱補出敵方半條、沿路放塔（外／中／內＋主塔）、
+// 中心垂直穿過一條河、河邊兩個野生首領坑、路旁凹槽營地（紅／藍／鱷魚，敵方點對稱）
+// v3.7 Pai：中立資源全部放在雙方外塔之間的交戰區（半路的 55%～95%），搶野怪就會碰到對方、容易打起團戰
+// camps：[種類, 沿半路的位置 0~1, 在路的哪一側 ±1, 離路中心幾格]；boss：[離路中心幾格, 沿路方向偏移]
+G.laneMap = spec => {
+  const W = 72, H = 54, C = [W / 2, H / 2], mir = p => [+(W - p[0]).toFixed(2), +(H - p[1]).toFixed(2)], R = spec.r || 5;
+  // Catmull-Rom 平滑：控制點之間各插 4 點
+  const cr = (pts, n = 4) => { const o = []; for (let i = 0; i < pts.length - 1; i++) { const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
+    for (let k = 0; k < n; k++) { const t = k / n, t2 = t * t, t3 = t2 * t, f = (a, b, c2, d) => 0.5 * (2 * b + (-a + c2) * t + (2 * a - 5 * b + 4 * c2 - d) * t2 + (-a + 3 * b - 3 * c2 + d) * t3); o.push([+f(p0[0], p1[0], p2[0], p3[0]).toFixed(2), +f(p0[1], p1[1], p2[1], p3[1]).toFixed(2)]); } }
+    o.push(pts[pts.length - 1]); return o; };
+  const ctl = spec.half.concat([C]), full = ctl.concat(ctl.slice(0, -1).reverse().map(mir)), lane = cr(full);
+  const len = pts => pts.slice(1).reduce((a, p, i) => a + Math.hypot(p[0] - pts[i][0], p[1] - pts[i][1]), 0);
+  const along = (pts, d) => { for (let i = 0; i < pts.length - 1; i++) { const a = pts[i], b = pts[i + 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (d <= L) { const t = d / L; return { p: [+(a[0] + (b[0] - a[0]) * t).toFixed(2), +(a[1] + (b[1] - a[1]) * t).toFixed(2)], u: [(b[0] - a[0]) / L, (b[1] - a[1]) / L] }; } d -= L; }
+    const a = pts[pts.length - 2], b = pts[pts.length - 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]); return { p: b, u: [(b[0] - a[0]) / L, (b[1] - a[1]) / L] }; };
+  const Lh = len(lane) / 2, hp = lane[0];
+  // 塔：主塔離聖所 6.5 格；內／中／外塔在半路的 36%／58%／79%（外塔之間留中立區）
+  const pt = [[along(lane, 6.5).p, 0, 9], [along(lane, Lh * 0.36).p, 0, 2], [along(lane, Lh * 0.58).p, 0, 1], [along(lane, Lh * 0.79).p, 0, 0]];
+  const et = pt.map(([p, l, t]) => [mir(p), l, t]);
+  // 河：在中心垂直穿過路，一路延伸到地圖邊
+  const cu = along(lane, Lh).u, n = [-cu[1], cu[0]], rv = [];
+  for (let t = -60; t <= 60; t += 6) { const w = Math.sin(t * 0.13 + spec.seed) * 1.6; const q = [C[0] + n[0] * t + cu[0] * w, C[1] + n[1] * t + cu[1] * w]; rv.push([+q[0].toFixed(2), +q[1].toFixed(2)]); }
+  const inMap = p => p[0] > -2 && p[1] > -2 && p[0] < W + 2 && p[1] < H + 2, river = { r: 2.4, pts: rv.filter((p, i) => inMap(p) || (rv[i - 1] && inMap(rv[i - 1])) || (rv[i + 1] && inMap(rv[i + 1]))) };
+  // 野生首領坑：河邊、路兩側（點對稱）
+  const [bd, bo] = spec.boss || [R + 7, 4.5];
+  const bp = [C[0] + n[0] * bd + cu[0] * bo, C[1] + n[1] * bd + cu[1] * bo], be = [C[0] + n[0] * bd, C[1] + n[1] * bd];
+  const wild = [['frost', bp.map(v => +v.toFixed(2))], ['blaze', mir(bp)]], necks = [{ r: 2.0, pts: [be, bp] }, { r: 2.0, pts: [mir(be), mir(bp)] }], clears = [[...bp, 3.9], [...mir(bp), 3.9]];
+  // 凹槽營地：從指定位置附近找一個合法的點（離路、離河、離邊界、彼此都留空間；敵方點對稱的那個也要合法）
+  const sdist = (p, pts) => { let m = 1e9; for (let i = 0; i < pts.length - 1; i++) { const a = pts[i], b = pts[i + 1], dx = b[0] - a[0], dy = b[1] - a[1], L = dx * dx + dy * dy, t = L ? Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L)) : 0; m = Math.min(m, Math.hypot(p[0] - a[0] - dx * t, p[1] - a[1] - dy * t)); } return m; };
+  const ok = (c, r) => { if (Math.min(c[0], c[1], W - c[0], H - c[1]) < r + 1.5) return false; if (sdist(c, lane) < R + r + 1.5) return false; if (sdist(c, river.pts) < 2.4 + r + 0.8) return false;
+    const m = mir(c); if (Math.hypot(c[0] - m[0], c[1] - m[1]) < 2 * r + 2) return false; return clears.every(q => Math.hypot(c[0] - q[0], c[1] - q[1]) >= r + q[2] + 2 && Math.hypot(m[0] - q[0], m[1] - q[1]) >= r + q[2] + 2); };
+  for (const [k, f, sd, d] of spec.camps) {
+    let pick = null, best = 1e9;                                     // 交戰區（半路 55%～100%）網格搜尋，挑最接近指定位置的合法點
+    for (const lo of [0.55, 0.4]) { if (pick) break; for (let ff = lo; ff <= 1.0001; ff += 0.02) for (let dd = 8.5; dd <= 17; dd += 0.5) for (const side of [1, -1]) {
+      const sc = Math.abs(ff - f) * 30 + Math.abs(dd - d) + (side !== sd ? 3 : 0); if (sc >= best) continue;
+      const a = along(lane, Lh * ff), c = [+(a.p[0] - a.u[1] * side * dd).toFixed(2), +(a.p[1] + a.u[0] * side * dd).toFixed(2)];
+      if (ok(c, 3.1)) { best = sc; pick = [a.p, c]; }
+    } }
+    if (!pick) { console.warn('laneMap: 營地放不下', spec.seed, k); continue; }
+    const [e, c] = pick; wild.push([k, c], [k, mir(c)]); necks.push({ r: 1.25, pts: [e, c] }, { r: 1.25, pts: [mir(e), mir(c)] }); clears.push([...c, 3.1], [...mir(c), 3.1]);
+  }
+  return { w: W, h: H, seed: spec.seed, holy: { player: hp, enemy: mir(hp) }, towers3: { player: pt, enemy: et }, bossHome: mir(along(lane, 12).p),
+    lanes: [{ r: R, pts: lane }].concat(necks), laneCount: 1, river, wild, clear: [[...hp, 8], [...mir(hp), 8], [...C, 4], ...clears], one: 1 };
+};
+G.MAPS.l1 = G.laneMap({ seed: 31, half: [[8, 46], [16, 42.5], [22, 35.5], [29, 31.5]], camps: [['red', 0.84, 1, 11], ['blue', 0.76, -1, 12], ['exp', 0.68, 1, 11]] });   // 翠葉森林：左下 → 右上，緩 S 彎
+G.MAPS.l2 = G.laneMap({ seed: 37, half: [[8, 8], [18, 8.5], [24, 15.5], [28, 23.5]], camps: [['red', 0.84, 1, 11], ['blue', 0.76, -1, 12], ['exp', 0.68, 1, 11]] });         // 楓紅山谷：左上 → 右下，長長的山谷彎
+G.MAPS.l3 = G.laneMap({ seed: 41, half: [[64, 8], [59, 15.5], [51, 17.5], [43, 20.5]], camps: [['red', 0.84, 1, 11], ['blue', 0.76, -1, 12], ['exp', 0.68, 1, 11]] });       // 霜雪凍原：右上 → 左下，冰原上的折線
+G.MAPS.l4 = G.laneMap({ seed: 43, half: [[64, 46], [63, 36], [56, 30.5], [46, 30]], camps: [['red', 0.84, 1, 11], ['blue', 0.76, -1, 12], ['exp', 0.68, 1, 11]] });        // 熔岩火山：右下 → 左上，繞過火山口的大弧
+G.MAPS.l5 = G.laneMap({ seed: 47, half: [[8, 46], [19, 47], [27, 41], [29.5, 33]], camps: [['red', 0.84, 1, 11], ['blue', 0.76, -1, 12], ['exp', 0.68, 1, 11]] });          // 幽冥深淵：左下 → 右上，Z 字折返
+
 // ---------- 關卡 ----------
 // enemies 取原著 stage_001 第 3 難度；boss 為雛形展示用（原著第 1 關沒有）
 G.STAGES = [
   {
-    map: 'lanes5', name: '1-1',
+    map: 'l1', name: '1-1',   // v3.7 首頁背景演示也改用單路地圖
     allyLevel: 1, enemyLevel: G.ORIG.stages[1].start_level,
     loadout: ['leafblower', 'seedshooter', 'treeprotector'],     // 植物點數 2+2+2
     waves: [G.ORIG.stages[1].missions[2].enemies, ['babybear', 'babybear', 'eagle', 'bear']],

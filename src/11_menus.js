@@ -1,5 +1,5 @@
 'use strict';
-G.VERSION = 'V3.6';                                  // 版本號（唯一來源；setup.sh 也從這行讀）
+G.VERSION = 'V3.7';                                  // 版本號（唯一來源；setup.sh 也從這行讀）
 /* =========================================================
    選單：首頁 / 隊伍 / 圖鑑 / 教學
    版面：直屏上下堆疊，橫屏左右分欄
@@ -672,7 +672,6 @@ G.Menus = (() => {
   };
 
   // ---------- 隊伍：左右滑動的角色轉盤（中央聚光、兩側暗影）→ 下方顯示資訊與數值 ----------
-  const LANES = ['上路', '中路', '下路'];
   let picker = null, info = null, flash = { k: '', t: 0 }, ttab = 0;
   // 植物點數條：preview = 目前選中小兵的花費（以閃爍格預覽）
   function pips(c, x, y, w, preview) {
@@ -698,43 +697,34 @@ G.Menus = (() => {
       tap(id, x, y, sz, sz, fn);
     }
   }
-  // 三路陣容：三欄並排（上／中／下），選中的那欄亮黃；虛線格＝下一隻會放的位置
-  // lists：[[name...]×3]；onLane/onRemove 省略 = 純展示（教學用）
-  function laneCols(c, x, y, w, lists, sel, onLane, onRemove, hotIdx) {
-    // v3.2.4 欄位高度固定（點數集中一路也不會把版面撐開）：同一種小兵合成一格＋右下數量；種類太多才把格子縮小
-    // v3.2.5 改兩列 13px（高 46）：橫屏右欄的 7 條數值條不用捲動就看得完
-    const gap = 3, cw = Math.floor((w - gap * 2) / 3), ROWS = 2, SZ = 13, hh = 15 + ROWS * (SZ + 2) + 3;
-    const groups = lists.map(l => { const m = new Map(); l.forEach(e => { const n = e.n || e; if (!m.has(n)) m.set(n, []); m.get(n).push(e); }); return [...m.entries()].map(([n, es]) => ({ n, es })); });
-    for (let l = 0; l < 3; l++) {
-      const on = sel === l, xx = x + l * (cw + gap), g = groups[l], need = g.length + (on ? 1 : 0);
-      let sz = SZ, per = 1;
-      for (;;) { per = Math.max(1, Math.floor((cw - 2) / (sz + 2))); if (per * ROWS >= need || sz <= 8) break; sz--; }
-      const rows = Math.min(ROWS, Math.max(1, Math.ceil(need / per))), st = sz + 2;
-      H().box(c, xx, y, cw, hh, on ? 1 : 0, on ? 13 : 3, false);
-      c.fillStyle = P[on ? 13 : 2]; c.fillRect(xx + 1, y + 1, cw - 2, 13);
-      G.cn(c, LANES[l], xx + cw / 2, y + 1, on ? 0 : 6, 0.5);
-      if (onLane) tap('ln' + l, xx, y, cw, hh, () => onLane(l));
-      const ox = xx + Math.round((cw - per * st + 2) / 2), oy = y + 15 + (sz < SZ ? Math.round((ROWS * (SZ + 2) - rows * st) / 2) : 0);
-      g.forEach((gr, k) => {
-        if (k >= per * ROWS) return;
-        const cx = ox + (k % per) * st, cy = oy + ((k / per) | 0) * st, n = gr.es.length;
-        chip(c, 'ch' + l + '_' + k, cx, cy, sz, gr.n, onRemove ? () => onRemove(gr.es[n - 1]) : null, hotIdx && gr.es.some(hotIdx));
-        if (n > 1) { const t = String(n), tw = G.textW(t); c.fillStyle = P[0]; c.fillRect(cx + sz - tw - 2, cy + sz - 6, tw + 2, 6); G.text(c, t, cx + sz - 1, cy + sz - 5, 13, 1, null, 1); }   // 數量
-      });
-      if (on && g.length < per * ROWS) {                       // 下一個位置（虛線）
-        const k = g.length, cx = ox + (k % per) * st, cy = oy + ((k / per) | 0) * st, m = Math.floor(sz / 2);
-        c.fillStyle = P[((gt * 3) | 0) % 2 ? 13 : 6];
-        for (let q = 0; q < sz; q += 2) { c.fillRect(cx + q, cy, 1, 1); c.fillRect(cx + q, cy + sz - 1, 1, 1); c.fillRect(cx, cy + q, 1, 1); c.fillRect(cx + sz - 1, cy + q, 1, 1); }
-        const a = Math.max(2, Math.round(sz * 0.375)); c.fillRect(cx + m - 1, cy + m - a, 2, a * 2); c.fillRect(cx + m - a, cy + m - 1, a * 2, 2);
-      }
+  // v3.7 陣容（單路地圖，不再分上中下）：同一種小兵合成一格＋右下數量；虛線格＝下一隻會放的位置；種類太多才把格子縮小
+  // list：[name 或 loadout 項目...]；onRemove 省略＝純展示（教學用）
+  function teamBox(c, x, y, w, list, onRemove, hotIdx, next = true) {
+    const ROWS = 2, SZ = 13, hh = 6 + ROWS * (SZ + 2);
+    const m = new Map(); list.forEach(e => { const n = e.n || e; if (!m.has(n)) m.set(n, []); m.get(n).push(e); }); const g = [...m.entries()].map(([n, es]) => ({ n, es }));
+    const need = g.length + (next ? 1 : 0); let sz = SZ, per = 1;
+    for (;;) { per = Math.max(1, Math.floor((w - 6) / (sz + 2))); if (per * ROWS >= need || sz <= 8) break; sz--; }
+    const st = sz + 2, rows = Math.min(ROWS, Math.max(1, Math.ceil(need / per)));
+    H().box(c, x, y, w, hh, 1, 13, false);
+    const ox = x + 4, oy = y + 3 + Math.round((ROWS * (SZ + 2) - rows * st) / 2);
+    g.forEach((gr, k) => {
+      if (k >= per * ROWS) return;
+      const cx = ox + (k % per) * st, cy = oy + ((k / per) | 0) * st, n = gr.es.length;
+      chip(c, 'ch_' + k, cx, cy, sz, gr.n, onRemove ? () => onRemove(gr.es[n - 1]) : null, hotIdx && gr.es.some(hotIdx));
+      if (n > 1) { const t = String(n), tw = G.textW(t); c.fillStyle = P[0]; c.fillRect(cx + sz - tw - 2, cy + sz - 6, tw + 2, 6); G.text(c, t, cx + sz - 1, cy + sz - 5, 13, 1, null, 1); }   // 數量
+    });
+    if (next && g.length < per * ROWS) {                         // 下一個位置（虛線）
+      const k = g.length, cx = ox + (k % per) * st, cy = oy + ((k / per) | 0) * st, mm = Math.floor(sz / 2);
+      c.fillStyle = P[((gt * 3) | 0) % 2 ? 13 : 6];
+      for (let q = 0; q < sz; q += 2) { c.fillRect(cx + q, cy, 1, 1); c.fillRect(cx + q, cy + sz - 1, 1, 1); c.fillRect(cx, cy + q, 1, 1); c.fillRect(cx + sz - 1, cy + q, 1, 1); }
+      const a = Math.max(2, Math.round(sz * 0.375)); c.fillRect(cx + mm - 1, cy + mm - a, 2, a * 2); c.fillRect(cx + mm - a, cy + mm - 1, a * 2, 2);
     }
     return y + hh;
   }
   function lineup(c, x, y, w, preview) {
     const T = G.Team.get();
     pips(c, x, y, w, preview); y += 11;
-    const lists = [0, 1, 2].map(l => T.loadout.filter(e => e.l === l));
-    return laneCols(c, x, y, w, lists, G.Team.lane, l => { G.Team.lane = l; G.Audio.play('tick'); },
+    return teamBox(c, x, y, w, T.loadout,
       e => { const i = T.loadout.indexOf(e); if (i >= 0) { T.loadout.splice(i, 1); G.Team.save(); G.Audio.play('click'); } },
       e => flash.t > 0 && e === T.loadout[T.loadout.length - 1] && flash.k === e.n) + 4;
   }
@@ -914,7 +904,7 @@ G.Menus = (() => {
       if (G.HEROES[T.hero].name === nm) btnFlat(c, bx, y, mw, 16, '出戰中', 13);
       else btnPrimary(c, 'pick', bx, y, mw, 16, '設為出戰英雄', () => setHero(nm));
     } else {
-      if (can) btnPrimary(c, 'add', bx, y, mw, 16, '＋ 加入' + LANES[G.Team.lane], () => addMinion(nm));
+      if (can) btnPrimary(c, 'add', bx, y, mw, 16, '＋ 加入', () => addMinion(nm));
       else btnFlat(c, bx, y, mw, 16, '點數不足', 10);
     }
     btnSecondary(c, 'demo', bx + mw + 4, y, dbw, 16, '技能展示', () => openDemo(nm, 0, null));
@@ -1074,9 +1064,9 @@ G.Menus = (() => {
   const ptr = (dk) => dk ? cursor : hand;
   // 小地圖示意
   function miniMap(c, x, y, w, h, hl) {
-    const md = G.MAPS.lanes5, sx = w / md.w, sy = h / md.h, P2 = p => [x + p[0] * sx, y + p[1] * sy];
+    const md = G.MAPS.l1, sx = w / md.w, sy = h / md.h, P2 = p => [x + p[0] * sx, y + p[1] * sy];   // v3.7 第 1 關的單路地圖
     H().box(c, x - 2, y - 2, w + 4, h + 4, 1, 4, false);
-    md.lanes.forEach((l, i) => { const lit = hl === i || (hl === 'path' && i >= 3); c.fillStyle = P[lit ? 13 : i >= 3 ? 4 : 6]; for (let k = 0; k < l.pts.length - 1; k++) { const a = P2(l.pts[k]), b = P2(l.pts[k + 1]); G.pxLine(c, a[0], a[1], b[0], b[1], i >= 3 ? 1 : 3); } });
+    md.lanes.forEach((l, i) => { const lit = hl === i || (hl === 'path' && i >= 1); c.fillStyle = P[lit ? 13 : i >= 1 ? 4 : 6]; for (let k = 0; k < l.pts.length - 1; k++) { const a = P2(l.pts[k]), b = P2(l.pts[k + 1]); G.pxLine(c, a[0], a[1], b[0], b[1], i >= 1 ? 1 : Math.max(3, Math.round(l.r * 2 * sx))); } });
     if (md.river) { c.fillStyle = P[hl === 'river' ? 12 : 2]; for (let k = 0; k < md.river.pts.length - 1; k++) { const a = P2(md.river.pts[k]), b = P2(md.river.pts[k + 1]); G.pxLine(c, a[0], a[1], b[0], b[1], hl === 'river' ? 3 : 2); } }
     if (md.wild && (hl === 'wild' || hl === 'river')) md.wild.forEach(([k2, p]) => { const q = P2(p), d = G.WILD[k2], big = d.kind === 'wboss'; c.fillStyle = P[0]; c.fillRect(q[0] - (big ? 3 : 2), q[1] - (big ? 3 : 2), big ? 6 : 4, big ? 6 : 4); c.fillStyle = P[d.col]; c.fillRect(q[0] - (big ? 2 : 1), q[1] - (big ? 2 : 1), big ? 4 : 2, big ? 4 : 2); });
     const ph = P2(md.holy.player), eh = P2(md.holy.enemy);
@@ -1439,7 +1429,7 @@ G.Menus = (() => {
     {
       name: '地圖', pages: [
         {
-          z: 1, t: '兵線', m: '雙方{每 20 秒}派出小兵，沿{上、中、下}三路前進',
+          z: 1, t: '兵線', m: '雙方{每 20 秒}派出小兵，沿著大路往對方基地前進',
           draw(c, x, y, w, h, t) {
             const gy = y + h * 0.7, T = t % 4, k = Math.min(1, T / 2.2);
             for (let i = 0; i < 3; i++) { unit(c, ['leafblower', 'seedshooter', 'treeprotector'][i], lerp(x + 10 - i * 14, x + w * 0.42 - i * 14, k), gy + (i % 2) * 6, k < 1); unit(c, ['babybear', 'bear', 'babybear'][i], lerp(x + w - 10 + i * 14, x + w * 0.58 + i * 14, k), gy + (i % 2) * 6, k < 1, -1); }
@@ -1447,14 +1437,14 @@ G.Menus = (() => {
           }
         },
         {
-          t: '防禦塔', m: '每路有{外、中、內}三座塔，基地前還有{主塔}。塔會越來越強，{連打同一個英雄會越打越痛}',
+          t: '防禦塔', m: '雙方各有{外、中、內}三座塔，基地前還有{主塔}。塔會越來越強，{連打同一個英雄會越打越痛}',
           draw(c, x, y, w, h, t) {
             const gy = y + h * 0.84, L = ((t / 0.9) | 0) % 4;
             [['enemy_tower', '外塔'], ['enemy_tower2', '中塔'], ['enemy_tower3', '內塔'], ['enemy_tower4', '主塔']].forEach(([n, lab], i) => { const tx = x + w * (0.13 + i * 0.25); tower(c, n, tx, gy); G.cn(c, lab, tx, y + 4, i === L ? 13 : 6, 0.5); });
           }
         },
         {
-          z: 1, t: '推塔順序', m: '同一路要{先拆外塔}，裡面那座的{b:藍色護盾}才會消失',
+          z: 1, t: '推塔順序', m: '要{先拆外塔}，裡面那座的{b:藍色護盾}才會消失',
           draw(c, x, y, w, h, t) {
             const T = t % 4.4, gy = y + h * 0.82, broke = T > 1.8;
             if (!broke) tower(c, 'enemy_tower', x + w * 0.35, gy, false, ((T * 10) | 0) % 3 === 0);
@@ -1464,7 +1454,7 @@ G.Menus = (() => {
           }
         },
         {
-          z: 1, t: '摧毀聖所', m: '{任一路內塔}倒了才能打主塔，主塔倒了才能打聖所，{拆掉聖所就贏}',
+          z: 1, t: '摧毀聖所', m: '{內塔}倒了才能打主塔，主塔倒了才能打聖所，{拆掉聖所就贏}',
           draw(c, x, y, w, h, t) {
             const T = t % 4.2, gy = y + Math.round(h * 0.86), eh = G.SPR.eholy[0], ex = x + w * 0.62;
             const boom = T > 2.2 && T < 3.4;
@@ -1473,7 +1463,7 @@ G.Menus = (() => {
           }
         },
         {
-          t: '河道與野區', m: '{野怪}住在森林營地，{野生首領}待在河道旁',
+          t: '河道與野區', m: '野怪都在{地圖中間}，{野生首領}待在河道旁，常常打起團戰',
           draw(c, x, y, w, h, t) { const mw = Math.min(w - 20, (h - 12) * 1.33), mh = mw * 0.75; miniMap(c, Math.round(x + w / 2 - mw / 2), Math.round(y + h / 2 - mh / 2), Math.round(mw), Math.round(mh), ((t * 1.2) | 0) % 2 ? 'river' : 'wild'); }
         },
         {
@@ -1513,7 +1503,7 @@ G.Menus = (() => {
           }
         },
         {
-          z: 1, t: '敵方獵手', m: '敵方{獵手}會清我方野區變強，還會{搶野生首領}，記得去阻止',
+          z: 1, t: '敵方獵手', m: '敵方{獵手}會清野怪變強，還會{搶野生首領}，記得去阻止',
           draw(c, x, y, w, h, t) {
             const T = t % 4.4, gy = y + h * 0.72, wx = x + w * 0.62, hx = lerp(x + w * 0.2, x + w * 0.45, ss(seg(T, 0, 1.2))), dead = T > 2.4;
             if (!dead) { unit(c, 'gorilla', wx, gy, false, -1, ((t * 10) | 0) % 3 === 0 && T > 1.2); hpBar(c, wx - 10, gy - 26, 20, 1 - G.clamp((T - 1.2) / 1.2, 0, 1), 13); }
@@ -1592,13 +1582,13 @@ G.Menus = (() => {
           }
         },
         {
-          t: '加入小兵', m: '先{點上、中、下其中一欄}，再把小兵轉到中間按「{加入}」',
+          t: '加入小兵', m: '把小兵轉到中間，按「{加入}」就放進陣容',
           draw(c, x, y, w, h, t, dk) {
             const T = t % 3.6, rw = Math.min(w - 16, 190), x0 = Math.round(x + w / 2 - rw / 2), y0 = y + 4, added = T > 2, sm = h < 100, by = y0 + (sm ? 14 : 29);
             const nw = G.cnW(G.nameOf('fruitpult')), nx = sm ? x0 + rw / 2 - (nw + 30) / 2 : x0 + rw / 2 - nw / 2;
             G.cn(c, G.nameOf('fruitpult'), nx, y0, 9); if (sm) { c.drawImage(G.SPR.leaf_pt.n, nx + nw + 6, y0 + 3); G.cn(c, '4點', nx + nw + 15, y0, 13); } else { c.drawImage(G.SPR.leaf_pt.n, x0 + rw / 2 - 12, y0 + 16); G.cn(c, '4點', x0 + rw / 2 - 3, y0 + 13, 13); }
-            yBtn(c, Math.round(x0 + rw / 2 - 40), by, 80, 15, '＋ 加入中路');
-            laneCols(c, x0, by + 20, rw, [['leafblower'], added ? ['seedshooter', 'fruitpult'] : ['seedshooter'], []], 1);
+            yBtn(c, Math.round(x0 + rw / 2 - 40), by, 80, 15, '＋ 加入');
+            teamBox(c, x0, by + 20, rw, added ? ['leafblower', 'seedshooter', 'fruitpult'] : ['leafblower', 'seedshooter']);
             if (T < 2.4) ptr(dk)(c, Math.round(lerp(x + w, x0 + rw / 2, ss(seg(T, 0.2, 1.4)))), by + 8, T > 1.8 && T < 2.0);
           }
         },
@@ -1606,9 +1596,8 @@ G.Menus = (() => {
           t: '移出小兵', m: '{點陣容裡的頭像}就移出隊伍',
           draw(c, x, y, w, h, t, dk) {
             const T = t % 3, rw = Math.min(w - 16, 190), x0 = Math.round(x + w / 2 - rw / 2), y0 = Math.round(y + h / 2 - 20);
-            laneCols(c, x0, y0, rw, [T < 1.2 ? ['leafblower', 'seedshooter'] : ['leafblower'], ['seedshooter'], []], 0);
-            const cw = Math.floor((rw - 6) / 3), per = Math.max(1, Math.floor((cw - 4) / 18)), ox = x0 + Math.round((cw - per * 18 + 2) / 2);
-            if (T < 1.5) ptr(dk)(c, Math.round(lerp(x + w, ox + 18 + 14, ss(seg(T, 0.1, 0.8)))), y0 + 17, T > 0.9 && T < 1.2);
+            teamBox(c, x0, y0, rw, T < 1.2 ? ['leafblower', 'seedshooter', 'treeprotector'] : ['leafblower', 'treeprotector'], null, null, false);
+            if (T < 1.5) ptr(dk)(c, Math.round(lerp(x + w, x0 + 4 + 15 + 7, ss(seg(T, 0.1, 0.8)))), y0 + 3 + 7 + 4, T > 0.9 && T < 1.2);
           }
         },
       ]

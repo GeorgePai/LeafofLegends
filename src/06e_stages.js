@@ -114,7 +114,7 @@ G.themeImg = (img, id) => {
 // hunt：n 獵手數、first 第一次出動（秒）、re 倒下後再來（秒）；hz 特殊規則；rew 首次通關鑰匙；roster [前期, 中期, 後期] 敵人
 G.SOLO = [   // v3.5 首通鑰匙 10/15/25/40/60 → 5/6/8/10/12
   { theme: 'forest', n: '翠葉森林', en: 'SPRING WOODS', d: 1, rule: '', hz: null, rew: 5,
-    dif: { lv: 0, hp: 0.75, pow: 0.75, tower: 0.8, wave: 1.2, boss: 4, cnt: [1, 4] }, hunt: { n: 0 },
+    dif: { lv: 0, hp: 1, pow: 0.95, tower: 0.9, wave: 1.1, boss: 4, cnt: [3, 6] }   /* v3.7 單路後原本太弱（小兵自己 2 分鐘就推完）：hp/pow 0.75→1/0.95、tower 0.8→0.9、wave 1.2→1.1、cnt [1,4]→[3,6] */, hunt: { n: 0 },
     roster: [['babybear', 'mouse', 'shroom'], ['babybear', 'chipmunk', 'boar', 'shroom'], ['bear', 'eagle', 'boar', 'shroom', 'chipmunk']], boss: 'bigbear', fresh: ['shroom'] },
   { theme: 'autumn', n: '楓紅山谷', en: 'MAPLE VALLEY', d: 2, rule: '{秋風}每 50 秒吹起，8 秒內全場跑速 {+30%}', hz: 'wind', rew: 6,
     dif: { lv: 0, hp: 1, pow: 1, tower: 1, wave: 1, boss: 3, cnt: [2, 5] }, hunt: { n: 1, first: 90, re: 75 },
@@ -130,7 +130,7 @@ G.SOLO = [   // v3.5 首通鑰匙 10/15/25/40/60 → 5/6/8/10/12
     roster: [['wraith', 'vampirebat', 'blackvulture'], ['wraith', 'madwolf', 'vampirebat', 'gnome'], ['wraith', 'lion', 'madwolf', 'blackvulture', 'gnome']], boss: 'cerberus', fresh: ['wraith', 'cerberus'] }
 ];
 G.STAGES[0].n = '經典戰場'; G.STAGES[0].theme = 'forest';
-G.SOLO.forEach(s => G.STAGES.push(Object.assign({ map: 'lanes5', allyLevel: 1, loadout: G.STAGES[0].loadout, bossLevel: 2 + s.dif.lv }, s)));
+G.SOLO.forEach((s, i) => G.STAGES.push(Object.assign({ map: 'l' + (i + 1), allyLevel: 1, loadout: G.STAGES[0].loadout, bossLevel: 2 + s.dif.lv }, s)));   // v3.7 每關各自的單路地圖（02_config G.MAPS.l1～l5）
 G.SOLO_STAR = 2;   // v3.5 5 → 2                                 // 每多拿一顆星的鑰匙
 G.SOLO_HZ = { wind: { every: 50, dur: 8, k: 1.3 }, blizzard: { every: 60, dur: 10, k: 0.75, atk: 1.25 }, lava: { every: 35, n: 5, r: 36, pct: 18, warn: 1.1 }, revive: { p: 25, hp: 40 } };
 
