@@ -26,7 +26,7 @@
    - setup.sh 會：複製工具到 `/home/claude/tools/`、建 `/tmp/s`、需要時裝 fonttools/brotli、build、印出版本號、和 main 線上版比對（排除字型那行）
    - 顯示「與線上版一致 ✔」就代表接手完成；**交接時不用跑完整文字檢查**（程式沒變）
 3. 部署用的 main 分支等要發佈時再 clone：`git clone -q --depth 1 https://github.com/GeorgePai/LeafofLegends /home/claude/leafoflegends`
-4. **Mac 資料夾**：每個新對話一開始都沒連 Mac 資料夾，Claude 自己請求權限可能被自動模式擋下（v3.1 發生過）。所以接手指令第二行請 Pai 先在桌面 App 這個對話的「+」→「加入資料夾」選 `Desktop/Claude/LeafofLegends`；接手時用 `get_device_info` 確認 connectedFolders 有它，沒有就在回報裡提醒一次
+4. **Mac 資料夾**：每個新對話一開始都沒連 Mac 資料夾，Claude 自己請求權限可能被自動模式擋下（v3.1 發生過）。所以接手指令第二行請 Pai 先在桌面 App 這個對話的「+」→「加入資料夾」選 `Desktop/Claude/LeafofLegends`；接手時用 `get_device_info` 確認 connectedFolders 有它，沒有就在回報裡提醒一次；要備份時可以直接 `device_request_folder_access(~/Desktop/Claude/LeafofLegends)`（v3.2.3 這樣請求成功過）
 5. 備援（GitHub 連不上時）：用 device 工具從 Mac 的 `source/` stage 進 `/home/claude/leafwar/`，再 `bash setup.sh`
 
 ## 4. 架構重點
@@ -121,6 +121,7 @@
 - （v2.8.7）一帳號同時一台：被別台登入的裝置會被登出，登出前顯示這台的存檔碼可複製；沒帶工作階段的舊版用戶端不擋。等 Pai 實機兩台測試
 - （v2.9）角色叫聲：Pai 聽過後可指定哪幾隻要改（`04b_cry.js` 的 `V` 表調音高／長度／基底）
 - （v3.1）出發過場長度、選關甩動手感、敵人暗色調與細紅邊、等級徽章配色（VALUES.md 6s）待 Pai 實機確認
+- （v3.2.4）排行榜伺服器改了 /ann?a=（公告即時）與 ping 快取 10 秒，已推 source 自動部署，但**還沒用內建瀏覽器確認 Deployments 成功**；請 Pai 用開發者模式發測試公告、另一台停首頁看約 40 秒內會不會跳出
 - （v3.2.5）小兵分散強度 `G.TUNE.laneSpread` 0.85、路邊保留 `laneEdge` 1 格（VALUES 6y），待 Pai 實機看
 - （v3.2.4）新暫定數值見 VALUES 6x（縮放每步 ×1.35、點數 24、欄位三列、ping 30 秒、通知條 10 秒）；點數 24 會讓我方兵線變多、遊戲變簡單（敵方波次不跟著加），等 Pai 實際玩再決定要不要調敵方
 - （v3.2.3）HD-2D 強度 Pai 已認可；效能優化後請 Pai 再實機確認縮小視角是否還卡、會不會發燙（VALUES 6w）；仍不行再加「省電畫面」開關（`G.HD.on`／降 `BUDGET`）
@@ -132,7 +133,7 @@
 ## 7. 工作規則
 **每次更新流程**：改 src → build → `bash /home/claude/tools/tc_all.sh`（背景跑，0 筆才可交付）→ 只截有改到的畫面，用 `sheet.py` 拼成一張看 → 發佈 artifact（先 `get_artifact` 取 version，再 `publish_files`，index.html＝dist/index.html）→ 推 GitHub main（遊戲）＋ source（原始碼）→ 備份 Mac（`LeafofLegends.html`、`versions/LeafofLegends_v版本.zip`、有改到的 `source/` 檔案）→ 升版號
 - 版本號在 `src/11_menus.js` 第 2 行 `G.VERSION = 'V3.2.2'`
-- **更新內容（玩家看得到）**：每次發佈前在 `release.json` 的 list 最前面加一筆 `{v, d, n:[…]}`（短句、玩家口吻、不寫技術細節），版本號要和 G.VERSION 一樣
+- **更新內容（玩家看得到）**：每次發佈前在 `release.json` 的 list 最前面加一筆 `{v, d, n:[…]}`（短句、玩家口吻、不寫技術細節），版本號要和 G.VERSION 一樣。**v3.2.4 起 build 會把 release.json 打包成 `G.RELEASE`（「查看更新內容」用），所以要先改 release.json 再 build**
 - 推 main：clone 到 `/home/claude/leafoflegends` → `python3 /home/claude/leafwar/tools/release.py`（複製 index.html＋產生 version.json；保留 `.nojekyll`；音樂有改才更新 `audio/`）→ commit → `git -c push.negotiate=true push origin HEAD:main`，約 1～2 分鐘生效。備援：Pai 在 Mac Terminal 執行 `bash ~/Desktop/Claude/LeafofLegends/deploy_github.sh`
 - 推 source：在 `/home/claude/leafwar` commit（dist/ 已在 .gitignore）→ `git -c push.negotiate=true push origin HEAD:source`
 - **排行榜伺服器**（Pai 要求全自動，不要叫他跑指令）：改 `leaderboard/worker.js` → 本機先測（`cd leaderboard && npm i wrangler@4`，用 `wrangler dev --local` 加假的 database_id 設定檔，curl 測 /board /submit /admin）→ 推 source 即自動部署。新欄位加在 worker.js 的 `SCHEMA`／`UPGRADES`。雲端 shell 連不到 Cloudflare 和 workers.dev：要確認部署就用桌面 App 內建瀏覽器（`mcp__remote-devices__Claude_Browser__*`，已登入 Cloudflare）開 lol-rank → Deployments，或開 /board。**不要用錯的密碼測管理 API**（猜錯 5 次會把 Pai 家的 IP 鎖 1 小時；全部合計 30 次會鎖住所有人）。測試場景裡設 `leafwar_adm` 時，一定要同時設 `G.Rank.adm.t=Date.now()+9e9` 並用 `G.RankUI.adm(true,1)`，避免自動去打正式伺服器
@@ -222,7 +223,7 @@
 add_repo(GeorgePai, LeafofLegends, push) →
 git clone -q -b source --depth 1 https://github.com/GeorgePai/LeafofLegends /home/claude/leafwar && bash /home/claude/leafwar/setup.sh
 讀 /home/claude/leafwar/HANDOFF.md（只讀這份；CHANGELOG.md、VALUES.md 需要時再查）。
-作品：https://claude.ai/artifact/8vvJWeebvgfkNQDrYWXHAB（目前 V○○）；排行榜伺服器：https://lol-rank.leafoflegends.workers.dev；遊戲：https://georgepai.github.io/LeafofLegends/
-設計前對照第 8 節；更新照第 7 節；我說「交接」照第 9 節。
+作品：https://claude.ai/artifact/8vvJWeebvgfkNQDrYWXHAB（目前 V○○）；遊戲：https://georgepai.github.io/LeafofLegends/；排行榜伺服器：https://lol-rank.leafoflegends.workers.dev
+設計前對照第 8 節（含 16b 爐石式文字、13b 歧路旅人 HD-2D 美術方向）；更新照第 7 節（排行榜伺服器推 source 就自動部署，不要叫我跑指令；發佈前先更新 release.json 再 build）；我說「交接」照第 9 節。
 準備好後用一句話回報版本與狀態（含 Mac 資料夾是否已連上），提醒我改名，然後等我的新需求。
 ```
