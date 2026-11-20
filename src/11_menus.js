@@ -1,5 +1,5 @@
 'use strict';
-G.VERSION = 'V3.2.4';                                  // 版本號（唯一來源；setup.sh 也從這行讀）
+G.VERSION = 'V3.2.5';                                  // 版本號（唯一來源；setup.sh 也從這行讀）
 /* =========================================================
    選單：首頁 / 隊伍 / 圖鑑 / 教學
    版面：直屏上下堆疊，橫屏左右分欄
@@ -701,8 +701,9 @@ G.Menus = (() => {
   // 三路陣容：三欄並排（上／中／下），選中的那欄亮黃；虛線格＝下一隻會放的位置
   // lists：[[name...]×3]；onLane/onRemove 省略 = 純展示（教學用）
   function laneCols(c, x, y, w, lists, sel, onLane, onRemove, hotIdx) {
-    // v3.2.4 欄位高度固定三列（點數集中一路也不會把版面撐開）：同一種小兵合成一格＋右下數量；種類太多才把格子縮小
-    const gap = 3, cw = Math.floor((w - gap * 2) / 3), ROWS = 3, SZ = 16, hh = 15 + ROWS * (SZ + 2) + 3;
+    // v3.2.4 欄位高度固定（點數集中一路也不會把版面撐開）：同一種小兵合成一格＋右下數量；種類太多才把格子縮小
+    // v3.2.5 改兩列 13px（高 46）：橫屏右欄的 7 條數值條不用捲動就看得完
+    const gap = 3, cw = Math.floor((w - gap * 2) / 3), ROWS = 2, SZ = 13, hh = 15 + ROWS * (SZ + 2) + 3;
     const groups = lists.map(l => { const m = new Map(); l.forEach(e => { const n = e.n || e; if (!m.has(n)) m.set(n, []); m.get(n).push(e); }); return [...m.entries()].map(([n, es]) => ({ n, es })); });
     for (let l = 0; l < 3; l++) {
       const on = sel === l, xx = x + l * (cw + gap), g = groups[l], need = g.length + (on ? 1 : 0);

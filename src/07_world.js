@@ -210,8 +210,13 @@ G.World = class {
       const lane = Math.min(q.lane ?? 1, this.nLanes - 1), [x, y] = q.at || this.laneSpawn[q.side][lane];
       // 雙生花：兩隻同時、左右並排出生（各自獨立行動）
       let sx = x + G.rr(-10, 10), sy = y + G.rr(-10, 10);
+      const lo = q.side < 2 && this.nLanes > 1 ? this.nextLo(q.side) : null;
+      if (lo != null && !q.at) {                              // v3.2.5 出生點也照橫向位置錯開
+        const T = G.TILE, k = this.M.laneNear(lane, x / T, y / T);
+        if (k) { const W = Math.max(0, k.r - G.TUNE.laneEdge) * lo * T, ox = x - k.uy * W + G.rr(-4, 4), oy = y + k.ux * W + G.rr(-4, 4); if (this.M.isWalk(ox, oy)) { sx = ox; sy = oy; } }
+      }
       if (q.twin != null) { const ox = x + (q.twin ? 8 : -8), oy = y + (q.twin ? 14 : -14); if (this.M.isWalk(ox, oy)) { sx = ox; sy = oy; } }
-      const u = this.add(new G.Unit(this, q.name, q.side, sx, sy, q.level, q.kind || 'creep')); u.lane = lane;
+      const u = this.add(new G.Unit(this, q.name, q.side, sx, sy, q.level, q.kind || 'creep')); u.lane = lane; u.lo = lo;
       if (q.ghost) { u.ghost = 1; u.hp = Math.max(1, Math.round(u.st.hp * q.ghost / 100)); }   // v3.0 亡者復甦：幽魂只剩部分血量
       G.FX.spawn(this, u); this.sfx('spawn', x, y);
     }
@@ -280,9 +285,22 @@ G.World = class {
     this.moveDir(u, dx / l, dy / l, dt, mul); return false;
   }
   flowMove(u, dt) {
-    const d = this.M.flowDir(this.flow[u.side][u.lane ?? Math.min(1, this.nLanes - 1)], u.x, u.y);
-    if (d) this.moveDir(u, d[0], d[1], dt); else this.brake(u, dt);
+    const li = u.lane ?? Math.min(1, this.nLanes - 1), d = this.M.flowDir(this.flow[u.side][li], u.x, u.y);
+    if (!d) { this.brake(u, dt); return; }
+    // v3.2.5 小兵分散在路面上：沿著路的中心線走，維持出生時分到的橫向位置 u.lo（−1 左緣～1 右緣），不再全部貼著彎道內側排隊
+    if (u.lo != null && this.nLanes > 1) {
+      const T = G.TILE, tx = u.x / T, ty = u.y / T, q = this.M.laneNear(li, tx, ty);
+      if (q && q.d < q.r + 0.6) {
+        let ux = q.ux, uy = q.uy; if (ux * d[0] + uy * d[1] < 0) { ux = -ux; uy = -uy; }
+        const W = Math.max(0, q.r - G.TUNE.laneEdge) * u.lo, gx = q.cx + ux * 1.6 - uy * W, gy = q.cy + uy * 1.6 + ux * W;
+        const vx = gx - tx, vy = gy - ty, l = Math.hypot(vx, vy);
+        if (l > 0.01 && vx * d[0] + vy * d[1] > 0) { this.moveDir(u, vx / l, vy / l, dt); return; }
+      }
+    }
+    this.moveDir(u, d[0], d[1], dt);
   }
+  // v3.2.5 下一隻小兵的橫向位置：黃金比例錯開（連續出生的幾隻會平均分在左、中、右）
+  nextLo(side) { this.loN = this.loN || [0, 0]; const n = this.loN[side]++; return (((n * 0.618034 + 0.31) % 1) * 2 - 1) * G.TUNE.laneSpread; }
   // 分離（避免重疊）
   separate() {
     const us = this.units;

@@ -150,6 +150,8 @@ G.cnBlock = (ctx, s, x, y, maxW, col = 7, lh = 13, maxLines = 9) => {   // v2.8.
   const ls = G.cnWrap(s, maxW).slice(0, maxLines); ls.forEach((l, i) => G.cn(ctx, l, x, y + i * lh, col)); return ls.length * lh; };
 
 // ---------- 隊伍（存在瀏覽器本機） ----------
+G.TUNE.laneSpread = 0.85;          // v3.2.5 小兵橫向分散：最外側到路寬的幾成
+G.TUNE.laneEdge = 1.0;             // v3.2.5 路邊保留幾格（不貼著樹）
 G.TUNE.plantPoints = 24;            // 隊伍點數上限（v3.2.4 Pai：12 → 24）
 G.ROSTER = {
   minions: Object.keys(G.ORIG.units).filter(n => ['npc', 'mercenary'].includes(G.ORIG.units[n].type)),

@@ -31,6 +31,16 @@ G.buildMap = function (def) {
   // 與某條路中心線的距離（格）
   M.laneSegs = def.lanes.map(l => { const a = []; for (let i = 0; i < l.pts.length - 1; i++) a.push([l.pts[i][0], l.pts[i][1], l.pts[i + 1][0], l.pts[i + 1][1], l.rs ? l.rs[i] : l.r]); return a; });
   M.laneIn = (li, tx, ty) => { let d = 1e9; for (const sg of M.laneSegs[li]) { const v = segDist(tx, ty, sg) - sg[4]; if (v < d) d = v; } return d; };   // 離路面邊緣多遠（<0 在路上）
+  // v3.2.5 離某條路中心線最近的點：{ cx, cy 最近點, ux, uy 該段方向, r 路寬（半徑）, d 距離 }（單位＝格）
+  M.laneNear = (li, tx, ty) => {
+    let b = null, bd = 1e9;
+    for (const s of M.laneSegs[li] || []) {
+      const dx = s[2] - s[0], dy = s[3] - s[1], L = dx * dx + dy * dy; if (!L) continue;
+      const t = G.clamp(((tx - s[0]) * dx + (ty - s[1]) * dy) / L, 0, 1), cx = s[0] + dx * t, cy = s[1] + dy * t, d = Math.hypot(tx - cx, ty - cy);
+      if (d < bd) { bd = d; const l = Math.sqrt(L); b = { cx, cy, ux: dx / l, uy: dy / l, r: s[4], d }; }
+    }
+    return b;
+  };
   M.laneDist = (li, tx, ty) => { let d = 1e9; for (const sg of M.laneSegs[li]) { const v = segDist(tx, ty, sg); if (v < d) d = v; } return d; };
   // 路面程度（0=路中央，1=路邊）
   M.pathiness = (tx, ty) => {
