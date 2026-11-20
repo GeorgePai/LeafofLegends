@@ -10,7 +10,7 @@ G.Solo = (() => {
   const ORDER = [1, 2, 3, 4, 5, 0];                                  // 卡片順序：五個關卡，最後是經典戰場
   const DIFF = ['', '簡單', '普通', '困難', '極難', '超難'], DCOL = [0, 11, 13, 14, 10, 17];
   let pos = 0, tgt = 0, drag = null, cried = -1, t = 0, wx = [], bgK = 0, bgFrom = null;
-  const info = si => si ? G.SOLO[si - 1] : { theme: 'forest', n: '經典戰場', en: 'CLASSIC', d: 0, rule: '原本的模式：敵人{一波比一波強}，打到分出勝負', rew: 0, roster: [['babybear', 'eagle', 'bear']], boss: 'bigbear' };
+  const info = si => si ? G.SOLO[si - 1] : { theme: 'forest', n: '經典戰場', en: 'CLASSIC', d: 0, rule: '沒有特殊規則', rew: 0, roster: [['babybear', 'eagle', 'bear']], boss: 'bigbear' };
   const open = si => G.SoloW.open(si);
   // 進入：停在「最新可以挑戰」的那一關
   S.open = () => {
@@ -26,7 +26,7 @@ G.Solo = (() => {
     return false;
   };
   const step = d => { const n = G.clamp(Math.round(tgt) + d, 0, ORDER.length - 1); if (n !== tgt) { tgt = n; G.Audio.play('tick'); } };
-  const go = () => { const si = ORDER[Math.round(tgt)]; if (!open(si)) { G.Audio.play('deny'); return; } U().start(si); };
+  const go = () => { const si = ORDER[Math.round(tgt)]; if (!open(si)) { G.Audio.play('deny'); return; } G.StageGo.go(si); };   // v3.1 出發過場（過場裡才建立戰場）
   S.cur = () => ORDER[Math.round(tgt)];
   S._go = i => { pos = tgt = i; };                                   // 測試用
   // ---- 小圖示：星星、骷髏（像素點陣）----
@@ -45,6 +45,8 @@ G.Solo = (() => {
     }
     return 45;
   }
+  // v3.1 敵人改暗色：加一圈細紅邊（和戰場一樣），暗底上也看得清楚
+  const rim = (c, img, x, y) => { const gl = G.glowOf(img, 15, 1, 1); c.globalAlpha = 0.9; c.drawImage(gl.c, x - gl.p, y - gl.p); c.globalAlpha = 1; c.drawImage(img, x, y); };
   // ---- 場景縮圖：主題地面＋兩棵樹＋這關的敵人（首領最大）----
   function preview(c, x, y, w, h, si, lock, big) {
     const I = info(si), th = I.theme;
@@ -56,7 +58,7 @@ G.Solo = (() => {
       const fr = G.SPR[G.VIS[nm].spr], f = fr[big ? ((t * 4) | 0) % fr.length : 0], img = sc > 1 ? G.scaled(G.foeImg(nm, face < 0 ? f.m : f.n), sc) : G.foeImg(nm, face < 0 ? f.m : f.n);
       const dx = Math.round(cx - img.width / 2), dy = Math.round(fl - img.height - (G.VIS[nm].fly ? 6 * sc : 0));
       G.pxDisc(c, cx, fl, img.width * 0.32, 2, 0, 0.5);
-      if (lock) { c.drawImage(G.scaled(G.glowOf(f.n, 0, 1, 2).tint, sc), dx, dy); } else c.drawImage(img, dx, dy);
+      if (lock) { c.drawImage(G.scaled(G.glowOf(f.n, 0, 1, 2).tint, sc), dx, dy); } else rim(c, img, dx, dy);
     };
     const sc = h >= 60 ? 2 : 1;
     names.forEach((nm, i) => draw(nm, x + w * (0.18 + i * 0.2), sc, -1));
@@ -95,7 +97,7 @@ G.Solo = (() => {
     iy += 15;
     // 特殊規則（重點上色）
     if (lock) { const pv = info(si - 1); G.cnWrap('通關「' + pv.n + '」解鎖', iw).forEach(l => { G.cn(c, l, ix, iy, 6); iy += 13; }); }
-    else G.cnWrapRich(I.rule, iw).forEach(l => { G.cnRich(c, l, ix, iy, 7); iy += 13; });
+    else if (I.rule) G.cnWrapRich(I.rule, iw).forEach(l => { G.cnRich(c, l, ix, iy, 7); iy += 13; });
     iy += 3;
     // 直屏空間夠：列出這關會出現的敵人（小圖）＋獵手數
     if (!LD) {
@@ -104,7 +106,7 @@ G.Solo = (() => {
         G.cn(c, '出沒', ix, iy, 6); iy += 14;
         const imgs = all.map(nm => { const f = G.SPR[G.VIS[nm].spr][0]; return lock ? G.glowOf(f.n, 0, 1, 2).tint : G.foeImg(nm, f.m); }), rows = [[]]; let rw = 0;
         for (const im of imgs) { if (rw + im.width > iw && rows[rows.length - 1].length) { rows.push([]); rw = 0; } rows[rows.length - 1].push(im); rw += im.width + 3; }
-        for (const row of rows) { const rh = Math.max(...row.map(im => im.height)); if (iy + rh > foot - 14) break; let sx = ix; for (const im of row) { c.drawImage(im, Math.round(sx), Math.round(iy + rh - im.height)); sx += im.width + 3; } iy += rh + 3; }
+        for (const row of rows) { const rh = Math.max(...row.map(im => im.height)); if (iy + rh > foot - 14) break; let sx = ix; for (const im of row) { if (lock) c.drawImage(im, Math.round(sx), Math.round(iy + rh - im.height)); else rim(c, im, Math.round(sx), Math.round(iy + rh - im.height)); sx += im.width + 3; } iy += rh + 3; }
         iy += 2;
         const hn = si ? I.hunt.n : 1;
         if (iy + 13 <= foot) { H().icon(c, 'i_attack', ix + 4, iy + 6); G.cn(c, hn ? '敵方獵手 ×' + hn : '沒有敵方獵手', ix + 11, iy, hn ? 14 : 6); iy += 14; }
@@ -117,7 +119,7 @@ G.Solo = (() => {
       H().icon(c, 'i_key', ix + sw + 8, gap + 4);
       const rt = best.c ? '已通關 ' + best.c + ' 次' : '首通 +' + I.rew;
       if (G.cnW(rt) + sw + 18 <= iw) G.cn(c, rt, ix + sw + 15, gap - 2, best.c ? 6 : 13);
-    } else G.cnWrap('沒有星等，獎勵照舊', iw).forEach(l => { G.cn(c, l, ix, iy, 5); iy += 13; });
+    } else G.cnWrap('不計星等', iw).forEach(l => { G.cn(c, l, ix, iy, 5); iy += 13; });
   }
   // ---- 背景：選到的關卡場景顏色＋天氣（換關時淡入）----
   function bg(c, uw, uh) {
@@ -141,7 +143,7 @@ G.Solo = (() => {
     const M = ui(); M.tick(); const dt = G.Menus.dt || 1 / 60; t += dt;
     const uw = R.uw, uh = R.uh, I = R.ins, LD = M.land();
     const dg = drag && drag.moved;
-    if (!dg) pos += (tgt - pos) * (1 - Math.exp(-dt * 11));
+    if (!dg) pos += (tgt - pos) * (1 - Math.exp(-dt * 13));
     if (Math.abs(tgt - pos) < 0.01 && !dg) { pos = tgt; if (cried !== tgt) { cried = tgt; const si = ORDER[tgt]; if (open(si)) G.Audio.cry(info(si).boss); G.Audio.play('snap'); } }
     bg(c, uw, uh);
     const y0 = M.header(c, '單人關卡');
@@ -151,13 +153,23 @@ G.Solo = (() => {
     const sp = cw + 10, order = ORDER.map((_, i) => i).sort((a, b) => Math.abs(b - pos) - Math.abs(a - pos));
     for (const i of order) {
       const d = i - pos, ad = Math.abs(d); if (ad > 1.6) continue;
-      const act = ad < 0.5 && !dg, sc = 1 - Math.min(ad, 1) * 0.12, w = Math.round(cw * sc), h = Math.round(ch * sc), x = Math.round(uw / 2 + d * sp * 0.92 - w / 2), y = Math.round(cy + (ch - h) / 2);
+      const act = ad < 0.5, sc = 1 - Math.min(ad, 1) * 0.12, w = Math.round(cw * sc), h = Math.round(ch * sc), x = Math.round(uw / 2 + d * sp * 0.92 - w / 2), y = Math.round(cy + (ch - h) / 2);
       card(c, x, y, w, h, ORDER[i], act, LD);
       if (!act) { c.fillStyle = 'rgba(10,10,10,' + Math.min(0.6, ad * 0.55).toFixed(3) + ')'; c.fillRect(x, y, w + 1, h + 1); }
-      if (ad >= 0.5) H().btn('stc' + i, x, y, w, h, null, () => { tgt = i; G.Audio.play('tick'); });
     }
-    // 滑動
-    U().btns.push({ id: 'stDrag', x: cx, y: cy, w: cw, h: ch, down: ux => { drag = { x0: ux, p0: pos, moved: false }; }, hdrag: ux => { if (!drag) return; drag.moved = true; pos = G.clamp(drag.p0 - (ux - drag.x0) / sp, -0.3, ORDER.length - 0.7); }, up: () => { if (!drag) return; const was = drag.moved; drag = null; tgt = G.clamp(Math.round(pos), 0, ORDER.length - 1); if (!was) { } else G.Audio.play('tick'); } });
+    // 滑動（v3.1 改順）：整排都能拖、卡片跟著手指走；放開時看甩的速度——輕輕一甩或拖超過 12% 就換到下一張，甩得快可以連跳
+    const px = sp * 0.92;
+    U().btns.push({ id: 'stDrag', x: 0, y: cy, w: uw, h: ch,
+      down: ux => { drag = { x0: ux, lx: ux, lt: performance.now(), p0: pos, b0: Math.round(tgt), v: 0, moved: false }; },
+      hdrag: ux => { if (!drag) return; drag.moved = true; const now = performance.now(), dt2 = Math.max(8, now - drag.lt) / 1000;
+        drag.v = G.lerp(drag.v, -(ux - drag.lx) / px / dt2, 0.45); drag.lx = ux; drag.lt = now;
+        let p = drag.p0 - (ux - drag.x0) / px; if (p < 0) p *= 0.35; if (p > ORDER.length - 1) p = ORDER.length - 1 + (p - ORDER.length + 1) * 0.35; pos = p; },   // 兩端有彈性
+      up: () => { if (!drag) return; const D = drag; drag = null;
+        if (!D.moved) { const k = D.x0 < cx ? -1 : D.x0 > cx + cw ? 1 : 0; if (k) step(k); return; }   // 點旁邊的卡＝換過去
+        const v = performance.now() - D.lt > 90 ? 0 : D.v, mv = pos - D.b0;
+        let n = D.b0;
+        if (Math.abs(v) > 0.9 || Math.abs(mv) > 0.12) { const dir = Math.abs(v) > 0.9 ? Math.sign(v) : Math.sign(mv); n = D.b0 + dir * Math.max(1, Math.round(Math.abs(mv + G.clamp(v * 0.22, -2, 2)))); }
+        n = G.clamp(n, 0, ORDER.length - 1); if (n !== tgt) G.Audio.play('tick'); tgt = n; } });
     // 左右箭頭
     const arrow = (dir, x) => { const id = 'sta' + dir, en = dir < 0 ? tgt > 0 : tgt < ORDER.length - 1, o = pr(id) ? 1 : 0, ay = Math.round(cy + ch / 2);
       c.fillStyle = P[en ? 9 : 3]; for (let k = 0; k < 5; k++) c.fillRect(x + (dir < 0 ? k : -k) + o * dir, ay - 4 + k, 1, 9 - k * 2);

@@ -66,7 +66,7 @@ G.FbUI = (() => {
     if (dev) { const n = list.filter(m => !m.reply).length; G.cn(c, A.busy && !A.list ? '讀取中' : '未回覆 ' + n, Rr, I.t + 1, n ? 10 : 6, 1); }
     // ---- 清單 ----
     if (!A.list) G.cn(c, A.err || '讀取中…', lx + lw / 2, ly + 16, A.err ? 10 : 6, 0.5);
-    else if (!list.length) G.cnWrap(dev ? '還沒有玩家來信' : '還沒有寫過信。有任何建議、發現 bug 或想說的話，都歡迎寫給開發者！', lw - 16).forEach((l, i) => G.cn(c, l, lx + lw / 2, ly + 16 + i * 13, 6, 0.5));
+    else if (!list.length) G.cnWrap(dev ? '還沒有玩家來信' : '還沒寫過信。建議、bug 或想說的話，都歡迎寫來！', lw - 16).forEach((l, i) => G.cn(c, l, lx + lw / 2, ly + 16 + i * 13, 6, 0.5));
     else M.scrollDetail(c, lx, ly, lw - 6, lh, dev ? 'fbA' : 'fbP', yy => {
       list.forEach(m => {
         const ny = card(c, lx, yy, lw - 6, m, dev, dev && m.id === sel, false);

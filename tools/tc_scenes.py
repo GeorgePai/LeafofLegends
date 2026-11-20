@@ -114,7 +114,7 @@ S.append(['hpanel',"G.UI.toast=null;G.UI.heroPanel=true",300]); S.append(['hpane
 S.append(['aim',"G.UI.start();var h=G.W.hero;h.skills.forEach(s=>s.lv=1);h.mp=999;G.UI.aim={i:2,s:h.skills[2],on:true,pre:false,bx:G.Render.uw-20,by:G.Render.uh-20,dx:-40,dy:-24,ux:G.Render.uw-60,uy:G.Render.uh-44};",400])
 S.append(['aim-cancel',"var A=G.UI.aim,b=G.UI.cancelBtn;if(A&&b){A.ux=b.x;A.uy=b.y;G.UI.aimUpdate();}",200]); S.append(['aim-x',"G.UI.aim=null",100])
 S.append(['guide',"G.UI.screen='guide'",300])
-for k in range(72):   # v2.7 教學 6 類約 68 頁
+for k in range(52):   # v3.1 教學 5 類 51 頁
   S.append([f'guide{k}',"G.Menus.guideTurn(1)",120])
   S.append([f'guide{k}b',"G.Menus._gt(1.9)",60]); S.append([f'guide{k}c',"G.Menus._gt(3.0)",60])
 # v2.6 寶箱新角色→前往隊伍、NEW、死靈召喚力夫戰鬥
@@ -156,4 +156,7 @@ for k in range(1,6): S.append([f'stg-b{k}',f"G.UI.start({k})",900])
 S.append(['stg-win',"G.W.kill(G.W.holy[1],G.W.hero)",9000])
 S.append(['stg-x',"G.Ach.P().stg={};G.UI.goTitle()",300])
 
+# v3.1 出發過場
+for k,(ph,t) in enumerate([('close',0.2),('hold',0.5),('hold',1.6),('open',0.2)]): S.append([f'stgo{k}',f"G.Team.setDev(true);G.Solo.open();G.Solo._go(2);G.StageGo.go(3);G.StageGo._t('{ph}',{t})",80])
+S.append(['stgo-x',"G.Team.setDev(false);G.UI.goTitle()",300])
 json.dump(S,open('/tmp/tc.json','w'))

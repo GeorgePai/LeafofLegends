@@ -809,6 +809,7 @@ G.UI = (() => {
     }
     if (G.Ach && G.Ach.drawBanner) G.Ach.drawBanner(c);
     G.Trans.draw(c, M_DT);
+    if (G.StageGo) G.StageGo.draw(c, M_DT);
     if (G.Dom) G.Dom.end();
     if (U.showFps) G.text(c, Math.round(U.fps) + 'FPS', R.uw / 2, R.ins.t + 2, 4, 1, null, 0.5);
   };
@@ -974,6 +975,7 @@ G.UI = (() => {
       if (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;   // 輸入名稱／存檔碼時不觸發遊戲快捷鍵
       G.Audio.init();
       const k = e.key.toLowerCase(); if (keys[k]) return; keys[k] = true;
+      if (G.StageGo && G.StageGo.active()) { if (k === 'enter' || k === ' ' || k === 'escape') G.StageGo.skip(); return; }   // v3.1 過場中不吃快捷鍵（Enter／空白／Esc＝跳過）
       if (U.screen !== 'battle') { if (G.Menus && G.Menus.key) G.Menus.key(k); return; }
       if (k === 'escape' && U.aim && U.aim.on) { U.aimCancel(); return; }
       if (k === 'escape' && U.shop) { U.shop = false; return; }

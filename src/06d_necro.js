@@ -40,8 +40,8 @@ G.rampOf = function (src, key) {
   }
   x.putImageData(d, 0, 0); C.set(src, c); return c;
 };
-// 單位外觀（世界、沙盒共用）：複製體 → 冰青；受控 → 幽魂紫；敵方 → 赤紅
-G.lookOf = (u, src) => u.clone ? G.rampOf(src, 'clone') : u.charm ? G.rampOf(src, 'necro') : (u.side === 1 && !u.static) ? G.redOf(src) : src;
+// 單位外觀（世界、沙盒共用）：複製體 → 冰青；受控 → 幽魂紫；敵方 → 暗黑（v3.1）
+G.lookOf = (u, src) => u.clone ? G.rampOf(src, 'clone') : u.charm ? G.rampOf(src, 'necro') : (u.side === 1 && !u.static) ? G.redOf(src, u.name) : src;
 
 // ---------- 美術 ----------
 // 死神造型：深色連帽斗篷（下襬破碎、走路時飄動）、帽兜裡兩顆紅眼、枯萎的嫩芽、右手暗黑法杖（頂端紫色魂晶）

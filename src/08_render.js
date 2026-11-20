@@ -265,6 +265,8 @@ G.Render = (() => {
           const gl = G.rarGlow(base, u.rar, 1, u.rar >= 2 ? 3 : 2);
           b.globalAlpha = u.rar === 0 ? 0.55 : 0.75 + Math.sin(rt * 4 + u.id) * 0.2; b.drawImage(gl.c, ax - gl.p, ay - gl.p); b.globalAlpha = 1;
         }
+        // v3.1 敵方：暗色身體＋一圈細紅邊（和開場動畫一樣），彩色地圖上一眼分得出敵我
+        if (u.side === 1 && !u.static && !u.charm && !u.clone) { const gl = G.glowOf(base, 10, 1, 1); b.globalAlpha = u.kind === 'boss' ? 0.75 + Math.sin(rt * 4 + u.id) * 0.15 : 0.6; b.drawImage(gl.c, ax - gl.p, ay - gl.p); b.globalAlpha = 1; }
         // 中立野怪：黃色淡外框
         if (u.side === 2) { const gl = G.glowOf(base, 13, 1, 2); b.globalAlpha = 0.45 + Math.sin(rt * 3 + u.id) * 0.15; b.drawImage(gl.c, ax - gl.p, ay - gl.p); b.globalAlpha = 1; }
         // 我方首領（被收服的野生首領）：黃色外框
@@ -349,6 +351,13 @@ G.Render = (() => {
       else if (u.side === 2) { b.fillStyle = G.PAL[13]; b.fillRect(x, y, f, 1); }
       else { for (let i = 0; i < f; i++) { b.fillStyle = G.PAL[(i % 3) === 2 ? 7 : 9]; b.fillRect(x + i, y, 1, 1); } }   // 敵方：亮白帶刻痕
       if (u.kind === 'hero') { b.fillStyle = G.PAL[3]; b.fillRect(x, y + 2, bw2, 1); b.fillStyle = G.PAL[11]; b.fillRect(x, y + 2, Math.round(bw2 * u.mp / u.st.mp), 1); b.fillStyle = G.PAL[0]; b.fillRect(x - 1, y + 3, bw2 + 2, 1); }
+      // v3.1 等級徽章（參考傳說對決）：英雄與會升級的敵方獵手，血條左邊一個小方塊寫等級
+      if (u.kind === 'hero' || u.kind === 'jungler') {
+        const ls = String(u.level), tw = G.textW(ls), ow = tw + 4, bx = x - ow;
+        b.fillStyle = G.PAL[0]; b.fillRect(bx, y - 2, ow, 7);
+        b.fillStyle = G.PAL[u.kind === 'hero' ? (u.side === 0 ? 12 : 15) : 15]; b.fillRect(bx + 1, y - 1, ow - 2, 5);
+        G.text(b, ls, bx + 2, y - 1, 9);
+      }
       if (u.kind === 'boss') G.text(b, 'BOSS', cx, y - 7, u.side === 1 ? 12 : 13, 1, 0, 0.5);
       if (u.kind === 'jungler') G.text(b, 'HUNTER', cx, y - 7, 14, 1, 0, 0.5);
     }

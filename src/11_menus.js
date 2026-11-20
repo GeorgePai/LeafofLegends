@@ -1,5 +1,5 @@
 'use strict';
-G.VERSION = 'V3.0';                                  // 版本號（唯一來源；setup.sh 也從這行讀）
+G.VERSION = 'V3.1';                                  // 版本號（唯一來源；setup.sh 也從這行讀）
 /* =========================================================
    選單：首頁 / 隊伍 / 圖鑑 / 教學
    版面：直屏上下堆疊，橫屏左右分欄
@@ -1075,7 +1075,7 @@ G.Menus = (() => {
     {
       name: '操作', pages: [
         {
-          z: 1, t: '移動', m: '{點一下地面}，英雄就會走過去', d: '滑鼠{左鍵點一下地面}，英雄就會走過去',
+          z: 1, t: '移動', m: '{點地面}，英雄就走過去', d: '{左鍵點地面}，英雄就走過去',
           draw(c, x, y, w, h, t, dk) {
             const T = t % 3.4, gy = y + Math.round(h * 0.7), x0 = x + w * 0.24, x1 = x + w * 0.7, k = ss(seg(T, 0.95, 2.4)), hx = lerp(x0, x1, k);
             if (T > 0.8 && T < 2.6) moveMark(c, Math.round(x1), gy, T - 0.8);
@@ -1085,7 +1085,7 @@ G.Menus = (() => {
           }
         },
         {
-          t: '鍵盤移動', only: 'd', d: '也可以用 {W A S D} 直接控制移動',
+          t: '鍵盤移動', only: 'd', d: '{W A S D} 也能移動',
           draw(c, x, y, w, h, t) {
             const T = t % 4, dir = [[0, -1], [-1, 0], [0, 1], [1, 0]][(T | 0)], f = T % 1, gy = y + h * 0.62, cx = x + w * 0.62;
             unit(c, 'leafy', cx + dir[0] * f * 26, gy + dir[1] * f * 14, true, dir[0] < 0 ? -1 : 1);
@@ -1093,7 +1093,7 @@ G.Menus = (() => {
           }
         },
         {
-          z: 1, t: '移動視角', m: '{單指}在畫面上{滑動}，可以查看地圖其他地方', d: '{按住滑鼠左鍵拖曳}，可以移動視角',
+          z: 1, t: '移動視角', m: '{單指滑動}看地圖其他地方', d: '{按住左鍵拖曳}移動視角',
           // 整個場景（地面、樹叢、塔）一起平移：左邊是英雄，滑過去看到右邊的敵塔
           draw(c, x, y, w, h, t, dk) {
             const T = t % 3.4, k = ss(seg(T, 0.4, 1.7)) - ss(seg(T, 2.4, 3.2)), off = Math.round(k * w * 0.5), W2 = Math.ceil(w * 1.6);
@@ -1105,7 +1105,7 @@ G.Menus = (() => {
           }
         },
         {
-          t: '縮放畫面', m: '{雙指撥開}放大，{捏合}縮小', d: '{滾動滑鼠滾輪}，放大或縮小畫面',
+          t: '縮放畫面', m: '{雙指撥開}放大，{捏合}縮小', d: '{滑鼠滾輪}放大縮小',
           draw(c, x, y, w, h, t, dk) {
             const T = t % 4, z = T < 2 ? ss(seg(T, 0.3, 1.6)) : 1 - ss(seg(T, 2.2, 3.5)), sc = 1 + z, cx = x + w / 2, gy = y + h * 0.5 + h * 0.2 * sc;
             const s = G.SPR.leafy[0], dw = s.w * Math.round(sc), dh = s.h * Math.round(sc);
@@ -1115,7 +1115,7 @@ G.Menus = (() => {
           }
         },
         {
-          t: '回到英雄', m: '按右下大招上方的{準心按鈕}，鏡頭回到英雄', d: '按 {C} 鍵，或按右下大招上方的{準心按鈕}，鏡頭回到英雄',
+          t: '回到英雄', m: '點大招上方的{準心}，鏡頭回到英雄', d: '按 {C} 或點大招上方的{準心}，鏡頭回到英雄',
           draw(c, x, y, w, h, t, dk) {
             const T = t % 3, k = T < 1.2 ? 1 : 1 - ss(seg(T, 1.2, 1.7)), hx = x + w / 2 - k * w * 0.45;
             unit(c, 'leafy', hx, y + h * 0.55, false);
@@ -1128,7 +1128,7 @@ G.Menus = (() => {
           }
         },
         {
-          z: 1, t: '傳送', m: '{連點我方的塔兩下}就傳送（3 秒）；跟隨的小兵也會一起，{每 30 秒一次}', d: '{左鍵連點我方的塔兩下}就傳送（3 秒）；跟隨的小兵也會一起，{每 30 秒一次}',
+          z: 1, t: '傳送', m: '{連點我方塔兩下}，3 秒後傳送過去，跟隨的小兵一起走。冷卻 {30 秒}', d: '{左鍵連點我方塔兩下}，3 秒後傳送過去，跟隨的小兵一起走。冷卻 {30 秒}',
           draw(c, x, y, w, h, t, dk) {
             const T = t % 5, gy = y + Math.round(h * 0.78), tx = x + w * 0.78, done = T > 3.6;
             if (T > 0.55 && T < 0.95) { const pr2 = (T * 2) % 1; G.pxEllipse(c, tx, gy - 6, 12 + pr2 * 5, 4 + pr2 * 2, 13); }   // 第一下：提示再點一下
@@ -1143,39 +1143,8 @@ G.Menus = (() => {
           }
         },
         {
-          t: '暫停', m: '按右上角的{暫停按鈕}，可以繼續、看教學、重新開始、調整音量或回首頁', d: '按 {Esc} 或右上角的{暫停按鈕}，可以繼續、看教學、重新開始、調整音量或回首頁',
-          draw(c, x, y, w, h, t, dk) {
-            const T = t % 3.6, on = T > 1;
-            unit(c, 'leafy', x + w * 0.3, y + h * 0.8, !on); unit(c, 'babybear', x + w * 0.62, y + h * 0.8, !on, -1);
-            if (on) {
-              H().dither(c, x, y, w, h, 0, 0.6);
-              const items = [['i_play', '繼續'], ['i_guide', '教學'], ['i_retry', '重新開始'], ['i_tree', '回首頁'], ['i_music', '音量']], bw = Math.max(...items.map(q => G.cnW(q[1]))) + 30;
-              const n = h < 110 ? 3 : 5, bh = 16, bx = Math.round(x + w / 2 - bw / 2), by0 = Math.round(y + h / 2 - n * (bh + 3) / 2);
-              items.slice(0, n).forEach(([ic, lab], i) => { const yy = by0 + i * (bh + 3); H().box(c, bx, yy, bw, bh, 1, i ? 7 : 13); H().icon(c, ic, bx + 9, yy + 8); G.cn(c, lab, bx + 19, yy + 2, i ? 9 : 13); });
-            }
-            if (dk) { const on2 = T > 0.8 && T < 1.1; H().box(c, x + w - 30, y + 6 + (on2 ? 1 : 0), 23, 13, on2 ? 13 : 1, on2 ? 13 : 6); G.text(c, 'ESC', x + w - 18.5, y + 10 + (on2 ? 1 : 0), on2 ? 0 : 9, 1, null, 0.5); }
-            else if (!on) { H().box(c, x + w - 20, y + 6, 14, 12, 1, 5); H().icon(c, 'i_pause', x + w - 13, y + 12); hand(c, x + w - 13, Math.round(lerp(y + h * 0.6, y + 12, ss(seg(T, 0.2, 0.8)))), T > 0.8); }
-          }
-        },
-        {
-          t: '音量', m: '首頁「{設定}」或戰鬥中{暫停}，左右拖動滑桿就能{分別調整音樂和音效}的音量',
-          draw(c, x, y, w, h, t, dk) {
-            const T = t % 4, sw = Math.min(w - 24, 130), sx = Math.round(x + w / 2 - sw / 2), y0 = Math.round(y + h / 2 - 20);
-            const vm = T < 1 ? 1 : T < 2 ? 1 - (T - 1) * 0.6 : 0.4, vs = T < 2.2 ? 0.8 : T < 3 ? 0.8 - (T - 2.2) * 0.5 : 0.4;
-            H().box(c, sx - 4, y0 - 4, sw + 8, 46, 1, 4, false);
-            [['i_music', '音樂', vm], ['i_sound', '音效', vs]].forEach(([ic, lab, v], i) => {
-              const yy = y0 + i * 20, lw = 18 + G.cnW(lab) + 6, tx = sx + lw, tw = sw - lw - 26;
-              H().icon(c, ic, sx + 6, yy + 9); G.cn(c, lab, sx + 14, yy + 3, 9);
-              G.bar3d(c, tx, yy + 7, tw, 4, v, 13); H().key(c, Math.round(tx + tw * v - 3), yy + 3, 7, 11, false, 13, 13, G.tint(14, -0.5));
-              G.text(c, Math.round(v * 100) + '%', sx + sw, yy + 7, 9, 1, null, 1);
-              const act = i === 0 ? T > 0.8 && T < 2.1 : T > 2.0 && T < 3.1;
-              if (act) ptr(dk)(c, Math.round(tx + tw * v), yy + 9, true);
-            });
-          }
-        },
-        {
-          t: '大地圖', m: '按小地圖下方的{展開按鈕}打開大地圖；{點地圖上任一處}，鏡頭就移過去',
-          d: '按小地圖下方的{展開按鈕}打開大地圖；{點地圖上任一處}，鏡頭就移過去',
+          t: '大地圖', m: '點小地圖下方的{展開}打開大地圖，{點任一處}鏡頭就移過去',
+          d: '點小地圖下方的{展開}打開大地圖，{點任一處}鏡頭就移過去',
           draw(c, x, y, w, h, t, dk) {
             const T = t % 4.2, open = T > 1.1 && T < 3.6;
             const mw = 40, mh = 30, mx = x + w - mw - 4, my = y + 4;
@@ -1196,7 +1165,7 @@ G.Menus = (() => {
     {
       name: '戰鬥', pages: [
         {
-          z: 1, t: '自動攻擊', m: '敵人進入{w:白色圈圈}，英雄會{自動攻擊}',
+          z: 1, t: '自動攻擊', m: '敵人走進{w:白圈}，英雄會{自動攻擊}',
           draw(c, x, y, w, h, t) {
             const T = t % 4.2, gy = y + Math.round(h * 0.68), hx = x + w * 0.3, rw = Math.min(w * 0.36, 74);
             const bx = lerp(x + w + 12, x + w * 0.3 + rw * 0.8, ss(seg(T, 0, 1.6))), inside = bx - hx < rw + 2;
@@ -1208,7 +1177,7 @@ G.Menus = (() => {
           }
         },
         {
-          z: 1, t: '攻擊順序', m: '自動攻擊會優先打{血量最少}的敵人',
+          z: 1, t: '攻擊順序', m: '自動攻擊優先打{血最少}的敵人',
           draw(c, x, y, w, h, t) {
             const gy = y + h * 0.68, hx = x + w * 0.25, e1 = x + w * 0.62, e2 = x + w * 0.78, T = t % 0.9;
             unit(c, 'leafy', hx, gy, false);
@@ -1219,7 +1188,7 @@ G.Menus = (() => {
           }
         },
         {
-          z: 1, t: '鎖定目標', m: '{點一下敵人或塔}就會鎖定，英雄會一直追打；右上角會顯示{r:目標血量}', d: '{左鍵點敵人或塔}就會鎖定，英雄會一直追打；右上角會顯示{r:目標血量}',
+          z: 1, t: '鎖定目標', m: '{點敵人或塔}鎖定，英雄會一路追打；{點地面}解除', d: '{左鍵點敵人或塔}鎖定，英雄會一路追打；{點地面}解除',
           draw(c, x, y, w, h, t, dk) {
             const T = t % 4, gy = y + h * 0.8, tx = x + w * 0.72, k = ss(seg(T, 1.0, 2.0)), hx = lerp(x + w * 0.15, x + w * 0.42, k);
             if (T > 0.75) lockRing(c, Math.round(tx), Math.round(gy), 12, T - 0.75);
@@ -1231,19 +1200,7 @@ G.Menus = (() => {
           }
         },
         {
-          z: 1, t: '解除鎖定', m: '{點一下地面}改為移動，鎖定就會{解除}',
-          draw(c, x, y, w, h, t, dk) {
-            const T = t % 3.4, gy = y + h * 0.75, tx = x + w * 0.75;
-            if (T < 0.9) lockRing(c, Math.round(tx), Math.round(y + h * 0.8), 12, 1);
-            tower(c, 'enemy_tower', tx, y + h * 0.8);
-            const k = ss(seg(T, 1.1, 2.5)), hx = lerp(x + w * 0.4, x + w * 0.15, k);
-            if (T > 0.9 && T < 2.6) moveMark(c, Math.round(x + w * 0.15), gy, T - 0.9);
-            unit(c, 'leafy', hx, gy, k > 0 && k < 1, -1);
-            if (T < 1.2) ptr(dk)(c, Math.round(lerp(x + w * 0.5, x + w * 0.15, ss(seg(T, 0.2, 0.8)))), Math.round(lerp(y + h, gy, ss(seg(T, 0.2, 0.8)))), T > 0.8 && T < 1.0);
-          }
-        },
-        {
-          z: 1, t: '召集小兵', m: '{點我方小兵}，牠會跟在英雄後方、打同一個目標；{再點一次解除}，右下{黃旗鈕}可一次全部解散', d: '{左鍵點我方小兵}，牠會跟著英雄打同一個目標；{再點一次解除}',
+          z: 1, t: '召集小兵', m: '{點我方小兵}，牠會跟著英雄作戰；{再點一次}放開，{黃旗鈕}全部解散', d: '{左鍵點我方小兵}，牠會跟著英雄作戰；{再點一次}放開，{黃旗鈕}全部解散',
           draw(c, x, y, w, h, t, dk) {
             const T = t % 5, gy = y + Math.round(h * 0.68), on = T > 0.9 && T < 4.3, k = ss(seg(T, 1.4, 2.6));
             const hx = lerp(x + w * 0.22, x + w * 0.5, k), mx = lerp(x + w * 0.34, x + w * 0.62, ss(seg(T, 1.55, 2.8))) - (T < 0.9 ? 0 : 0), ex = x + w * 0.86;
@@ -1259,7 +1216,7 @@ G.Menus = (() => {
           }
         },
         {
-          t: '施放技能', m: '右下角一排技能按鈕，{點一下施放}；{最右邊是大招}', d: '按 {Q／E／R} 施放技能',
+          t: '施放技能', m: '{點技能按鈕}施放，{最右邊是大招}', d: '按 {Q／E／R} 施放技能',
           draw(c, x, y, w, h, t, dk) {
             const T = t % 3.6, gy = y + Math.round(h * 0.68), hx = x + w * 0.16, bx = x + w * 0.52;
             unit(c, 'leafy', hx, gy, false);
@@ -1273,15 +1230,7 @@ G.Menus = (() => {
           }
         },
         {
-          t: '技能冷卻', m: '施放後按鈕會變暗，中間數字是{剩餘秒數}',
-          draw(c, x, y, w, h, t) {
-            const T = t % 4.4, cd = T < 0.4 ? 0 : Math.max(0, 1 - (T - 0.4) / 4), bw = 34, bx = Math.round(x + w / 2 - bw / 2), by = Math.round(y + h / 2 - bw / 2);
-            skBtn(c, bx, by, bw, 'i_mistic', cd, Math.ceil(cd * 4), false);
-            if (cd <= 0 && T > 1) { G.pxEllipse(c, bx + bw / 2, by + bw / 2, bw / 2 + 3, bw / 2 + 3, 9); }
-          }
-        },
-        {
-          t: '魔力 MP', m: '按鈕右下的數字是 {g:MP 消耗}，{g:MP} 不夠時按鈕會變暗',
+          t: '魔力 MP', m: '按鈕右下是 {g:MP 消耗}，不夠時按鈕會變暗',
           draw(c, x, y, w, h, t) {
             const T = t % 4, mp = T < 2 ? 0.25 : Math.min(1, 0.25 + (T - 2) * 0.5), ok = mp * 150 >= 120, bw = 30, bx = Math.round(x + w / 2 + 10), by = Math.round(y + h / 2 - bw / 2);
             G.cn(c, 'MP', x + w * 0.12, y + h / 2 - 6, 11); c.fillStyle = P[0]; c.fillRect(Math.round(x + w * 0.12) + 22, Math.round(y + h / 2 - 2), 52, 5); c.fillStyle = P[11]; c.fillRect(Math.round(x + w * 0.12) + 23, Math.round(y + h / 2 - 1), Math.round(50 * mp), 3);
@@ -1289,7 +1238,7 @@ G.Menus = (() => {
           }
         },
         {
-          t: '金幣與商店', m: '戰鬥中會持續得到金幣，{擊殺與推塔得更多}；點左下{商店}購買藥水', d: '戰鬥中會持續得到金幣，{擊殺與推塔得更多}；按 {B} 開商店購買藥水',
+          t: '金幣與商店', m: '金幣會自動增加，{擊殺和推塔}拿更多；點左下{商店}買藥水', d: '金幣會自動增加，{擊殺和推塔}拿更多；按 {B} 開商店買藥水',
           draw(c, x, y, w, h, t, dk) {
             const T = t % 4.4, bx = x + 8, by = y + h - 28, gold = Math.floor(120 + T * 30), open = T > 1 && T < 2.6, bought = T > 2.2;
             H().box(c, bx, by + (T > 0.8 && T < 1 ? 1 : 0), 24, 22, 1, open ? 13 : 5); H().icon(c, 'i_shop', bx + 12, by + 8); G.text(c, bought ? gold - 150 : gold, bx + 12, by + 15, 13, 1, null, 0.5);
@@ -1304,7 +1253,7 @@ G.Menus = (() => {
           }
         },
         {
-          t: '使用道具', m: '藥水排在{左側滾輪}，滑動切換、{點中間亮黃那格}使用；閒置會自動縮小', d: '用滾輪或拖曳切換{左側藥水}，{點中間亮黃那格}使用；閒置會自動縮小',
+          t: '使用道具', m: '藥水在{左側滾輪}，轉到中間後{點亮黃那格}使用', d: '藥水在{左側滾輪}，用滾輪轉到中間後{點亮黃那格}使用',
           draw(c, x, y, w, h, t, dk) {
             const T = t % 4, gy = y + Math.round(h * 0.62), hx = x + w * 0.7, used = T > 2.3, f = !used ? 0.3 : lerp(0.3, 1, ss(seg(T, 2.3, 2.7)));
             unit(c, 'leafy', hx, gy, false); hpBar(c, hx - 12, gy - 23, 24, f, 10);
@@ -1323,7 +1272,7 @@ G.Menus = (() => {
           }
         },
         {
-          z: 1, t: '鑰匙掉落', m: '擊倒敵人、塔或野怪{有機率掉鑰匙}，自動飛進左上角；{小兵擊倒的機率減半}',
+          z: 1, t: '鑰匙掉落', m: '擊倒敵人、塔或野怪{有機會掉鑰匙}（開寶箱用）；{被小兵打倒的機率減半}',
           draw(c, x, y, w, h, t) {
             const T = t % 3.2, gy = y + h * 0.72, ex = x + w * 0.66, kx = x + 14, ky = y + 10;
             unit(c, 'leafy', x + w * 0.3, gy, false);
@@ -1338,7 +1287,7 @@ G.Menus = (() => {
           }
         },
         {
-          t: '技能升級', m: '升級得到{技能點}，點技能上方的{黃色＋}升級（{最高 3 級}），畫面會顯示變強多少', d: '升級得到{技能點}，點技能上方的{黃色＋}升級（{最高 3 級}），畫面會顯示這一級變強多少；按 {U} 自動配點',
+          t: '技能升級', m: '升級得到{技能點}，點技能上方的{黃色＋}升級，{最高 3 級}', d: '升級得到{技能點}，點技能上方的{黃色＋}升級，{最高 3 級}',
           draw(c, x, y, w, h, t, dk) {
             const T = t % 3.6, bw = 30, bx = Math.round(x + w / 2 - bw / 2), by = Math.round(y + h / 2 - bw / 2 + 6), lv = T > 1.4 ? 2 : 1;
             H().box(c, bx, by, bw, bw, 1, 5); H().icon(c, 'i_mistic', bx + bw / 2, by + bw / 2);
@@ -1350,7 +1299,7 @@ G.Menus = (() => {
           }
         },
         {
-          t: '技能說明', m: '{長按}任何技能（被動技也是長按）會跳出{資訊卡}，用動畫示範效果並列出數值；放開就關閉', d: '{按住}技能按鈕不放（被動技也是），會跳出{資訊卡}，用動畫示範效果並列出數值',
+          t: '技能說明', m: '{長按}技能或增益圖示，看說明和數值', d: '{按住}技能或增益圖示，看說明和數值',
           draw(c, x, y, w, h, t, dk) {
             const T = t % 3.6, bw = 22, bx = Math.round(x + w - bw - 8), by = Math.round(y + h - bw - 6), hold = T > 0.6 && T < 3.0;
             H().box(c, bx, by + (hold ? 1 : 0), bw, bw, 0, 5); H().icon(c, 'i_mistic', bx + bw / 2, by + bw / 2 + (hold ? 1 : 0));
@@ -1370,7 +1319,7 @@ G.Menus = (() => {
           }
         },
         {
-          t: '施法前搖', m: '放技能前會先{蓄力}，大招更久、畫面變暗；首領放招前腳下也會出現{法陣}，{快閃開}',
+          t: '施法前搖', m: '放技能前要{蓄力}，大招更久。首領腳下出現{法陣}時，{快閃開}',
           draw(c, x, y, w, h, t) {
             const T = t % 2.6, gy = Math.round(y + h * 0.72), hx = Math.round(x + w * 0.3), ex = Math.round(x + w * 0.72), ch = T < 1.1, cp = Math.min(1, T / 1.1);
             if (ch) { c.globalAlpha = 0.35 * cp; c.fillStyle = P[0]; c.fillRect(x, y, w, h); c.globalAlpha = 1; G.pxEllipse(c, hx, gy, 6 + cp * 10, 3 + cp * 4, 11, 3, t * 10); G.pxEllipse(c, hx, gy, 4 + cp * 6, 2 + cp * 2, 13, 2, -t * 14);
@@ -1383,7 +1332,7 @@ G.Menus = (() => {
         },
         // v2.4 技能瞄準／取消施放／塔的警戒／特殊藥水
         {
-          t: '技能瞄準', m: '{按住技能往外拖}，可以自己選落點，地上會畫出作用範圍；放開就施放。{點一下則自動瞄準}',
+          t: '技能瞄準', m: '{按住技能往外拖}選落點，放開就施放；{點一下}自動瞄準',
           draw(c, x, y, w, h, t, dk) {
             const T = t % 3.6, gy = Math.round(y + h * 0.6), hx = Math.round(x + w * 0.22), bx = Math.round(x + w - 26), by = Math.round(y + h - 24);
             const k = ss(seg(T, 0.5, 1.7)), ax = Math.round(lerp(hx + 14, x + w * 0.66, k)), ay = Math.round(lerp(gy, gy - 4, k)), aiming = T > 0.5 && T < 1.9, boom = T >= 1.9 && T < 2.5;
@@ -1398,7 +1347,7 @@ G.Menus = (() => {
           }
         },
         {
-          t: '取消施放', m: '瞄準時把手指拖到上方的「{取消}」再放開，就不會施放。電腦版按 {Esc} 或{滑鼠右鍵}',
+          t: '取消施放', m: '瞄準時拖到上方的「{取消}」再放開', d: '瞄準時按 {Esc} 或{滑鼠右鍵}取消',
           draw(c, x, y, w, h, t, dk) {
             const T = t % 3.2, gy = Math.round(y + h * 0.58), hx = Math.round(x + w * 0.25), bx = Math.round(x + w - 26), by = Math.round(y + h - 24), cx0 = bx - 8, cy0 = by - 30;
             const k = ss(seg(T, 0.9, 1.6)), on = T > 0.4 && T < 2.0, hot = T > 1.5 && T < 2.0;
@@ -1411,7 +1360,7 @@ G.Menus = (() => {
           }
         },
         {
-          t: '塔的警戒', m: '走進敵塔範圍時，地上會出現{r:粉紅色的圈}。被塔鎖定時會響警示音，英雄頭上冒出{r:紅色驚嘆號}',
+          t: '塔的警戒', m: '走進敵塔範圍，地上出現{r:粉紅圈}；被塔鎖定時，頭上冒出{r:驚嘆號}',
           draw(c, x, y, w, h, t) {
             const T = t % 3.6, gy = Math.round(y + h * 0.78), tx = Math.round(x + w * 0.74), hx = Math.round(lerp(x + 14, x + w * 0.42, ss(seg(T, 0, 1.2)))), lk = T > 1.2;
             const rx = 58, ry = 24; c.globalAlpha = lk ? 0.18 : 0.12; c.fillStyle = P[lk ? 10 : 19]; c.beginPath(); c.ellipse(tx, gy - 4, rx, ry, 0, 0, 6.2832); c.fill(); c.globalAlpha = 1; G.pxEllipse(c, tx, gy - 4, rx, ry, lk ? 10 : 19, lk ? 0 : 4, t * 6);
@@ -1423,7 +1372,7 @@ G.Menus = (() => {
           }
         },
         {
-          t: '特殊藥水', m: '{無敵藥水} 2.5 秒內不受傷害；{復活藥水}放在背包，陣亡時會{自動原地復活}',
+          t: '特殊藥水', m: '{無敵藥水}：2.5 秒不受傷。{復活藥水}：帶在身上，陣亡時{原地復活}',
           draw(c, x, y, w, h, t) {
             const T = t % 4, gy = Math.round(y + h * 0.72), hx = Math.round(x + w * 0.4), inv = T < 2;
             unit(c, 'leafy', hx, gy, false);
@@ -1433,7 +1382,7 @@ G.Menus = (() => {
           }
         },
         {
-          t: '戰鬥數據', m: '左上角鑰匙旁邊的 {K/D/A} 顯示擊殺／陣亡／助攻；{點開}可以看野怪、推塔、金幣、傷害等即時數據',
+          t: '戰鬥數據', m: '{點左上 K/D/A}，看擊殺、推塔、傷害等即時數據',
           draw(c, x, y, w, h, t, dk) {
             const T = t % 4, open = T > 1.1 && T < 3.6, kda = '3/0/2', kw = G.textW(kda) + 8, kx = x + 30, ky = y + 6;
             c.fillStyle = P[0]; c.fillRect(x + 6, ky, 21, 8); H().icon(c, 'i_key', x + 12, ky + 4); G.text(c, 'X2', x + 19, ky + 1, 13);
@@ -1449,17 +1398,7 @@ G.Menus = (() => {
           }
         },
         {
-          t: '增益狀態', m: '左上角的增益圖示，{長按}可看效果與剩餘秒數', d: '左上角的增益圖示，{按住不放}可看效果與剩餘秒數',
-          draw(c, x, y, w, h, t, dk) {
-            const T = t % 3.6, bx = x + 10, by = y + 10, hold = T > 0.7 && T < 3, left = Math.max(0, 62 - Math.floor(T * 3));
-            H().box(c, bx, by, 13, 13, hold ? 3 : 0, 10, false); H().icon(c, 'i_rage', bx + 6.5, by + 6.5);
-            H().box(c, bx + 15, by, 13, 13, 0, 12, false); H().icon(c, 'i_mp', bx + 21.5, by + 6.5);
-            if (hold && T > 1.05) { const cw = Math.min(w - 24, 120), sm = h < 90, cy = sm ? by - 4 : by + 20, bx2 = bx; { const bx = sm ? bx2 + 34 : bx2; H().box(c, bx, cy, cw, 50, 1, 10); H().icon(c, 'i_rage', bx + 11, cy + 10); G.cn(c, '狂暴之力', bx + 22, cy + 3, 9); G.cn(c, '攻擊力 +25%', bx + 6, cy + 20, 7); c.fillStyle = P[0]; c.fillRect(bx + 6, cy + 38, cw - 60, 3); c.fillStyle = P[9]; c.fillRect(bx + 6, cy + 39, Math.round((cw - 60) * left / 90), 1); G.cn(c, '剩 ' + left + ' 秒', bx + cw - 6, cy + 33, 13, 1); } }
-            if (T < 3.1) ptr(dk)(c, bx + 7, Math.round(lerp(y + h + 6, by + 7, ss(seg(T, 0.1, 0.6)))), hold);
-          }
-        },
-        {
-          z: 1, t: '升級', m: '打倒敵人得到經驗，升級後 {r:HP} 與 {g:MP} {全滿}',
+          z: 1, t: '升級', m: '得到經驗就會升級，升級時 {r:HP}、{g:MP} {全滿}',
           draw(c, x, y, w, h, t) {
             const T = t % 3, gy = y + h * 0.72, hx = x + w / 2;
             if (T > 0.6 && T < 2.2) { const p = (T - 0.6) / 1.6, bw2 = Math.round(10 * (1 - p)) + 1; H().dither(c, Math.round(hx - bw2), Math.round(gy - 60), bw2 * 2, 60, 13, (1 - p) * 0.9); ztext(c, 'LV UP', hx, gy - 34 - p * 10, 13, 1, 0, 0.5); }
@@ -1468,7 +1407,7 @@ G.Menus = (() => {
           }
         },
         {
-          t: '英雄資訊', m: '{點左上角的英雄頭像}，可以看目前的能力值；{黃色代表增益中}', d: '{點左上角的英雄頭像}，可以看目前的能力值；{黃色代表增益中}',
+          t: '英雄資訊', m: '{點左上頭像}看能力值，{黃色}是增益中', d: '{點左上頭像}看能力值，{黃色}是增益中',
           draw(c, x, y, w, h, t, dk) {
             const T = t % 4, open = T > 0.9 && T < 3.6;
             H().box(c, x + 6, y + 6, 20, 20, 2, 6); c.drawImage(G.SPR.leafy[0].n, x + 16 - G.SPR.leafy[0].w / 2, y + 16 - G.SPR.leafy[0].h / 2);
@@ -1481,26 +1420,13 @@ G.Menus = (() => {
             if (T < 1.1) ptr(dk)(c, Math.round(lerp(x + w * 0.6, x + 16, ss(seg(T, 0.1, 0.7)))), Math.round(lerp(y + h, y + 16, ss(seg(T, 0.1, 0.7)))), T > 0.7 && T < 0.9);
           }
         },
-        {
-          z: 1, t: '復活', m: '英雄倒下後，倒數結束會在{聖樹旁復活}',
-          draw(c, x, y, w, h, t) {
-            const T = t % 4, ph = G.SPR.pholy[0], gy = y + h * 0.85;
-            c.drawImage(ph.n, Math.round(x + w * 0.3 - ph.w / 2), Math.round(gy - ph.h));
-            if (T < 3) { H().dither(c, x, y, w, h, 0, 0.35); ztext(c, 3 - (T | 0), x + w * 0.65, y + h * 0.3 - 4, 9, 3, 0, 0.5); }
-            else unit(c, 'leafy', x + w * 0.5, gy - 4, false);
-          }
-        }
       ]
     },
     // v2.8.4 拿掉「英雄」分類：個別英雄的招式看「隊伍 → 技能展示」，教學只放通用說明
     {
       name: '地圖', pages: [
         {
-          t: '三條路', m: '地圖有{上路、中路、下路}三條路',
-          draw(c, x, y, w, h, t) { const mw = Math.min(w - 20, (h - 12) * 1.33), mh = mw * 0.75, L = ((t / 1.2) | 0) % 3; miniMap(c, Math.round(x + w / 2 - mw / 2), Math.round(y + h / 2 - mh / 2), Math.round(mw), Math.round(mh), L); G.cn(c, ['上路', '中路', '下路'][L], x + w - 6, y + 4, 13, 1); }
-        },
-        {
-          z: 1, t: '兵線', m: '雙方{每 20 秒}從聖所派出小兵，沿著三條路前進',
+          z: 1, t: '兵線', m: '雙方{每 20 秒}派出小兵，沿{上、中、下}三路前進',
           draw(c, x, y, w, h, t) {
             const gy = y + h * 0.7, T = t % 4, k = Math.min(1, T / 2.2);
             for (let i = 0; i < 3; i++) { unit(c, ['leafblower', 'seedshooter', 'treeprotector'][i], lerp(x + 10 - i * 14, x + w * 0.42 - i * 14, k), gy + (i % 2) * 6, k < 1); unit(c, ['babybear', 'bear', 'babybear'][i], lerp(x + w - 10 + i * 14, x + w * 0.58 + i * 14, k), gy + (i % 2) * 6, k < 1, -1); }
@@ -1508,14 +1434,14 @@ G.Menus = (() => {
           }
         },
         {
-          t: '防禦塔', m: '每條路有{外、中、內}三層塔，基地前還有{主塔}；塔會隨時間變強，{連續打同一個英雄會越打越痛}',
+          t: '防禦塔', m: '每路有{外、中、內}三座塔，基地前還有{主塔}。塔會越來越強，{連打同一個英雄會越打越痛}',
           draw(c, x, y, w, h, t) {
             const gy = y + h * 0.84, L = ((t / 0.9) | 0) % 4;
             [['enemy_tower', '外塔'], ['enemy_tower2', '中塔'], ['enemy_tower3', '內塔'], ['enemy_tower4', '主塔']].forEach(([n, lab], i) => { const tx = x + w * (0.13 + i * 0.25); tower(c, n, tx, gy); G.cn(c, lab, tx, y + 4, i === L ? 13 : 6, 0.5); });
           }
         },
         {
-          z: 1, t: '推塔順序', m: '同一路要{先拆外塔}，中塔、內塔的{b:藍色護盾}才會依序消失',
+          z: 1, t: '推塔順序', m: '同一路要{先拆外塔}，裡面那座的{b:藍色護盾}才會消失',
           draw(c, x, y, w, h, t) {
             const T = t % 4.4, gy = y + h * 0.82, broke = T > 1.8;
             if (!broke) tower(c, 'enemy_tower', x + w * 0.35, gy, false, ((T * 10) | 0) % 3 === 0);
@@ -1525,7 +1451,7 @@ G.Menus = (() => {
           }
         },
         {
-          z: 1, t: '摧毀聖所', m: '{任一路內塔}倒了才能打主塔；主塔倒了才能打聖所，{摧毀即獲勝}',
+          z: 1, t: '摧毀聖所', m: '{任一路內塔}倒了才能打主塔，主塔倒了才能打聖所，{拆掉聖所就贏}',
           draw(c, x, y, w, h, t) {
             const T = t % 4.2, gy = y + Math.round(h * 0.86), eh = G.SPR.eholy[0], ex = x + w * 0.62;
             const boom = T > 2.2 && T < 3.4;
@@ -1534,11 +1460,11 @@ G.Menus = (() => {
           }
         },
         {
-          t: '河道與野區', m: '河道分開雙方；{野怪}住在森林裡的凹槽營地，{野生首領}待在河道旁的坑裡',
+          t: '河道與野區', m: '{野怪}住在森林營地，{野生首領}待在河道旁',
           draw(c, x, y, w, h, t) { const mw = Math.min(w - 20, (h - 12) * 1.33), mh = mw * 0.75; miniMap(c, Math.round(x + w / 2 - mw / 2), Math.round(y + h / 2 - mh / 2), Math.round(mw), Math.round(mh), ((t * 1.2) | 0) % 2 ? 'river' : 'wild'); }
         },
         {
-          t: '視野與迷霧', m: '我方單位看不到的地方會蓋上{迷霧}，裡面的敵人不會顯示；{森林會擋住視線}',
+          t: '視野與迷霧', m: '看不到的地方蓋著{迷霧}，敵人躲在裡面；{森林會擋視線}',
           draw(c, x, y, w, h, t) {
             const T = t % 4.4, gy = y + h * 0.68, hx = x + w * 0.3, ex = lerp(x + w + 10, x + w * 0.56, ss(seg(T, 0.2, 2.4))), R0 = Math.min(w * 0.3, 64);
             unit(c, 'leafy', hx, gy, false);
@@ -1553,7 +1479,7 @@ G.Menus = (() => {
           }
         },
         {
-          z: 1, t: '野怪增益', m: '打倒{r:紅色營}得攻擊增益，{b:藍色營}得 MP 與冷卻增益，{鱷魚營}給大量經驗',
+          z: 1, t: '野怪增益', m: '{r:紅營}給攻擊增益，{b:藍營}給 MP 與冷卻增益，{鱷魚營}給大量經驗',
           draw(c, x, y, w, h, t) {
             const k = ((t / 2.2) | 0) % 3, T = t % 2.2, gy = y + h * 0.7, d = G.WILD[['red', 'blue', 'exp'][k]];
             if (T < 1.2) { unit(c, d.unit, x + w * 0.65, gy, false, -1, ((t * 12) | 0) % 3 === 0); hpBar(c, x + w * 0.65 - 10, gy - 26, 20, 1 - T / 1.2, 13); }
@@ -1563,7 +1489,7 @@ G.Menus = (() => {
           }
         },
         {
-          z: 1, t: '野生首領', m: '河道上的野生首領很強，{打倒後會加入我方}，幫忙推塔',
+          z: 1, t: '野生首領', m: '河道的野生首領很強，{打倒後加入我方}幫忙推塔',
           draw(c, x, y, w, h, t) {
             const T = t % 4, gy = y + h * 0.72, ally = T > 1.6, bx = ally ? lerp(x + w * 0.55, x + w + 30, ss(seg(T, 2.2, 4))) : x + w * 0.6;
             if (ally) { const s = G.SPR[G.VIS.polarbear.spr][((gt * 6) | 0) % 2], gl = G.glowOf(s.n, 13, 1, 3); c.drawImage(gl.c, Math.round(bx - s.w / 2 - gl.p), Math.round(gy - s.h + 1 - gl.p)); }
@@ -1574,7 +1500,7 @@ G.Menus = (() => {
           }
         },
         {
-          z: 1, t: '敵方獵手', m: '敵方的{獵手}（頭上 HUNTER）會來野區清怪變強，還會{搶走野生首領}，記得去阻止牠',
+          z: 1, t: '敵方獵手', m: '敵方{獵手}會清我方野區變強，還會{搶野生首領}，記得去阻止',
           draw(c, x, y, w, h, t) {
             const T = t % 4.4, gy = y + h * 0.72, wx = x + w * 0.62, hx = lerp(x + w * 0.2, x + w * 0.45, ss(seg(T, 0, 1.2))), dead = T > 2.4;
             if (!dead) { unit(c, 'gorilla', wx, gy, false, -1, ((t * 10) | 0) % 3 === 0 && T > 1.2); hpBar(c, wx - 10, gy - 26, 20, 1 - G.clamp((T - 1.2) / 1.2, 0, 1), 13); }
@@ -1584,7 +1510,7 @@ G.Menus = (() => {
           }
         },
         {
-          z: 1, t: '首領', m: '{每 3 波}敵人會出現一隻首領，頭上有{b:藍色 BOSS}',
+          z: 1, t: '首領', m: '敵方{每 3 波}來一隻首領，頭上寫著{b:BOSS}',
           draw(c, x, y, w, h, t) {
             const gy = y + h * 0.75, bx = lerp(x + w + 20, x + w * 0.55, ss(seg(t % 4, 0, 2)));
             unit(c, 'tiger', bx, gy, (t % 4) < 2, -1); hpBar(c, bx - 12, gy - 22, 24, 1, 7); ztext(c, 'BOSS', Math.min(bx, x + w - 12), gy - 27, 12, 1, 0, 0.5);
@@ -1592,7 +1518,7 @@ G.Menus = (() => {
           }
         },
         {
-          z: 1, t: '聖樹回復', m: '待在{我方聖樹旁邊}，會快速回復 {r:HP} 與 {g:MP}',
+          z: 1, t: '聖樹回復', m: '待在{我方聖樹旁}，快速回復 {r:HP} 和 {g:MP}',
           draw(c, x, y, w, h, t) {
             const ph = G.SPR.pholy[0], gy = y + h * 0.86, f = 0.3 + ((t % 3) / 3) * 0.7;
             c.drawImage(ph.n, Math.round(x + w * 0.35 - ph.w / 2), Math.round(gy - ph.h));
@@ -1605,22 +1531,7 @@ G.Menus = (() => {
     {
       name: '隊伍', pages: [
         {
-          t: '選擇角色', m: '在「隊伍」{左右滑動}角色，{轉到中間}的角色會顯示詳細資料', d: '在「隊伍」用{滑鼠拖曳、滾輪或左右鍵}轉動角色',
-          draw(c, x, y, w, h, t, dk) {
-            const T = t % 3, pos = 1 + ss(seg(T, 0.4, 1.2)), cx = x + w / 2, fl = y + h * 0.7;
-            const names = G.HEROES.slice(0, 5).map(hd => hd.name);
-            names.map((n, i) => [n, i]).sort((A, B) => Math.abs(B[1] - pos) - Math.abs(A[1] - pos)).forEach(([n, i]) => {
-              const d = i - pos, sc = 1 + Math.pow(Math.max(0, 1 - Math.abs(d)), 1.4), s = G.SPR[n][0], fw = Math.round(s.w * sc), fh = Math.round(s.h * sc), px = cx + Math.sign(d) * Math.min(Math.abs(d), 1) * 34 + Math.sign(d) * Math.max(0, Math.abs(d) - 1) * 22;
-              c.drawImage(s.n, Math.round(px - fw / 2), Math.round(fl - fh), fw, fh);
-              const dk2 = Math.min(1, Math.abs(d)) * 0.7; if (dk2 > 0.02) { c.globalAlpha = dk2; c.drawImage(G.glowOf(s.n, 0, 1, 2).tint, Math.round(px - fw / 2), Math.round(fl - fh), fw, fh); c.globalAlpha = 1; }
-            });
-            G.pxEllipse(c, cx, fl + 1, 18, 4, 6);
-            if (T > 1.2) yBtn(c, Math.round(cx - 40), Math.round(fl + 8), 80, 14, '設為出戰英雄');
-            ptr(dk)(c, Math.round(lerp(cx + 30, cx - 20, ss(seg(T, 0.3, 1.1)))), Math.round(fl - 10), T > 0.3 && T < 1.1);
-          }
-        },
-        {
-          t: '解鎖角色', m: '開局只有「普通」角色；{黑色剪影}代表還沒擁有，到首頁「{商店}」開寶箱取得',
+          t: '解鎖角色', m: '{黑色剪影}是還沒擁有的角色，到「{商店}」開寶箱取得',
           draw(c, x, y, w, h, t) {
             const T = t % 4, gy = y + h * 0.78, cx = x + w * 0.62, got = T > 2.2, sp = G.SPR.spearleafy[0];
             const sx = Math.round(x + w * 0.24 - sp.w), sy = Math.round(gy - sp.h * 2);
@@ -1632,28 +1543,14 @@ G.Menus = (() => {
           }
         },
         {
-          t: '寶箱', m: '賭徒 {1 把}、英雄 {5 把}、小兵 {3 把}鑰匙；機率看「說明」，{不會開到已擁有的角色}',
+          t: '寶箱', m: '寶箱{不會開出重複角色}，機率看「{說明}」',
           draw(c, x, y, w, h, t) {
             const gy = y + h * 0.66, ids = [['gamble', 1], ['hero', 5], ['minion', 3]], sel = ((t / 1.3) | 0) % 3;
             ids.forEach(([id, cost], i) => { const cx = x + w * (0.2 + i * 0.3), on = i === sel; G.Store.drawChest(c, id, cx, gy - (on ? Math.round(Math.abs(Math.sin(t * 6)) * 3) : 0), on ? 2 : 1, false, on ? 13 : null, 0.6); H().icon(c, 'i_key', cx - 6, gy + 8); G.text(c, 'X' + cost, cx + 2, gy + 6, 13, 1); });
           }
         },
         {
-          t: '新角色', m: '開到新角色時按「{前往隊伍}」，牠會直接站在聚光燈下；新角色標著 {NEW}，看過再滑走就消失',
-          draw(c, x, y, w, h, t) {
-            const T = t % 5, gy = Math.round(y + h * 0.7), cx = x + w / 2, sp = 34, k = ss(seg(T, 2.4, 3.0)), names = ['leafy', 'stemskewer', 'peasniper', 'leafblower'];
-            G.pxDisc(c, cx, gy, 20, 5, 4, 0.9); G.pxEllipse(c, cx, gy, 20, 5, 7);
-            names.forEach((n, i) => {
-              const d = i - 1 - k, px = cx + d * sp, sc = Math.abs(d) < 0.5 ? 1 : 0.8; if (Math.abs(d) > 2.2) return;
-              const s = G.SPR[G.VIS[n].spr][Math.abs(d) < 0.5 ? ((gt * 4) | 0) % 2 : 0], iw = Math.round(s.w * sc), ih = Math.round(s.h * sc), ix = Math.round(px - iw / 2), iy = Math.round(gy - ih + 1);
-              c.globalAlpha = Math.abs(d) < 0.5 ? 1 : 0.45; c.drawImage(s.n, ix, iy, iw, ih); c.globalAlpha = 1;
-              if (i === 1 && T < 3.0) { const bw2 = G.textW('NEW') + 4, by = iy - 9 - (Math.abs(d) < 0.5 ? Math.round(Math.abs(Math.sin(gt * 5)) * 2) : 0); c.fillStyle = P[0]; c.fillRect(ix + iw - 3, by - 1, bw2 + 2, 9); c.fillStyle = P[13]; c.fillRect(ix + iw - 2, by, bw2, 7); G.text(c, 'NEW', ix + iw, by + 1, 0); }
-            });
-            G.cn(c, T < 2.4 ? '看到新角色' : T < 3.0 ? '滑走…' : 'NEW 消失了', x + w / 2, y + 2, T < 2.4 ? 13 : 7, 0.5);
-          }
-        },
-        {
-          t: '免費寶箱', m: '賭徒寶箱{每 5 分鐘可以免費開一次}；時間一到會跳出通知，商店也會亮{g:綠色按鈕}',
+          t: '免費寶箱', m: '賭徒寶箱{每 5 分鐘免費開一次}',
           draw(c, x, y, w, h, t) {
             const T = t % 4, gy = Math.round(y + h * 0.62), cx = Math.round(x + w * 0.32), on = T > 1.6, bw = 52, bx = Math.round(x + w * 0.58), by = gy - 22;
             G.Store.drawChest(c, 'gamble', cx, gy - (on ? Math.round(Math.abs(Math.sin(t * 6)) * 3) : 0), 2, false, on ? 11 : null, 0.7);
@@ -1663,7 +1560,7 @@ G.Menus = (() => {
           }
         },
         {
-          t: '稀有度', m: '角色外框顏色代表稀有度：{w:白 普通}、{g:綠 稀有}、{p:紫 史詩}、{o:橘 傳說}、{m:七彩 神話}',
+          t: '稀有度', m: '外框顏色是稀有度：{w:白 普通}、{g:綠 稀有}、{p:紫 史詩}、{o:橘 傳說}、{m:七彩 神話}',
           draw(c, x, y, w, h, t) {
             const ex = ['leafblower', 'stemskewer', 'peasniper', 'iceshooter', 'necroleafy'], gw = Math.min(40, (w - 6) / 5), x0 = Math.round(x + w / 2 - gw * 2.5), gy = y + h * 0.62;
             ex.forEach((n, i) => {
@@ -1674,20 +1571,7 @@ G.Menus = (() => {
           }
         },
         {
-          // v2.8 開箱光色：箱縫的光一階一階升級，停在哪個顏色就是開到的稀有度
-          t: '開箱光色', m: '箱縫的光會{升級}：白→{g:綠}→{p:紫}→{o:橘}→{m:七彩}，停在哪色就開到哪個稀有度',
-          draw(c, x, y, w, h, t) {
-            const T = t % 5.5, st = T < 1.2 ? 0 : Math.min(4, 1 + (((T - 1.2) / 0.8) | 0)), col = [9, 11, 17, 14, -1][st], cx = Math.round(x + w / 2), gy = Math.round(y + h * 0.72);
-            const sx = Math.round(Math.sin(gt * 48) * (0.5 + st * 0.5));
-            G.Store.drawChest(c, 'hero', cx + sx, gy, 2, false, col, 0.5 + st * 0.12);
-            c.fillStyle = col < 0 ? P[[10, 14, 13, 11, 12, 17][((gt * 8) | 0) % 6]] : P[col]; c.globalAlpha = 0.9;
-            for (let q = -3; q <= 3; q++) { const hh = Math.round((4 + st * 2) * (1 - Math.abs(q) * 0.2) * (0.8 + Math.sin(gt * 30 + q) * 0.2)); c.fillRect(cx + sx + q * 6, gy - 22 - hh, 1, hh); }
-            c.globalAlpha = 1;
-            if (st) G.cnRar(c, G.RARITY[st].n, cx, y + 2, st, 0.5); else G.cn(c, '白光：還看不出來', cx, y + 2, 7, 0.5);
-          }
-        },
-        {
-          t: '植物點數', m: '每隻小兵要花點數，隊伍{上限 12 點}',
+          t: '植物點數', m: '每隻小兵要花點數，隊伍{最多 12 點}',
           draw(c, x, y, w, h, t) {
             const used = 2 + ((t * 1.5) | 0) % 11, max = 12, pw = 8, x0 = Math.round(x + w / 2 - max * (pw + 1) / 2), y0 = Math.round(y + h / 2 - 4);
             for (let i = 0; i < max; i++) { c.fillStyle = P[0]; c.fillRect(x0 + i * (pw + 1), y0, pw, 8); c.fillStyle = P[i < used ? (used >= max ? 14 : 13) : 3]; c.fillRect(x0 + i * (pw + 1), y0 + 1, pw, 6); }
@@ -1695,15 +1579,7 @@ G.Menus = (() => {
           }
         },
         {
-          t: '選擇路線', m: '小兵頁的陣容分成上、中、下三欄，{點一欄}就會亮黃色',
-          draw(c, x, y, w, h, t, dk) {
-            const L = ((t / 1.3) | 0) % 3, rw = Math.min(w - 16, 190), x0 = Math.round(x + w / 2 - rw / 2), y0 = Math.round(y + h / 2 - 20);
-            laneCols(c, x0, y0, rw, [['leafblower'], ['seedshooter'], ['treeprotector', 'leafblower']], L);
-            const cw = Math.floor((rw - 6) / 3); ptr(dk)(c, x0 + L * (cw + 3) + cw / 2, y0 + 7, (t % 1.3) < 0.2);
-          }
-        },
-        {
-          t: '加入小兵', m: '小兵轉到中間，按「{加入}」就放進亮黃色那路；{花費點數}寫在名字下方',
+          t: '加入小兵', m: '先{點上、中、下其中一欄}，再把小兵轉到中間按「{加入}」',
           draw(c, x, y, w, h, t, dk) {
             const T = t % 3.6, rw = Math.min(w - 16, 190), x0 = Math.round(x + w / 2 - rw / 2), y0 = y + 4, added = T > 2, sm = h < 100, by = y0 + (sm ? 14 : 29);
             const nw = G.cnW(G.nameOf('fruitpult')), nx = sm ? x0 + rw / 2 - (nw + 30) / 2 : x0 + rw / 2 - nw / 2;
@@ -1714,7 +1590,7 @@ G.Menus = (() => {
           }
         },
         {
-          t: '移出小兵', m: '{點一下陣容裡小兵頭像}（右上{r:紅色 ×}），就能移出隊伍',
+          t: '移出小兵', m: '{點陣容裡的頭像}就移出隊伍',
           draw(c, x, y, w, h, t, dk) {
             const T = t % 3, rw = Math.min(w - 16, 190), x0 = Math.round(x + w / 2 - rw / 2), y0 = Math.round(y + h / 2 - 20);
             laneCols(c, x0, y0, rw, [T < 1.2 ? ['leafblower', 'seedshooter'] : ['leafblower'], ['seedshooter'], []], 0);
@@ -1722,86 +1598,12 @@ G.Menus = (() => {
             if (T < 1.5) ptr(dk)(c, Math.round(lerp(x + w, ox + 18 + 14, ss(seg(T, 0.1, 0.8)))), y0 + 17, T > 0.9 && T < 1.2);
           }
         },
-        {
-          t: '技能展示', m: '按「{技能展示}」或點技能按鈕，會跳出展示視窗；{切換下方圖示}看每招的動畫與數值',
-          draw(c, x, y, w, h, t, dk) {
-            const T = t % 4, open = T > 0.9, pw = Math.min(w - 20, 150), px = Math.round(x + w / 2 - pw / 2);
-            if (!open) { H().key(c, px + pw / 2 - 30, y + h / 2 - 8 + (T > 0.7 ? 1 : 0), 60, 16, T > 0.7, 7); G.cn(c, '技能展示', px + pw / 2, y + h / 2 - 6 + (T > 0.7 ? 1 : 0), 9, 0.5); ptr(dk)(c, Math.round(lerp(x + w, px + pw / 2, ss(seg(T, 0.1, 0.6)))), Math.round(y + h / 2), T > 0.7); return; }
-            const ph = Math.min(h - 8, 74), py = Math.round(y + h / 2 - ph / 2), sh = ph - 32, si = T > 2.3 ? 1 : 0;
-            H().box(c, px, py, pw, ph, 1, 7); G.cn(c, '力夫', px + 5, py + 2, 9); G.cn(c, '技能展示', px + pw - 5, py + 2, 13, 1);
-            c.drawImage(G.groundStrip(pw - 10, sh), px + 5, py + 15);
-            unit(c, 'leafy', px + pw * 0.3, py + 15 + sh * 0.8, false); unit(c, 'bear', px + pw * 0.75, py + 15 + sh * 0.8, false, -1);
-            const q = (T * 1.4) % 1, s2 = si ? G.SPR.mistic[0] : G.SPR.magicball; c.drawImage(s2.n, Math.round(lerp(px + pw * 0.3 + 6, px + pw * 0.72, q) - s2.w / 2), Math.round(py + 15 + sh * 0.8 - 10 - s2.h / 2));
-            ['i_attack', 'i_mistic', 'i_slam'].forEach((ic, k) => { const bx = px + pw / 2 - 31 + k * 22; H().key(c, bx, py + ph - 16, 18, 14, k === si, k === si ? 13 : 6); H().icon(c, ic, bx + 9, py + ph - 9); });
-            if (T > 1.8 && T < 2.5) ptr(dk)(c, px + pw / 2 - 31 + 22 + 9, py + ph - 8, T > 2.1 && T < 2.3);
-          }
-        },
-        {
-          t: '角色叫聲', m: '轉盤停下或{點中間的角色}會發出{專屬叫聲}，進化型比較低沉',
-          draw(c, x, y, w, h, t, dk) {
-            const T = t % 2.6, cx = Math.round(x + w / 2), fl = Math.round(y + h / 2 + 14), nm = ((t / 2.6) | 0) % 2 ? 'eliteleafy' : 'leafy';
-            unit(c, nm, cx, fl, false); G.cn(c, G.nameOf(nm), cx, fl + 4, 9, 0.5);
-            for (let i = 0; i < 3; i++) {                     // 聲波：左右各 3 道弧線往外擴散
-              const k = seg(T, 0.5 + i * 0.18, 1.5 + i * 0.18); if (k <= 0 || k >= 1) continue;
-              const r = 9 + k * 16; c.globalAlpha = 1 - k; c.fillStyle = P[13];
-              for (let a = -0.75; a <= 0.75; a += 0.08) { const dy2 = Math.round(Math.sin(a) * r), dx2 = Math.round(Math.cos(a) * r); c.fillRect(cx + dx2, fl - 6 + dy2, 1, 1); c.fillRect(cx - dx2, fl - 6 + dy2, 1, 1); }
-              c.globalAlpha = 1;
-            }
-            if (T < 0.7) ptr(dk)(c, cx + 4, fl - 8, T > 0.35 && T < 0.55);
-          }
-        },
-        {
-          t: '圖鑑', m: '{左右滑動}查看首領、小怪、塔、野怪與獵手；上方切到「{藥水}」可以看全部藥水的效果和價格',
-          draw(c, x, y, w, h, t, dk) {
-            const T = t % 3.2, cat = ((t / 3.2) | 0) % 3, names = [['tiger', 'lion', 'cat'], ['babybear', 'eagle', 'boar'], ['gorilla', 'hippo', 'polarbear']][cat];
-            const tw = Math.min(42, (w - 12) / 4), x0 = Math.round(x + w / 2 - tw * 2);
-            ['BOSS', '小怪', '塔', '野怪'].forEach((s2, i) => { const on = i === [0, 1, 3][cat]; H().key(c, x0 + i * tw, y + 4, tw - 2, 13, on, on ? 9 : 4); G.cn(c, s2, x0 + i * tw + (tw - 2) / 2, y + 4, on ? 9 : 5, 0.5); });
-            const pos = ss(seg(T, 0.6, 1.4)), cx = x + w / 2, fl = y + h - 8;
-            names.map((n, i) => [n, i]).sort((A, B) => Math.abs(B[1] - pos) - Math.abs(A[1] - pos)).forEach(([n, i]) => {
-              const d = i - pos, s2 = G.SPR[G.VIS[n].spr][0], sc = Math.abs(d) < 0.5 ? 2 : 1, fw = s2.w * sc, fh = s2.h * sc, px = cx + d * 40;
-              if (fh > h - 30) return unit(c, n, px, fl, false);
-              c.drawImage(s2.n, Math.round(px - fw / 2), Math.round(fl - fh), fw, fh);
-              if (Math.abs(d) > 0.3) { c.globalAlpha = 0.6; c.drawImage(G.glowOf(s2.n, 0, 1, 2).tint, Math.round(px - fw / 2), Math.round(fl - fh), fw, fh); c.globalAlpha = 1; }
-            });
-            if (T > 0.3 && T < 1.5) ptr(dk)(c, Math.round(lerp(cx + 30, cx - 20, ss(seg(T, 0.5, 1.4)))), Math.round(fl - 12), T > 0.5 && T < 1.4);
-          }
-        }
       ]
     },
     {
       name: '系統', pages: [
         {
-          t: '首頁選單', m: '首頁選單可以{上下滑動}，轉到中間{亮黃色的按鈕}，再點一下進入', d: '用{滑鼠滾輪、拖曳或上下鍵}轉動選單，點中間{亮黃色的按鈕}進入',
-          draw(c, x, y, w, h, t, dk) {
-            const T = t % 4.2, items = [['i_play', '單人'], ['i_users', '多人'], ['i_tree', '隊伍'], ['i_key', '商店'], ['i_trophy', '成就']];
-            const pos = 2 * ss(seg(T, 0.5, 1.4)) - 2 * ss(seg(T, 3.3, 4.0)), cx = Math.round(x + w / 2), cy = Math.round(y + h / 2), bw = 86, bh = 14, step = 18, press = T > 2.1 && T < 2.3;
-            c.fillStyle = P[9]; c.globalAlpha = 0.06; c.fillRect(cx - 56, cy - 10, 112, 20); c.globalAlpha = 1;
-            c.save(); c.beginPath(); c.rect(x, y + 4, w, h - 8); c.clip();
-            items.forEach(([ic, n], i) => {
-              const d = i - pos, ad = Math.abs(d); if (ad > 2.6) return;
-              const ctr = ad < 0.5, w2 = bw - Math.round(Math.min(ad, 2) * 8), xx = Math.round(cx - w2 / 2), yy = Math.round(cy - bh / 2 + d * step) + (ctr && press ? 1 : 0);
-              if (ctr) { c.fillStyle = P[Math.sin(gt * 4) > 0 ? 13 : 14]; c.fillRect(xx - 1, yy - 1, w2 + 2, bh + 2); }
-              H().box(c, xx, yy, w2, bh, ctr ? 2 : 1, ctr ? 13 : 5); H().icon(c, ic, xx + 9, yy + 7); G.cn(c, n, xx + 19, yy + 1, ctr ? 9 : 7);
-              if (!ctr) { c.fillStyle = 'rgba(12,12,12,' + Math.min(0.5, ad * 0.24).toFixed(3) + ')'; c.fillRect(xx, yy, w2, bh); }
-            });
-            c.restore();
-            c.fillStyle = P[13]; for (let k = 0; k < 4; k++) { c.fillRect(cx - bw / 2 - 8 + k, cy - 3 + k, 1, 7 - k * 2); c.fillRect(cx + bw / 2 + 7 - k, cy - 3 + k, 1, 7 - k * 2); }
-            if (T > 0.3 && T < 1.5) { const fy = Math.round(lerp(cy + 26, cy - 10, ss(seg(T, 0.5, 1.4)))); dk ? cursor(c, cx + 30, fy, true) : hand(c, cx + 30, fy, true); }
-            else if (T > 1.8 && T < 2.5) ptr(dk)(c, cx + 20, cy + 2, press);
-          }
-        },
-        {
-          t: '單人關卡', m: '首頁「{單人}」左右滑選關卡；通關上一關才會{解鎖下一關}，最後一張是經典戰場',
-          draw(c, x, y, w, h, t, dk) {
-            const T = t % 4, k = ss(seg(T, 1.2, 1.8)), cw = Math.min(w - 40, 96), ch = Math.min(h - 20, 74), cy = Math.round(y + h / 2 - ch / 2), ids = ['forest', 'autumn', 'snow'];
-            for (let i = 0; i < 3; i++) { const d = i - k, cx = Math.round(x + w / 2 + d * (cw + 8) - cw / 2); if (cx > x + w || cx + cw < x) continue;
-              H().box(c, cx, cy, cw, ch, 1, Math.abs(d) < 0.5 ? 13 : 6, false); c.drawImage(G.withTheme(ids[i], () => G.groundStrip(cw - 6, Math.round(ch * 0.5))), cx + 3, cy + 3);
-              G.cn(c, G.SOLO[i].n, cx + cw / 2, cy + ch * 0.5 + 6, 9, 0.5); if (i === 2 && k < 1) H().icon(c, 'i_lock', cx + cw / 2, cy + ch * 0.3); }
-            if (T < 1.8) ptr(dk)(c, Math.round(lerp(x + w * 0.7, x + w * 0.35, ss(seg(T, 0.6, 1.6)))), cy + ch - 10, T > 0.6 && T < 1.6);
-          }
-        },
-        {
-          t: '關卡星等', m: '通關得 1 星；{聖樹血量保持一半以上}、{英雄沒陣亡}各加 1 星，新星送鑰匙',
+          t: '關卡星等', m: '通關得 1 星；{聖樹血量過半}、{英雄沒陣亡}各 +1 星，拿到新星送鑰匙',
           draw(c, x, y, w, h, t) {
             const T = t % 3.6, n = T < 0.6 ? 0 : T < 1.2 ? 1 : T < 1.8 ? 2 : 3, sw = 3 * 11, sx = Math.round(x + w / 2 - sw), sy = Math.round(y + h / 2 - 14);
             c.save(); c.translate(sx, sy); c.scale(2, 2); G.Solo.stars(c, 0, 0, n, 3, 9); c.restore();
@@ -1809,18 +1611,7 @@ G.Menus = (() => {
           }
         },
         {
-          t: '關卡天氣', m: '各關規則：{秋風}加速、{暴風雪}變慢、{火山}落熔岩、{深淵}亡者復甦',
-          draw(c, x, y, w, h, t) {
-            const i = ((t / 1.6) | 0) % 4, id = ['autumn', 'snow', 'lava', 'abyss'][i], sw = Math.min(w - 16, 150), sh = Math.min(h - 26, 70), sx = Math.round(x + w / 2 - sw / 2), sy = Math.round(y + 4);
-            c.drawImage(G.withTheme(id, () => G.groundStrip(sw, sh)), sx, sy);
-            const T = G.THEMES[id]; for (let k = 0; k < 18; k++) { const u = ((t * 0.3 + G.hash(k, 3)) % 1), up = id === 'lava' || id === 'abyss'; c.fillStyle = P[id === 'snow' ? 9 : id === 'lava' ? 14 : id === 'abyss' ? 27 : 14]; c.fillRect(Math.round(sx + G.hash(k, 9) * sw), Math.round(up ? sy + sh - u * sh : sy + u * sh), 1, 1); }
-            if (T.grade) { const [m2, col, a] = T.grade; c.globalCompositeOperation = m2; c.globalAlpha = a; c.fillStyle = col; c.fillRect(sx, sy, sw, sh); c.globalCompositeOperation = 'source-over'; c.globalAlpha = 1; }
-            if (id === 'lava') { const r = 8 + (t * 6 % 6); G.pxEllipse(c, sx + sw / 2, sy + sh * 0.6, r, r * 0.5, 10); }
-            G.cn(c, ['秋風', '暴風雪', '火山噴發', '亡者復甦'][i], x + w / 2, sy + sh + 4, 13, 0.5);
-          }
-        },
-        {
-          t: '成就', m: '完成挑戰就會{解鎖成就}；{累計遊玩、擊倒首領、推塔}都算進度',
+          t: '成就', m: '完成挑戰解鎖成就，按「{領取}」拿鑰匙',
           draw(c, x, y, w, h, t) {
             const T = t % 3.6, f = ss(seg(T, 0.3, 1.6)), done = T > 1.6, cw = w - 16, cx = x + 8;
             achCard(c, cx, y + 10, cw, '首領獵人', '累計擊倒 10 隻首領', done ? 1 : 0, Math.round(lerp(4, 10, f)), 10, 2);
@@ -1829,25 +1620,7 @@ G.Menus = (() => {
           }
         },
         {
-          t: '領取鑰匙', m: '達成的成就按「{領取}」拿鑰匙：銅 {1}、銀 {2}、金 {3}、傳說 {5} 把',
-          draw(c, x, y, w, h, t, dk) {
-            const T = t % 3.4, got = T > 1.2, cw = w - 16, cx = x + 8, keys = got && T > 1.8 ? 7 : 4, kx = x + w - 30, ky = y + 4;
-            H().box(c, kx, ky, 26, 12, 0, 13); H().icon(c, 'i_key', kx + 7, ky + 6); G.text(c, keys, kx + 22, ky + 4, 13, 1, null, 1);
-            achCard(c, cx, y + 26, cw, '千人斬', '累計擊倒 1000 個敵人', got ? 2 : 1, 1000, 1000, 3, T > 1.0 && T < 1.2);
-            if (!got) ptr(dk)(c, cx + cw - 20, y + 34, T > 0.9 && T < 1.2);
-            for (let i = 0; i < 3; i++) { const k = seg(T, 1.2 + i * 0.1, 1.8 + i * 0.1); if (k <= 0 || k >= 1) continue; const e = ss(k); H().icon(c, 'i_key', Math.round(lerp(cx + cw - 20, kx + 7, e)), Math.round(lerp(y + 33, ky + 6, e) - Math.sin(k * Math.PI) * 14)); }
-          }
-        },
-        {
-          t: '隱藏成就', m: '顯示「{？？？}」的是{隱藏成就}，只給一句提示，達成後才揭曉',
-          draw(c, x, y, w, h, t) {
-            const T = t % 3.6, rev = T > 1.8, cw = w - 16, cx = x + 8;
-            achCard(c, cx, y + 26, cw, rev ? '絕地大反攻' : '？？？', rev ? '聖樹快倒時逆轉勝' : '最危險時別放棄。', rev ? 1 : 0, 0, 1, 3, false, !rev);
-            if (T > 1.6 && T < 2.4) { const k = seg(T, 1.6, 2.4); c.globalAlpha = 1 - k; c.fillStyle = P[9]; c.fillRect(cx, y + 26, cw, 30); c.globalAlpha = 1; }
-          }
-        },
-        {
-          t: '存檔碼', m: '首頁「{帳號}」→「{產生存檔碼}」，取個玩家名稱後按「{複製}」保存',
+          t: '存檔碼', m: '「{帳號}」→「{產生存檔碼}」→「{複製}」存好，換手機也能接著玩',
           draw(c, x, y, w, h, t, dk) {
             const T = t % 4.4, cx = x + 10, cw = w - 20;
             if (T < 1.8) {
@@ -1863,7 +1636,7 @@ G.Menus = (() => {
           }
         },
         {
-          t: '讀取存檔', m: '在「讀取存檔碼」按「{貼上}」，就會自動讀取', d: '在「讀取存檔碼」直接按 {Cmd+V} 或 {Ctrl+V}，會自動讀取',
+          t: '讀取存檔', m: '在「{讀取存檔碼}」按「{貼上}」就會讀取', d: '在「{讀取存檔碼}」按 {Cmd+V} 或 {Ctrl+V} 就會讀取',
           draw(c, x, y, w, h, t, dk) {
             const T = t % 4.4, cx = x + 10, cw = w - 20;
             if (T < 2.4) {
@@ -1882,7 +1655,7 @@ G.Menus = (() => {
         },
         {
           // v2.8 線上排行榜
-          t: '排行榜', m: '取好玩家名稱就會{自動上榜}；首頁「{排行}」看 9 類的{前 20 名}，按{跳至自己}找到你的名次',
+          t: '排行榜', m: '取好玩家名稱就{自動上榜}；按「{跳至自己}」看你的名次',
           draw(c, x, y, w, h, t) {
             const ct = [['總傷害', ['葉子王', '小派', '阿明'], ['9.2萬', '5.0萬', '3.1萬']], ['勝率', ['小派', '阿明', '葉子王'], ['80.0%', '66.7%', '50.0%']], ['成就數', ['阿明', '葉子王', '小派'], ['32 個', '27 個', '20 個']]][((t / 2) | 0) % 3];
             const lw = Math.min(150, w - 16), lx = Math.round(x + w / 2 - lw / 2); let yy = y + 8;
@@ -1895,32 +1668,8 @@ G.Menus = (() => {
           }
         },
         {
-          t: '排行通知', m: '你有任何一項{衝進前三名}會跳出通知；有人{登上第 1 名}，大家都看得到',
-          draw(c, x, y, w, h, t) {
-            const T = t % 4, k = Math.min(1, T / 0.25), cx = x + w / 2, gy = y + h - 10;
-            [[-1, 7, 18, '2'], [0, 13, 28, '1'], [1, 14, 12, '3']].forEach(([d, col, hh, n]) => { const bx = Math.round(cx + d * 26 - 12); c.fillStyle = P[0]; c.fillRect(bx - 1, gy - hh - 1, 26, hh + 1); c.fillStyle = P[col]; c.fillRect(bx, gy - hh, 24, hh); G.text(c, n, bx + 12, gy - hh + 3, 0, 0.5); });
-            const s = T < 2 ? '登上總傷害第 1 名！' : '阿明 登上勝率第 1 名！', col = T < 2 ? 13 : 12, bw = Math.min(w - 8, G.cnW(s) + 24), bx = Math.round(cx - bw / 2), by = Math.round(y + 4 - (1 - k) * 6);
-            H().box(c, bx, by, bw, 16, 1, col, false); H().icon(c, 'i_rank', bx + 9, by + 8); G.cn(c, s, bx + 18, by + 2, col);
-            const f = G.SPR.leafy[((gt * 6) | 0) % G.SPR.leafy.length]; c.drawImage(f.n, Math.round(cx - f.w / 2), Math.round(gy - 28 - f.h - Math.abs(Math.sin(gt * 5)) * 3));
-          }
-        },
-        {
-          t: '戰鬥結算', m: '戰鬥結束會顯示{評價（S～D）}、擊殺數據、{拿到的鑰匙與新成就}',
-          draw(c, x, y, w, h, t) {
-            const T = t % 4.4, cx = x + w / 2;
-            const rw = 96, rx = Math.round(cx - rw / 2), k0 = ss(seg(T, 0.1, 0.4)), ry = y + 4 + Math.round((1 - k0) * -20);
-            c.fillStyle = P[0]; c.fillRect(rx - 1, ry - 1, rw + 2, 17); c.fillStyle = P[13]; c.fillRect(rx, ry, rw, 15); c.fillStyle = P[14]; c.fillRect(rx, ry + 13, rw, 2);
-            G.text(c, 'VICTORY', cx, ry + 4, 0, 2, null, 0.5);
-            const cnt = (v, t0) => Math.round(v * ss(seg(T, t0, t0 + 0.5)));
-            [['擊殺', 34, 13], ['陣亡', 1, 10], ['助攻', 12, 18]].forEach(([lab, v, col], i) => { if (T < 0.6 + i * 0.12) return; const bx = x + 8 + i * 38; H().box(c, bx, y + 28, 35, 26, 0, 4, false); G.text(c, cnt(v, 0.6 + i * 0.12), bx + 17, y + 31, col, 2, null, 0.5); G.cn(c, lab, bx + 17, y + 41, 6, 0.5); });
-            const gk = seg(T, 1.6, 1.8);
-            if (gk > 0) { const gs = Math.round(3 + (1 - gk) * 3), gx = x + w - 24, gy2 = y + 41, rr = 12 + Math.round((1 - gk) * 5); c.fillStyle = P[0]; c.fillRect(gx - rr - 1, gy2 - rr - 1, rr * 2 + 2, rr * 2 + 2); c.fillStyle = P[14]; c.fillRect(gx - rr, gy2 - rr, rr * 2, rr * 2); c.fillStyle = P[1]; c.fillRect(gx - rr + 2, gy2 - rr + 2, rr * 2 - 4, rr * 2 - 4); G.text(c, 'S', gx, gy2 - Math.round(gs * 2.5), 14, gs, null, 0.5); }
-            if (T > 2.0) { H().icon(c, 'i_key', x + 14, y + 66); G.cn(c, '鑰匙 +3', x + 22, y + 60, 13); H().icon(c, 'i_trophy', x + 14, y + 80); G.cn(c, '成就達成 ×2', x + 22, y + 74, 13); }
-          }
-        },
-        {
           // v2.8.6 反饋信箱
-          t: '反饋', m: '首頁「{反饋}」可以寫信給開發者；開發者回覆後，按鈕上會出現{紅色數字}',
+          t: '反饋', m: '「{反饋}」可以寫信給開發者，有回覆時按鈕會出現{r:紅色數字}',
           draw(c, x, y, w, h, t) {
             const T = t % 5.6, cw = Math.min(w - 16, 150), cx = Math.round(x + w / 2 - cw / 2), cy = y + Math.max(4, Math.round((h - 72) / 2));
             H().box(c, cx, cy, cw, 46, 1, T > 2.6 ? 3 : 4, false);                      // 一封信：時間、內容、回覆（一行）
@@ -1935,7 +1684,7 @@ G.Menus = (() => {
         },
         {
           // v2.8.5 版本更新通知
-          t: '版本更新', m: '首頁右下角出現{點擊更新}時，點它看更新內容，再按{立即更新}；{進度不會不見}',
+          t: '版本更新', m: '右下出現「{點擊更新}」時點它更新，{進度不會不見}',
           draw(c, x, y, w, h, t) {
             const T = t % 5.2, rx = x + w - 8, vy = y + h - 12;
             if (T < 2.4) {

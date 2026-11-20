@@ -215,22 +215,33 @@ G.glowOf = function (src, col, ring = 1, halo = 3) {
   const t = G.canvas(w, h), tx = t.getContext('2d'); tx.drawImage(src, 0, 0); tx.globalCompositeOperation = 'source-in'; tx.fillStyle = G.PAL[col]; tx.fillRect(0, 0, w, h);
   return (m[key] = { c, p, tint: t });
 };
-// 敵方配色（v2.3）：把灰階身體換成「赤紅」色階，和地圖的灰階拉開色相（小地圖也是紅點＝敵人）
-// 只換灰階像素；外框（最暗）維持近黑，其他點綴色（眼睛、武器顏色）不動
-G.ENEMY_RAMP = ['#1c0708', '#8e2522', '#a92f27', '#c23b2c', '#d24c33', '#df623d', '#ea7c4e', '#f39b6a', '#f9bf95', '#ffe3cc'];
-G._redCache = new WeakMap();
+// 敵方配色（v3.1）：地圖改彩色後，敵人改回開場動畫那種「暗黑」色調（v2.3～v3.0 是赤紅）
+// 只換灰階像素；外框維持近黑，其他點綴色（眼睛、武器、火光）不動。戰場上另外加一圈細紅邊（08_render）
+// 場景生物各有自己的暗色調：森林苔黑、秋楓棕黑、凍原冰藍、熔岩黑曜、深淵紫黑（幽魂是淡紫的亡魂）
+G.FOE_RAMPS = {
+  base: ['#050505', '#0f0f11', '#161619', '#1e1e22', '#27272c', '#313137', '#3d3d44', '#4c4c54', '#62626b', '#85858f'],
+  moss: ['#060705', '#10130e', '#171c14', '#20261b', '#293023', '#333b2c', '#3f4937', '#4f5a45', '#66735a', '#8a987a'],
+  umber: ['#080604', '#17110c', '#201812', '#2a2018', '#35291f', '#413227', '#4f3d30', '#614b3b', '#7b604c', '#a08068'],
+  frost: ['#0b1420', '#1c2c40', '#26394f', '#31465e', '#3d546d', '#4b637d', '#5d7690', '#7790a8', '#9ab0c4', '#c6d6e4'],
+  obsidian: ['#070504', '#140f0d', '#1c1512', '#251c18', '#2f241f', '#3a2c26', '#47362f', '#58433a', '#70574b', '#937462'],
+  shade: ['#08050c', '#140e1c', '#1c1426', '#251b31', '#2f233d', '#3a2c4a', '#47375a', '#58466d', '#706085', '#9282a6'],
+  ghost: ['#140c1f', '#2e2140', '#3b2b52', '#4a3865', '#5a4878', '#6c5a8c', '#8270a2', '#9d8cbb', '#bfb1d6', '#e4dcf2']
+};
+G.FOE_RAMP_OF = { shroom: 'moss', hedgehog: 'umber', stagking: 'umber', snowhare: 'frost', yeti: 'frost', salamander: 'obsidian', magmagolem: 'obsidian', wraith: 'ghost', cerberus: 'shade' };
+G._redCache = {};
 G.isFoe = n => n === 'hunter' || !!(G.ORIG && G.ORIG.units[n] && G.ORIG.units[n].type === 'enemy');
-G.foeImg = (n, img) => G.isFoe(n) ? G.redOf(img) : img;
-G.redOf = function (src) {
-  let r = G._redCache.get(src); if (r) return r;
+G.foeImg = (n, img) => G.isFoe(n) ? G.redOf(img, n) : img;
+G.redOf = function (src, n) {
+  const key = G.FOE_RAMP_OF[n] || 'base', C = G._redCache[key] || (G._redCache[key] = new WeakMap());
+  let r = C.get(src); if (r) return r;
   const w = src.width, h = src.height, c = G.canvas(w, h), x = c.getContext('2d'); x.drawImage(src, 0, 0);
-  const d = x.getImageData(0, 0, w, h), a = d.data, RR = G.ENEMY_RAMP.map(hx => [parseInt(hx.slice(1, 3), 16), parseInt(hx.slice(3, 5), 16), parseInt(hx.slice(5, 7), 16)]);
+  const d = x.getImageData(0, 0, w, h), a = d.data, RR = G.FOE_RAMPS[key].map(hx => [parseInt(hx.slice(1, 3), 16), parseInt(hx.slice(3, 5), 16), parseInt(hx.slice(5, 7), 16)]);
   for (let i = 0; i < a.length; i += 4) {
     if (!a[i + 3]) continue; const R0 = a[i], G0 = a[i + 1], B0 = a[i + 2]; if (Math.abs(R0 - G0) > 6 || Math.abs(G0 - B0) > 6) continue;   // 非灰階：保留
     let k = 0, bd = 1e9; for (let j = 0; j < 10; j++) { const dd = Math.abs(G.PAL_RGB[j][0] - R0); if (dd < bd) { bd = dd; k = j; } }
     a[i] = RR[k][0]; a[i + 1] = RR[k][1]; a[i + 2] = RR[k][2];
   }
-  x.putImageData(d, 0, 0); G._redCache.set(src, c); return c;
+  x.putImageData(d, 0, 0); C.set(src, c); return c;
 };
 // 稀有度：0 普通(白) 1 稀有(綠) 2 史詩(紫) 3 傳說(橘)
 // v2.6 新增 4 神話（傳說之上）：外框是流動的七彩光＋鑽石閃光（G.mythGlow），文字用七彩逐字變色（G.cnRb）

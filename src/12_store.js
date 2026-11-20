@@ -202,7 +202,7 @@ G.Store = (() => {
     const w = Math.min(uw - I.l - I.r - 8, 220);
     const rows = ch.pool ? (() => { const e = S.effRates(ch); return ch.rates.map((_, r) => r).filter(r => r >= 1).map(r => [G.RARITY[r].n, G.RARITY[r].c, e.cnt[r] ? e.pct[r].toFixed(1).replace(/\.0$/, '') + '%' : '已全部擁有', ch.rates[r] + '%', e.cnt[r], r]); })()
       : ch.keys.map((p, i) => [i + ' 把鑰匙', i ? 13 : 5, p + '%']);
-    const notes = ch.pool ? ['不會開到已擁有的角色。', '某稀有度全部擁有後，它的機率會按比例分給其他稀有度。']
+    const notes = ch.pool ? ['不會開到已擁有的角色。', '某個稀有度收集齊後，它的機率按比例分給其他稀有度。']
       : [];                                             // 賭徒寶箱：不顯示期望值
     const nl = notes.map(n => G.cnWrap(n, w - 16)), nh = nl.reduce((a, l) => a + l.length * 13, 0);
     const h = 27 + G.cnWrap(ch.d, w - 16).length * 13 + 14 + rows.length * 13 + (nh ? 8 + nh : 0) + 8, x = Math.round(uw / 2 - w / 2), y = Math.round(G.clamp(uh / 2 - h / 2, I.t + 2, uh - h - 2));

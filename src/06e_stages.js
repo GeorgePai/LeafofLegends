@@ -113,19 +113,19 @@ G.themeImg = (img, id) => {
 // dif：lv 敵人等級加成、hp／pow 敵人血量／攻擊倍率、tower 敵塔血量倍率、wave 出兵間隔倍率、boss 每幾波來一隻首領、cnt [起始, 上限] 每路每波隻數
 // hunt：n 獵手數、first 第一次出動（秒）、re 倒下後再來（秒）；hz 特殊規則；rew 首次通關鑰匙；roster [前期, 中期, 後期] 敵人
 G.SOLO = [
-  { theme: 'forest', n: '翠葉森林', en: 'SPRING WOODS', d: 1, rule: '新手關：敵人比較弱，也{沒有敵方獵手}', hz: null, rew: 10,
+  { theme: 'forest', n: '翠葉森林', en: 'SPRING WOODS', d: 1, rule: '', hz: null, rew: 10,
     dif: { lv: 0, hp: 0.75, pow: 0.75, tower: 0.8, wave: 1.2, boss: 4, cnt: [1, 4] }, hunt: { n: 0 },
     roster: [['babybear', 'mouse', 'shroom'], ['babybear', 'chipmunk', 'boar', 'shroom'], ['bear', 'eagle', 'boar', 'shroom', 'chipmunk']], boss: 'bigbear', fresh: ['shroom'] },
-  { theme: 'autumn', n: '楓紅山谷', en: 'MAPLE VALLEY', d: 2, rule: '{秋風}：每 50 秒吹起，全場跑速 {+30%}（8 秒）', hz: 'wind', rew: 15,
+  { theme: 'autumn', n: '楓紅山谷', en: 'MAPLE VALLEY', d: 2, rule: '{秋風}每 50 秒吹起，8 秒內全場跑速 {+30%}', hz: 'wind', rew: 15,
     dif: { lv: 0, hp: 1, pow: 1, tower: 1, wave: 1, boss: 3, cnt: [2, 5] }, hunt: { n: 1, first: 90, re: 75 },
     roster: [['boar', 'monkey', 'hedgehog'], ['hedgehog', 'raven', 'smartmonkey', 'boar'], ['kangaroo', 'buffalo', 'hedgehog', 'smartmonkey', 'raven']], boss: 'stagking', fresh: ['hedgehog', 'stagking'] },
-  { theme: 'snow', n: '霜雪凍原', en: 'FROST TUNDRA', d: 3, rule: '{暴風雪}：每 60 秒颳起，全場跑速和攻速 {−25%}（10 秒）', hz: 'blizzard', rew: 25,
+  { theme: 'snow', n: '霜雪凍原', en: 'FROST TUNDRA', d: 3, rule: '{暴風雪}每 60 秒颳起，10 秒內全場跑速、攻速 {−25%}', hz: 'blizzard', rew: 25,
     dif: { lv: 1, hp: 1.1, pow: 1.05, tower: 1.15, wave: 1, boss: 3, cnt: [2, 5] }, hunt: { n: 2, first: 90, re: 70 },
     roster: [['snowhare', 'whitemouse', 'penguin'], ['snowhare', 'penguin', 'madwolf', 'turtle'], ['snowhare', 'madwolf', 'polarbear', 'penguin', 'turtle']], boss: 'yeti', fresh: ['snowhare', 'yeti'] },
-  { theme: 'lava', n: '熔岩火山', en: 'MOLTEN PEAK', d: 4, rule: '{火山噴發}：每 35 秒落下熔岩彈，{紅圈}裡敵我都會受傷', hz: 'lava', rew: 40,
+  { theme: 'lava', n: '熔岩火山', en: 'MOLTEN PEAK', d: 4, rule: '{火山噴發}每 35 秒落下熔岩彈，{紅圈}內敵我都會受傷', hz: 'lava', rew: 40,
     dif: { lv: 2, hp: 1.25, pow: 1.15, tower: 1.3, wave: 0.95, boss: 2, cnt: [2, 6] }, hunt: { n: 2, first: 75, re: 60 },
     roster: [['salamander', 'firegnome', 'crocodile'], ['salamander', 'firebear', 'splashbuffalo', 'crocodile'], ['salamander', 'firebear', 'firegnome', 'splashbuffalo', 'smartmonkey']], boss: 'magmagolem', fresh: ['salamander', 'magmagolem'] },
-  { theme: 'abyss', n: '幽冥深淵', en: 'THE ABYSS', d: 5, rule: '{亡者復甦}：敵兵倒下有 {25%} 會變成幽魂再站起來，視野也變小', hz: 'revive', rew: 60,
+  { theme: 'abyss', n: '幽冥深淵', en: 'THE ABYSS', d: 5, rule: '{亡者復甦}敵兵倒下時有 {25%} 機率化成幽魂。{視野縮小}', hz: 'revive', rew: 60,
     dif: { lv: 3, hp: 1.4, pow: 1.25, tower: 1.5, wave: 0.9, boss: 2, cnt: [3, 6] }, hunt: { n: 3, first: 70, re: 55 },
     roster: [['wraith', 'vampirebat', 'blackvulture'], ['wraith', 'madwolf', 'vampirebat', 'gnome'], ['wraith', 'lion', 'madwolf', 'blackvulture', 'gnome']], boss: 'cerberus', fresh: ['wraith', 'cerberus'] }
 ];
@@ -146,13 +146,12 @@ G.SoloW = {
   },
   // 每一幀：特殊規則
   tick(W, dt) {
-    if (!W.introSaid && !W.attract) { W.introSaid = 1; W.say({ s: '第 ' + W.stageI + ' 關：' + W.stage.n, ic: 'i_play', col: G.THEMES[W.themeId] ? 13 : 9, t: 3 }); }   // 開場：關卡名稱
     const hz = W.stage.hz; if (!hz || W.attract || W.over) return;
     const C = G.SOLO_HZ[hz];
     W.hzT = (W.hzT == null ? (C.every || 1e9) : W.hzT) - dt;
     if (W.wind > 0) W.wind -= dt; if (W.bliz > 0) W.bliz -= dt;
     if (hz === 'wind' && W.hzT <= 0) { W.hzT = C.every; W.wind = C.dur; W.say({ s: '秋風吹起：全場跑速 +30%', ic: 'p_move', col: 14, t: 2.6 }); G.Audio.play('meteor'); }
-    if (hz === 'blizzard' && W.hzT <= 0) { W.hzT = C.every; W.bliz = C.dur; W.say({ s: '暴風雪來了：全場變慢', ic: 'i_ice', col: 12, t: 2.6 }); G.Audio.play('warn'); }
+    if (hz === 'blizzard' && W.hzT <= 0) { W.hzT = C.every; W.bliz = C.dur; W.say({ s: '暴風雪：全場跑速、攻速 −25%', ic: 'i_ice', col: 12, t: 2.6 }); G.Audio.play('warn'); }
     if (hz === 'lava' && (W.hzT == null || W.hzT <= 0)) { W.hzT = C.every; G.SoloW.erupt(W); }
   },
   // 火山噴發：英雄附近 2 顆＋戰場上隨機 3 顆，紅圈預警後落下

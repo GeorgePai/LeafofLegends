@@ -13,7 +13,7 @@ G.ACH = [
   { id: 'games1', c: 0, t: 1, n: '初次出征', d: '完成 1 場戰鬥', g: 1, v: P => P.games },
   { id: 'games20', c: 0, t: 2, n: '身經百戰', d: '完成 20 場戰鬥', g: 20, v: P => P.games },
   { id: 'games50', c: 0, t: 3, n: '老兵不死', d: '完成 50 場戰鬥', g: 50, v: P => P.games },
-  { id: 'wins10', c: 0, t: 2, n: '常勝軍', d: '累計贏得 10 場勝利', g: 10, v: P => P.wins },
+  { id: 'wins10', c: 0, t: 2, n: '常勝軍', d: '累計獲勝 10 場', g: 10, v: P => P.wins },
   { id: 'time30', c: 0, t: 1, n: '小試身手', d: '累計戰鬥 30 分鐘', g: 30, u: '分', v: P => Math.floor(P.time / 60) },
   { id: 'time180', c: 0, t: 2, n: '樂此不疲', d: '累計戰鬥 3 小時', g: 180, u: '分', v: P => Math.floor(P.time / 60) },
   { id: 'time600', c: 0, t: 4, n: '森林守護者', d: '累計戰鬥 10 小時', g: 600, u: '分', v: P => Math.floor(P.time / 60) },
@@ -25,17 +25,17 @@ G.ACH = [
   { id: 'tower100', c: 0, t: 3, n: '城牆粉碎機', d: '累計推倒 100 座敵塔', g: 100, v: P => P.towers },
   { id: 'gold', c: 0, t: 3, n: '富可敵國', d: '累計賺到 10 萬金幣', g: 100000, v: P => Math.floor(P.gold) },
   // v2.6 新增
-  { id: 'wins50', c: 0, t: 3, n: '百戰百勝', d: '累計贏得 50 場勝利', g: 50, v: P => P.wins },
+  { id: 'wins50', c: 0, t: 3, n: '百戰百勝', d: '累計獲勝 50 場', g: 50, v: P => P.wins },
   { id: 'camp100', c: 0, t: 2, n: '野區常客', d: '累計清掉 100 個野怪營地', g: 100, v: P => P.camps },
   { id: 'dmg', c: 0, t: 3, n: '毀天滅地', d: '英雄累計造成 50 萬點傷害', g: 500000, v: P => Math.floor(P.dmg) },
   { id: 'tp50', c: 0, t: 2, n: '傳送大師', d: '累計用我方塔傳送 50 次', g: 50, v: P => P.tps },
   // ----- 戰鬥：單場挑戰 -----
-  { id: 'win1', c: 1, t: 1, n: '首勝', d: '贏得第一場勝利', g: 1, v: P => P.wins },
+  { id: 'win1', c: 1, t: 1, n: '首勝', d: '第一次獲勝', g: 1, v: P => P.wins },
   { id: 'flawless', c: 1, t: 3, n: '毫髮無傷', d: '一次都沒倒下就獲勝', g: 1, v: (P, B, M) => M && M.win && M.st.deaths === 0 ? 1 : 0 },
   { id: 'speed', c: 1, t: 3, n: '速戰速決', d: '15 分鐘內獲勝', g: 1, v: (P, B, M) => M && M.win && M.st.time <= 900 ? 1 : 0 },
-  { id: 'comeback', c: 1, t: 3, n: '絕地大反攻', d: '聖樹剩不到 25% 血量時仍然獲勝', hint: '最危險的時候，千萬別放棄。', g: 1, v: (P, B, M) => M && M.win && M.st.minHoly < 0.25 ? 1 : 0 },
-  { id: 'phoenix', c: 1, t: 2, n: '打不死的小強', d: '一場倒下 5 次以上仍然獲勝', hint: '倒下幾次都沒關係。', g: 1, v: (P, B, M) => M && M.win && M.st.deaths >= 5 ? 1 : 0 },
-  { id: 'few', c: 1, t: 3, n: '以少勝多', d: '出戰小兵總共 4 點以內，仍然獲勝', hint: '兵不在多。', g: 1, v: (P, B, M) => M && M.win && M.pts <= 4 ? 1 : 0 },
+  { id: 'comeback', c: 1, t: 3, n: '絕地大反攻', d: '聖樹血量剩不到 25% 時獲勝', hint: '最危險的時候，千萬別放棄。', g: 1, v: (P, B, M) => M && M.win && M.st.minHoly < 0.25 ? 1 : 0 },
+  { id: 'phoenix', c: 1, t: 2, n: '打不死的小強', d: '單場倒下 5 次以上並獲勝', hint: '倒下幾次都沒關係。', g: 1, v: (P, B, M) => M && M.win && M.st.deaths >= 5 ? 1 : 0 },
+  { id: 'few', c: 1, t: 3, n: '以少勝多', d: '小兵總點數 4 點以內並獲勝', hint: '兵不在多。', g: 1, v: (P, B, M) => M && M.win && M.pts <= 4 ? 1 : 0 },
   { id: 'streak', c: 1, t: 2, n: '一騎當千', d: '4 秒內連續擊倒 5 個敵人', g: 5, v: (P, B) => B.streak },
   { id: 'demolish', c: 1, t: 3, n: '拆家專家', d: '單場推倒 8 座敵塔', g: 8, v: (P, B) => B.towers },
   { id: 'rich', c: 1, t: 2, n: '小富翁', d: '單場累積 3000 金幣', g: 3000, v: (P, B) => Math.floor(B.gold) },
@@ -48,11 +48,11 @@ G.ACH = [
   { id: 'potion', c: 1, t: 1, n: '藥罐子', d: '單場喝掉 10 瓶藥水', g: 10, v: (P, B) => B.potions },
   { id: 'fullbag', c: 1, t: 1, n: '全副武裝', d: '背包同時裝滿 6 種藥水', g: 6, v: (P, B) => B.bag },
   // v2.6 新增
-  { id: 'pacifist', c: 1, t: 3, n: '不戰而勝', d: '英雄擊倒不超過 5 個敵人，仍然獲勝', hint: '讓小兵們去打吧。', g: 1, v: (P, B, M) => M && M.win && M.st.kills <= 5 ? 1 : 0 },
+  { id: 'pacifist', c: 1, t: 3, n: '不戰而勝', d: '英雄擊倒 5 個以內並獲勝', hint: '讓小兵們去打吧。', g: 1, v: (P, B, M) => M && M.win && M.st.kills <= 5 ? 1 : 0 },
   { id: 'marathon', c: 1, t: 2, n: '持久戰', d: '打超過 30 分鐘才獲勝', g: 1, v: (P, B, M) => M && M.win && M.st.time >= 1800 ? 1 : 0 },
-  { id: 'tank', c: 1, t: 2, n: '銅牆鐵壁', d: '單場承受 5000 點傷害，仍然獲勝', g: 1, v: (P, B, M) => M && M.win && M.st.taken >= 5000 ? 1 : 0 },
+  { id: 'tank', c: 1, t: 2, n: '銅牆鐵壁', d: '單場承受 5000 點傷害並獲勝', g: 1, v: (P, B, M) => M && M.win && M.st.taken >= 5000 ? 1 : 0 },
   { id: 'jungle12', c: 1, t: 2, n: '野區霸主', d: '單場清掉 12 個野怪營地', g: 12, v: (P, B) => B.camps },
-  { id: 'allmax', c: 1, t: 2, n: '技藝精通', d: '單場把英雄所有技能都升到 LV3', g: 1, v: (P, B) => B.allmax },
+  { id: 'allmax', c: 1, t: 2, n: '技藝精通', d: '單場把所有技能升到 3 級', g: 1, v: (P, B) => B.allmax },
   { id: 'spend', c: 1, t: 1, n: '揮金如土', d: '單場在商店花掉 2000 金幣', g: 2000, v: (P, B) => B.spent },
   { id: 'streak10', c: 1, t: 4, n: '殺神降臨', d: '4 秒內連續擊倒 10 個敵人', g: 10, v: (P, B) => B.streak },
   // ----- 收藏 -----
@@ -85,7 +85,7 @@ G.ACH = [
   { id: 'stg5', c: 1, t: 4, n: '深淵征服者', d: '通關「幽冥深淵」', g: 1, v: P => P.stg && P.stg[5] ? 1 : 0 },
   { id: 'star3', c: 1, t: 2, n: '完美演出', d: '任一關拿到三顆星', g: 1, v: P => P.stg && Object.values(P.stg).some(q => q.s >= 3) ? 1 : 0 },
   { id: 'starAll', c: 1, t: 4, n: '五星傳說', d: '五個關卡全部三顆星', g: 5, v: P => P.stg ? Object.values(P.stg).filter(q => q.s >= 3).length : 0 },
-  { id: 'huntKill', c: 1, t: 3, n: '獵人剋星', d: '在熔岩火山或幽冥深淵，一場擊倒 3 隻獵手並獲勝', g: 3, v: (P, B, M) => M && M.win && M.stage >= 4 ? M.st.hunters : 0 },
+  { id: 'huntKill', c: 1, t: 3, n: '獵人剋星', d: '在熔岩火山或幽冥深淵，單場擊倒 3 隻獵手並獲勝', g: 3, v: (P, B, M) => M && M.win && M.stage >= 4 ? M.st.hunters : 0 },
 ];
 G.ACH_BY = Object.fromEntries(G.ACH.map(a => [a.id, a]));
 

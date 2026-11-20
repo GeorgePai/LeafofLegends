@@ -24,7 +24,7 @@ G.boot = function () {
     if (dt > 0.1) dt = 0.1; if (dt < 0) dt = 0;
     fpsT += dt; fpsN++; if (fpsT >= 0.5) { G.UI.fps = fpsN / fpsT; fpsT = 0; fpsN = 0; }
     const W = G.W, U = G.UI;
-    if (!U.paused && !(G.Menus && G.Menus.covers(U.screen))) {
+    if (!U.paused && !(G.Menus && G.Menus.covers(U.screen)) && !(G.StageGo && G.StageGo.hold())) {
       W.keyDir = U.screen === 'battle' ? U.keyDir() : null;
       if (W.keyDir) G.Render.cam.follow = true;
       acc += dt;

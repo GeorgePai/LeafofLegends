@@ -183,8 +183,10 @@ G.renderGround = function (M) {
   const c = G.canvas(GW, GH), x = c.getContext('2d'), id = x.createImageData(GW, GH), d = id.data;
   // v2.6 地面改用自然色盤 G.NAT：idx 存「色名的編號」
   const NK = Object.keys(G.NAT), NI = {}, NRGB = NK.map((k, i) => (NI[k] = i, G.hexRGB(G.NAT[k])));
-  const idx = new Int8Array(GW * GH);
-  for (let ay = 0; ay < GH; ay++) for (let ax = 0; ax < GW; ax++) {
+  // v3.1 色名編號跟主題無關：算一次存在 M 上，換主題只要換色盤（原本每個主題都重算 2~3 秒）
+  const C0 = M._gidx && M._gidx.GW === GW && M._gidx.GH === GH ? M._gidx : null;
+  const idx = C0 ? C0.idx : new Int8Array(GW * GH);
+  if (!C0) for (let ay = 0; ay < GH; ay++) for (let ax = 0; ax < GW; ax++) {
     const tx = (ax - PAD + 0.5) / G.AX / T, ty = (ay - PAD + 0.5) / G.AY / T;
     const f = M.field(tx, ty), b = G.bayer(ax, ay);
     let v;
@@ -218,7 +220,7 @@ G.renderGround = function (M) {
     idx[ay * GW + ax] = NI[v];
   }
   // 草叢、花、碎石
-  const rng = G.mulberry(M.def.seed * 31);
+  if (!C0) { const rng = G.mulberry(M.def.seed * 31);
   const put = (ax, ay, k) => { if (ax >= 0 && ay >= 0 && ax < GW && ay < GH) idx[ay * GW + ax] = NI[k]; };
   for (let i = 0; i < GW * GH / 55; i++) {
     const ax = (rng() * GW) | 0, ay = (rng() * GH) | 0;
@@ -232,6 +234,7 @@ G.renderGround = function (M) {
       else { put(ax, ay, 'stD'); put(ax + 1, ay, 'stD'); put(ax, ay - 1, 'stL'); }                                    // 小石
     } else if (r < 0.25) { put(ax, ay, 'rdPb'); put(ax + 1, ay + 1, 'rdD'); }
   }
+  M._gidx = { idx, GW, GH }; }
   for (let i = 0; i < GW * GH; i++) { const rgb = NRGB[idx[i]]; d[i * 4] = rgb[0]; d[i * 4 + 1] = rgb[1]; d[i * 4 + 2] = rgb[2]; d[i * 4 + 3] = 255; }
   x.putImageData(id, 0, 0);
   // 樹影烘進地面
@@ -239,12 +242,13 @@ G.renderGround = function (M) {
   for (const p of M.props) if (p.tree) G.pxDisc(x, p.x * G.AX + PAD, p.y * G.AY + PAD, p.s.w * 0.4, 2.5, 0, 0.6);
   // 小地圖
   const MR = 3, mm = G.canvas(M.w * MR, M.h * MR), mx = mm.getContext('2d'), mid = mx.createImageData(mm.width, mm.height);
-  for (let y = 0; y < M.h * MR; y++) for (let xx = 0; xx < M.w * MR; xx++) {
-    const fx = (xx + 0.5) / MR, fy = (y + 0.5) / MR, f = M.field(fx, fy);
-    const wet = M.hasRiver && f < 0 && M.river(fx, fy) < 0;
-    const rgb = G.hexRGB(G.NAT[wet ? 'wM' : f < 0 ? (M.pathiness(fx, fy) < 0.6 ? 'rdM' : 'grD') : 'fD']), i = (y * mm.width + xx) * 4;
-    mid.data[i] = rgb[0]; mid.data[i + 1] = rgb[1]; mid.data[i + 2] = rgb[2]; mid.data[i + 3] = 255;
-  }
+  if (!M._gmini) { const mk = M._gmini = new Int8Array(mm.width * mm.height);
+    for (let y = 0; y < M.h * MR; y++) for (let xx = 0; xx < M.w * MR; xx++) {
+      const fx = (xx + 0.5) / MR, fy = (y + 0.5) / MR, f = M.field(fx, fy);
+      const wet = M.hasRiver && f < 0 && M.river(fx, fy) < 0;
+      mk[y * mm.width + xx] = NI[wet ? 'wM' : f < 0 ? (M.pathiness(fx, fy) < 0.6 ? 'rdM' : 'grD') : 'fD'];
+    } }
+  for (let i = 0; i < M._gmini.length; i++) { const rgb = NRGB[M._gmini[i]]; mid.data[i * 4] = rgb[0]; mid.data[i * 4 + 1] = rgb[1]; mid.data[i * 4 + 2] = rgb[2]; mid.data[i * 4 + 3] = 255; }
   mx.putImageData(mid, 0, 0);
   return { c, w: GW, h: GH, pad: PAD, mini: mm };
 };

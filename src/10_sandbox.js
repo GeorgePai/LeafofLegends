@@ -97,7 +97,7 @@ const NO_START = '，。、！？：；）」』,.!?:;)';
 G.cnWrap = (s, maxW) => {
   const out = [];
   for (const para of String(s).split('\n')) {
-    let line = '';
+    let line = ''; const p0 = out.length;
     for (const ch of para) {
       if (G.cnW(line + ch) > maxW && line) {
         if (NO_START.includes(ch)) { const a = [...line]; let carry = ch; do { carry = a.pop() + carry; } while (a.length > 1 && NO_START.includes([...carry][0])); if (a.length) { out.push(a.join('')); line = carry; } else line += ch; }   // v2.8.7 連續標點（」：）也不放行首   // 標點不放行首，也不超出寬度：把前一個字一起帶下去
@@ -108,6 +108,9 @@ G.cnWrap = (s, maxW) => {
         }
       } else line += ch;
     }
+    // v3.1 最後一行只剩一個字：從上一行借一個字下來（不借標點）
+    const la = [...line], st = out.length;
+    if (la.length === 1 && st > p0 && !NO_START.includes(la[0])) { const pa = [...out[st - 1]]; if (pa.length >= 4 && !NO_START.includes(pa[pa.length - 1]) && !/[A-Za-z0-9%.+\-]/.test(pa[pa.length - 1])) { line = pa.pop() + line; out[st - 1] = pa.join(''); } }
     out.push(line);
   }
   return out;
