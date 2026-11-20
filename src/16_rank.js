@@ -132,15 +132,26 @@ G.Rank = (() => {
   // ---- v2.8.6 即時在線人數：每台開著遊戲的裝置（含戰鬥中）每 60 秒回報一次，伺服器算最近 2 分鐘有回報的裝置 ----
   K.online = { n: null, t: -1e12, busy: 0 };
   const sid = () => { let s = null; try { s = localStorage.getItem('leafwar_sid'); if (!s) { s = hex(16); localStorage.setItem('leafwar_sid', s); } } catch (e) { s = s || hex(16); } return s; };
+  // v3.2 玩家動態（給開發者「管理玩家」看）：目前畫面＋戰鬥狀態，短字串
+  //   s 畫面；戰鬥中再加 g 關卡、b 秒數、l 英雄等級、h 英雄、k K/D/A、w 結果（1 勝 2 敗）
+  K.state = () => {
+    const U = G.UI, sc = document.hidden ? 'bg' : U.screen === 'battle' && U.paused ? 'pause' : U.screen, o = { s: sc };
+    if (U.screen === 'battle' && G.W && !G.W.attract) { const W = G.W, h = W.hero, S = W.stats || {}; o.g = W.stageI || 0; o.b = Math.round(W.time || 0); if (h) { o.l = h.level; o.h = h.name; } o.k = (S.kills || 0) + '/' + (S.deaths || 0) + '/' + (S.assists || 0); if (W.over) o.w = W.over.win ? 1 : 2; }
+    if (U.screen === 'battle' && U.shop) o.s = 'shop_b';
+    return JSON.stringify(o);
+  };
+  let lastSc = '';
   const ping = async () => {
     K.online.busy = 1; K.online.t = Date.now();
-    const me = K.me(), ss = K.ss(), j = await req('/ping', me && ss && !G.Team.dev ? { sid: sid(), id: me.id, ss } : { sid: sid() }); K.online.busy = 0;
+    const me = K.me(), ss = K.ss(), base = { sid: sid(), st: G.Team.dev ? '' : K.state(), v: G.VERSION, m: matchMedia && matchMedia('(pointer:coarse)').matches ? 1 : 0 };
+    const j = await req('/ping', me && ss && !G.Team.dev ? Object.assign(base, { id: me.id, ss }) : base); K.online.busy = 0;
     isMoved(j);
-    if (j.ok) K.online.n = j.n; else if (j.err === 'net') K.online.n = null;
+    if (j.ok) { K.online.n = j.n; if (G.Mail) G.Mail.seen(j.a || 0); } else if (j.err === 'net') K.online.n = null;
   };
   addEventListener('visibilitychange', () => { if (!document.hidden) K.online.t = -1e12; });
   K.tick = () => {
     if (!K.on()) return;
+    { const sc = G.UI.screen + (G.UI.paused ? 'p' : '') + (G.UI.shop ? 's' : '') + (G.W && G.W.over ? 'o' : ''); if (sc !== lastSc && Date.now() - K.online.t > 12000 && !K.online.busy) { lastSc = sc; K.online.t = -1e12; } }   // v3.2 換畫面就提早回報（最快 12 秒一次）
     if (!document.hidden && !K.online.busy && Date.now() - K.online.t > 60000) ping();
     const sc = G.UI.screen; if (sc === 'battle' || sc === 'intro' || sc === 'tap' || document.hidden) return;
     const now = Date.now();
@@ -180,7 +191,7 @@ G.Rank = (() => {
     K.adm.busy = 1; K.adm.err = '';
     let j; try { const r = await fetch(G.RANK_URL + '/admin/list?key=' + encodeURIComponent(k)); j = await r.json(); } catch (e) { j = { err: 'net' }; }
     K.adm.busy = 0;
-    if (Array.isArray(j)) { K.adm.list = j; if (key) try { localStorage.setItem('leafwar_adm', key); } catch (e) { } return true; }
+    if (Array.isArray(j)) { K.adm.list = j; K.adm.t = Date.now(); if (key) try { localStorage.setItem('leafwar_adm', key); } catch (e) { } return true; }
     K.adm.err = j.err === 'auth' ? '密碼不對' : j.err === 'locked' ? '猜錯太多次，1 小時後再試' : '連不上伺服器';
     return false;
   };
@@ -210,12 +221,13 @@ G.RankUI = (() => {
   let adm = false, askDel = null, askPurge = 0, jmp = null;
   const cw = G.UI.wheel();
   const cat = () => cw.idx();
-  S.reset = () => { adm = false; askDel = null; askPurge = 0; jmp = null; K().poll(true); };
+  S.reset = () => { adm = false; det = null; askDel = null; askPurge = 0; jmp = null; K().poll(true); };
   S.jump = () => { jmp = { st: 'ask' }; };
   S.badge = (...a) => badge(...a); S.frame = (...a) => frame(...a);    // 教學頁共用                                                   // 測試用
   S.esc = () => { if (adm) { adm = false; return true; } return false; };
   S.cat = i => { cw.go(i); cw.pos = cw.tgt = i; cw.settled = true; };                         // 測試用
-  S.adm = on => { adm = on; if (on) K().admLoad(); };                                         // 測試用
+  S.adm = (on, noLoad) => { adm = on; if (on && !noLoad) K().admLoad(); };                                         // 測試用
+  S._det = id => { det = id; };                                                               // 測試用
   // 名字太長：截斷加「…」
   const ell = (s, maxW) => { if (G.cnW(s) <= maxW) return s; const a = [...s]; while (a.length > 1 && G.cnW(a.join('') + '…') > maxW) a.pop(); return a.join('') + '…'; };
   // 分類滾輪：中間一格是選到的分類（全名），上下各露出一格（短名）
@@ -364,39 +376,86 @@ G.RankUI = (() => {
     }, M.SM);
   };
   // ---- 管理玩家（開發者模式）：隱藏＝不出現在排行、可復原；刪除＝永久移除（要按兩下）----
+  // ---- v3.2 玩家動態 ----
+  let det = null;
+  const SCN = { menu: '首頁', stages: '選關卡', battle: '戰鬥中', pause: '戰鬥暫停中', shop_b: '戰鬥中・逛商店', team: '隊伍', book: '圖鑑', store: '商店（寶箱）', ach: '成就', rank: '排行榜', save: '帳號', guide: '教學', fb: '反饋', about: '關於', mail: '信箱', intro: '開場動畫', tap: '開始畫面', bg: '切到背景' };
+  const st = p => { try { return p.st ? JSON.parse(p.st) : {}; } catch (e) { return {}; } };
+  const ago = s => s < 60 ? '剛剛' : s < 3600 ? Math.floor(s / 60) + ' 分鐘前' : s < 86400 ? Math.floor(s / 3600) + ' 小時前' : Math.floor(s / 86400) + ' 天前';
+  const mmss = s => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+  function doing(p, now) {
+    const o = st(p), sc = SCN[o.s] || o.s || '';
+    if (!p.pt) return '最後上傳 ' + ago(now - (p.updated || p.created || now));
+    let t = sc;
+    if (o.g != null) { t += '・' + (o.g ? '第 ' + o.g + ' 關' : '經典') + ' ' + mmss(o.b || 0); if (o.l) t += '・Lv' + o.l; if (o.w) t += o.w === 1 ? '・勝利' : '・落敗'; }
+    return now - p.pt < 120 ? t : '離線 ' + ago(now - p.pt) + (t ? '（最後在' + t + '）' : '');
+  }
+  function detail(p, now) {
+    const o = st(p), on = p.pt && now - p.pt < 120, d = t => { const x = new Date(t * 1000); return (x.getMonth() + 1) + '/' + x.getDate() + ' ' + x.getHours() + ':' + String(x.getMinutes()).padStart(2, '0'); };
+    const r = [['狀態', doing(p, now), on ? 11 : 6]];
+    if (o.k) r.push(['本場', o.k + (o.h ? '・' + (G.TXT.unit[o.h] || o.h) : '')]);
+    if (on && p.t0) r.push(['上線', Math.max(1, Math.round((now - p.t0) / 60)) + ' 分鐘']);
+    if (p.m != null) r.push(['裝置', p.m ? '手機／平板' : '電腦']);
+    if (p.v) r.push(['版本', p.v + (p.v !== G.VERSION ? '（舊版）' : ''), p.v !== G.VERSION ? 10 : 9]);
+    r.push(['戰績', (p.games || 0) + ' 場・' + (p.wins || 0) + ' 勝・勝率 ' + (p.games ? Math.round((p.wins || 0) / p.games * 100) : 0) + '%']);
+    r.push(['擊殺', (p.kills || 0) + '/' + (p.deaths || 0) + '/' + (p.assists || 0) + '（KDA ' + (p.kda != null ? Number(p.kda).toFixed(1) : '-') + '）']);
+    r.push(['收集', '英雄 ' + (p.heroes || 0) + '・小兵 ' + (p.minions || 0) + '・成就 ' + (p.ach || 0)]);
+    r.push(['鑰匙', '累積 ' + (p.keys || 0)]);
+    r.push(['時長', Math.round((p.time || 0) / 3600 * 10) / 10 + ' 小時']);
+    r.push(['傷害', String(p.dmg || 0)]);
+    if (p.created) r.push(['建立', d(p.created)]);
+    if (p.updated) r.push(['上傳', d(p.updated)]);
+    return r;
+  }
   function admin(c, M, x, y, W, B) {
     const Kk = K(), A = Kk.adm, key = Kk.admKey();
-    const bh = bar(c, x, B, W, ['隱藏可以復原', '刪除無法復原'], 3, ['rkAdmBk', '返回', () => { adm = false; askDel = null; G.Audio.play('click'); }]);
+    const bh = bar(c, x, B, W, ['刪除無法復原'], 3, ['rkAdmBk', '返回', () => { adm = false; askDel = null; G.Audio.play('click'); }]);
     if (!key || A.err === '密碼不對') {                                                       // 舊版開過開發者模式的裝置：重新輸入一次開發者密碼就好
       G.cnWrap('請先關閉開發者模式，再重新開啟一次（輸入密碼）', W - 8).forEach((l, i) => G.cn(c, l, x + 4, y + i * 13, 7));
       return;
     }
     if (!A.list) { G.cn(c, A.busy ? '讀取中…' : A.err || '讀取中…', x + W / 2, y + 16, A.err ? 10 : 6, 0.5); if (!A.busy && !A.err) Kk.admLoad(); return; }
-    const now = Date.now() / 1000, days = p => Math.max(0, Math.floor((now - (p.updated || p.created || now)) / 86400)), GH = G.RANK_GHOST;
-    const hid = A.list.filter(p => p.hidden).length, gh = A.list.filter(p => days(p) >= GH).length, pbw = 52;
-    // v2.8.4 幽靈帳號：GH 天以上沒上線（紅字），右邊一鍵清除（要按兩下）
-    const hl = G.cnWrap(A.err || '共 ' + A.list.length + ' 人' + (hid ? '・隱藏 ' + hid : '') + (gh ? '・幽靈 ' + gh : ''), W - (gh ? pbw + 8 : 0));
-    hl.forEach((l, i) => G.cn(c, l, x, y + i * 13, A.err ? 10 : 13));                        // 錯誤訊息直接取代人數，不並排
+    if (!A.busy && A.t && !A.err && Date.now() - A.t > 15000) Kk.admLoad();               // 只有上次成功才自動更新（失敗不重試，避免密碼錯誤次數累積）                          // v3.2 停在這頁時每 15 秒更新動態
+    const now = Date.now() / 1000, last = p => Math.max(p.pt || 0, p.updated || 0, p.created || 0), days = p => Math.max(0, Math.floor((now - (last(p) || now)) / 86400)), GH = G.RANK_GHOST;
+    const on = p => p.pt && now - p.pt < 120, L = A.list.slice().sort((a, b) => (on(b) - on(a)) || last(b) - last(a));
+    const hid = L.filter(p => p.hidden).length, gh = L.filter(p => days(p) >= GH).length, onN = L.filter(on).length, fight = L.filter(p => on(p) && /^(battle|pause|shop_b)$/.test(st(p).s)).length, pbw = 52;
+    // 上方摘要：總數、在線（戰鬥中）、隱藏、幽靈；幽靈帳號（GH 天以上沒上線）右邊一鍵清除（要按兩下）
+    const hl = G.cnWrap(A.err || '共 ' + L.length + ' 人・在線 ' + onN + (fight ? '（戰鬥 ' + fight + '）' : '') + (hid ? '・隱藏 ' + hid : '') + (gh ? '・幽靈 ' + gh : ''), W - (gh ? pbw + 8 : 0));
+    hl.forEach((l, i) => G.cn(c, l, x, y + i * 13, A.err ? 10 : 13));
     if (gh && !A.err) { const ask = askPurge && Date.now() - askPurge < 3000;
       (ask ? M.btnPrimary : M.btnSecondary)(c, 'rkPurge', x + W - pbw - 6, y, pbw, 13, ask ? '確定清除' : '清除幽靈', () => { if (ask) { askPurge = 0; Kk.admPurge(GH); } else { askPurge = Date.now(); G.Audio.play('tick'); } }); }
     const ly = y + Math.max(1, hl.length) * 13 + 2, listH = B - bh - 3 - ly;
-    const gl = G.cnWrap('紅字＝' + GH + ' 天沒上線', W); gl.forEach((l, i) => G.cn(c, l, x, ly - 1 + i * 13, 4)); const ly2 = ly + gl.length * 13, listH2 = listH - gl.length * 13;
-    M.scrollDetail(c, x, ly2, W - 6, listH2, 'rkadm', yy => {                                   // v2.8.4 每人兩行：名字一整行、下面是場數＋幾天沒上線；按鈕在右邊
-      A.list.forEach(p => {
-        const RH = 28;
+    const gl = G.cnWrap('綠點在線・紅字 ' + GH + ' 天沒上線・點一列看詳細', W); gl.forEach((l, i) => G.cn(c, l, x, ly - 1 + i * 13, 4)); const ly2 = ly + gl.length * 13, listH2 = listH - gl.length * 13;
+    M.scrollDetail(c, x, ly2, W - 6, listH2, 'rkadm', yy => {                                   // v3.2 每人三行：名字、現在在做什麼、場數／裝置／版本；按鈕在右邊
+      L.forEach(p => {
+        const RH = 41;
         if (yy + RH <= ly2 || yy >= ly2 + listH2) { yy += RH + 2; return; }
-        const d = days(p), w = W - 6, bw = 30, del = askDel && askDel.id === p.id && Date.now() - askDel.t < 3000, info = p.games + ' 場・' + (d < 1 ? '今天' : d + ' 天前');
-        H().box(c, x, yy, w, RH, 1, p.hidden ? 2 : 3, false);
-        const tx = w - bw - 12;                                                                  // 按鈕上下疊在右邊，左邊文字寬一點
-        G.cn(c, ell(p.name, tx), x + 4, yy + 1, p.hidden ? 4 : 9);
-        G.cn(c, info, x + 4, yy + 14, d >= GH ? 10 : 5);
-        const by = yy + 1;
-        M.btnSecondary(c, 'ah' + p.id, x + w - bw - 3, by, bw, 12, p.hidden ? '復原' : '隱藏', () => Kk.admAct('hide', p.id, p.hidden ? 0 : 1));
-        (del ? M.btnPrimary : M.btnSecondary)(c, 'ad' + p.id, x + w - bw - 3, by + 14, bw, 12, del ? '確定' : '刪除', () => { if (del) { askDel = null; Kk.admAct('del', p.id); } else { askDel = { id: p.id, t: Date.now() }; G.Audio.play('tick'); } });
+        const d = days(p), w = W - 6, o = on(p), tx = w - 8;
+        H().box(c, x, yy, w, RH, 1, p.hidden ? 2 : o ? 16 : 3, false);
+        if (o) { c.fillStyle = P[11]; c.globalAlpha = 0.6 + 0.4 * Math.sin(Date.now() / 300); c.fillRect(x + 4, yy + 5, 4, 4); c.globalAlpha = 1; } else { c.fillStyle = P[4]; c.fillRect(x + 4, yy + 5, 4, 4); }
+        G.cn(c, ell(p.name, tx - 8), x + 11, yy + 1, p.hidden ? 4 : 9);
+        G.cn(c, ell(doing(p, now), tx), x + 4, yy + 14, o ? 11 : d >= GH ? 10 : 5);
+        const wr = p.games ? Math.round((p.wins || 0) / p.games * 100) + '%' : '-', dev = p.m == null ? '' : p.m ? '・手機' : '・電腦', old = p.v && p.v !== G.VERSION;
+        const l3 = (p.games || 0) + ' 場' + dev; G.cn(c, ell(l3, tx - (p.v ? G.cnW(p.v) + 6 : 0)), x + 4, yy + 27, 6);
+        if (p.v) G.cn(c, p.v, x + 4 + tx, yy + 27, old ? 10 : 5, 1);
+        M.tap('aq' + p.id, x, yy, w, RH, () => { det = p.id; askDel = null; G.Audio.play('tick'); });   // 隱藏／刪除改到詳細資料裡，清單留給動態
         yy += RH + 2;
       });
       return yy;
     }, M.SM);
+    // v3.2 玩家詳細資料（點一列）
+    const p = det != null && L.find(q => q.id === det);
+    if (p) {
+      H().btn('adBg', 0, 0, R.uw, R.uh, null, () => { det = null; }); H().dim(c, 0.7);
+      const pw = Math.min(R.uw - 12, 260), rows = detail(p, now), lw2 = Math.max(...rows.map(r => G.cnW(r[0]))) + 8, vw = pw - 16 - lw2;
+      const lines = rows.map(r => G.cnWrap(r[1], vw)), ph = 26 + lines.reduce((a, l) => a + l.length * 13, 0) + 28, px = Math.round(R.uw / 2 - pw / 2), py = Math.max(R.ins.t + 2, Math.round(R.uh / 2 - ph / 2));
+      H().box(c, px, py, pw, ph, 1, on(p) ? 11 : 7); H().btn('adIn', px, py, pw, ph, null, null);
+      G.cn(c, ell(p.name, pw - 16), px + 8, py + 6, 9);
+      let yy = py + 24; rows.forEach((r, i) => { G.cn(c, r[0], px + 8, yy, 5); lines[i].forEach((l, k) => G.cn(c, l, px + 8 + lw2, yy + k * 13, r[2] || 9)); yy += lines[i].length * 13; });
+      const bw = Math.floor((pw - 16 - 8) / 3), by = py + ph - 22, del = askDel && askDel.id === p.id && Date.now() - askDel.t < 3000;
+      M.btnSecondary(c, 'ah' + p.id, px + 8, by, bw, 16, p.hidden ? '復原' : '隱藏', () => Kk.admAct('hide', p.id, p.hidden ? 0 : 1));
+      (del ? M.btnPrimary : M.btnSecondary)(c, 'ad' + p.id, px + 12 + bw, by, bw, 16, del ? '確定刪除' : '刪除', () => { if (del) { askDel = null; det = null; Kk.admAct('del', p.id); } else { askDel = { id: p.id, t: Date.now() }; G.Audio.play('tick'); } });
+      M.btnSecondary(c, 'adOk', px + 16 + bw * 2, by, bw, 16, '關閉', () => { det = null; });
+    }
   }
   return S;
 })();

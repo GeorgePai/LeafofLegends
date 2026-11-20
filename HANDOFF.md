@@ -2,7 +2,7 @@
 
 > 新 session 只要讀這份。排行榜相關再看 `LEADERBOARD.md`。**做任何新設計前，先對照第 8 節「設計守則」**。
 > 各版完成內容在 `CHANGELOG.md`、暫定數值在 `VALUES.md`，需要時用 grep 找到段落再讀，不要整份讀。
-> 最後更新：2026-11-20，版本 **v3.1**
+> 最後更新：2026-11-20，版本 **v3.2**
 
 ## 1. 專案是什麼
 - Pai 的 HTML5 瀏覽器遊戲，仿 Gamevil《Plants War》（三路推塔＋英雄操作＋小兵兵線）
@@ -64,12 +64,13 @@
 | 13_ach | **成就（v1.7）**：`G.ACH`（43 個定義：c 分類、t 等級 1～4、g 目標、v 取值、hint 隱藏提示）、`G.Ach`（`P()` 檔案、`check/commit/tick/final/on/claim`、`recent`、`banner`）、`G.AchUI` 成就畫面、`G.Ach.drawBanner` |
 | 14_save | **存檔碼（v1.7）**：`G.SaveCode`（`make/read/clean/apply/summary`）、`G.Dom`（疊在 canvas 上的 input/textarea，每幀 `place`，沒用到自動隱藏）、`G.SaveUI`（存檔畫面 home/name/code/load/confirm、`drawWelcome` 歡迎回來、`drawGreet` 開啟問候） |
 | 15_intro | **開場動畫（v1.7）**：`G.Intro`（`draw/skip/reset/drawFlash`），約 2.45 秒＋白光淡出 |
-| 16_rank | **線上排行榜（v2.8；v2.8.4 強制參加、跳至自己 `jmp`、`remove/forget/uid`、幽靈清除 `admPurge`）**：`G.RANK_URL`、`G.RANK_CATS`（9 分類）、`G.Rank`（poll/submit/join/leave/autoJoin、通知 diff/news、管理 admLoad/admAct、測試 `_mock/_set`）、`G.RankUI`（分類滾輪 `cw`、清單、底部名次列、管理玩家 `admin()`）。身分 `P.rk={id,tok}`、累積鑰匙 `P.keysTot` |
+| 16_rank | **線上排行榜（v3.2 玩家動態 `K.state`、管理玩家詳細 `det`／`_det`）（v2.8；v2.8.4 強制參加、跳至自己 `jmp`、`remove/forget/uid`、幽靈清除 `admPurge`）**：`G.RANK_URL`、`G.RANK_CATS`（9 分類）、`G.Rank`（poll/submit/join/leave/autoJoin、通知 diff/news、管理 admLoad/admAct、測試 `_mock/_set`）、`G.RankUI`（分類滾輪 `cw`、清單、底部名次列、管理玩家 `admin()`）。身分 `P.rk={id,tok}`、累積鑰匙 `P.keysTot` |
 | 17_update | **版本更新通知（v2.8.5）**：`G.Update`（check/tick/corner/card、`_set/_open/force` 測試用）、讀 `version.json` |
 | 18_feedback | **反饋信箱（v2.8.6）**：`G.FbUI`（玩家寫信／看回覆；開發者模式＝玩家信箱）；連線在 16_rank 的 `K.fb*` |
 | 19_about | **關於（v2.8.6）**：`G.About` 片尾名單＋櫻花、結尾淡出回首頁（`post` 在首頁最後畫淡入）|
 | 20_solo | **選關畫面（v3.0）**：`G.Solo`（open/draw/key/stars、`_go` 測試用），畫面 `stages`；v3.1 甩動換關 |
 | 21_stagego | **出發過場（v3.1）**：`G.StageGo`（go/draw/hold/skip、`_t(階段,秒)` 測試用） |
+| 22_mail | **系統公告＋信箱（v3.2）**：`G.Mail`（seen/load/unread/drawCast/draw、畫面 `mail`；測試 `_set/_sel/_comp/_cast`） |
 | 99_main | 啟動與主迴圈（啟動後先進 `intro` 畫面） |
 
 ## 5. 版本摘要（細節見 CHANGELOG.md）
@@ -92,13 +93,14 @@
 - v2.8.7：首頁聚光改橢圓、存檔→帳號／玩家名稱、說明文字重點上色、一帳號同時一台（/claim、moved）
 - v2.9：全部 71 個角色的專屬叫聲（轉盤停下／點中間角色）
 - v3.0：單人五關（場景、難度、特殊規則、9 個新敵人、選關畫面、星等獎勵、8 個成就；成就共 68 個）
+- v3.2：等級數字改白字細黑邊、復活無敵 2 秒、2.5D 立體感（側面厚度＋光影＋接觸陰影）、系統公告＋信箱、管理玩家動態
 - v3.1：出發過場動畫＋進關卡卡頓修正（地面色名快取）、等級徽章、敵人改回暗黑色調（場景生物各有色調＋細紅邊）、選關滑動重做、教學 72→51 頁全面改寫、爐石式文字守則
 - v2.4：敵塔範圍＋鎖定警示、道路 ×1.5、結算放慢＋鎖值＋音效、新藥水 5 種＋全部藥水特效、DEV 密碼、技能範圍顯示＋指定施放（拖曳／取消）、LOGO 改版、塔射程 190/210
 
 ## 6. 待 Pai 決定
 - 畫質再提升：A＝高解析文字（像素角色＋平滑字體），B＝提高像素解析度（480×270，整套美術重畫）。尚未選擇
 - 圖鑑動畫重畫：Pai 說「有些動畫可以描繪得更好」，等他指定哪幾隻
-- 暫定數值全部在 `VALUES.md`（最新：6s v3.1 段）
+- 暫定數值全部在 `VALUES.md`（最新：6t v3.2 段）
 - （v2.7）成就鑰匙過剩：全收集只要 90 把，成就給 138 把；「群英薈萃／森羅萬象」較晚完成的那個獎勵用不到。Pai 決定先保留，等鑰匙有新用途再說
 - （v2.4）首頁 RESET 要不要也加密碼鎖？隕石等範圍技仍可在塔射程外打到塔（目前視為合理技能消耗），要不要禁止？
 - （v2.5）重生時間、塔成長／升溫、野怪脫戰規則等暫定數值待確認（VALUES.md 6h）
@@ -113,15 +115,16 @@
 - （v2.8.7）一帳號同時一台：被別台登入的裝置會被登出，登出前顯示這台的存檔碼可複製；沒帶工作階段的舊版用戶端不擋。等 Pai 實機兩台測試
 - （v2.9）角色叫聲：Pai 聽過後可指定哪幾隻要改（`04b_cry.js` 的 `V` 表調音高／長度／基底）
 - （v3.1）出發過場長度、選關甩動手感、敵人暗色調與細紅邊、等級徽章配色（VALUES.md 6s）待 Pai 實機確認
+- （v3.2）立體感強度、公告與動態數值（VALUES.md 6t）待 Pai 實機確認；公告／動態的伺服器功能要等 Cloudflare 自動部署完才會生效
 - DEV 密碼只有 Pai 知道（程式內只有雜湊）；要改密碼請 Pai 提供新密碼，重算 `DEV_H`
 
 ## 7. 工作規則
 **每次更新流程**：改 src → build → `bash /home/claude/tools/tc_all.sh`（背景跑，0 筆才可交付）→ 只截有改到的畫面，用 `sheet.py` 拼成一張看 → 發佈 artifact（先 `get_artifact` 取 version，再 `publish_files`，index.html＝dist/index.html）→ 推 GitHub main（遊戲）＋ source（原始碼）→ 備份 Mac（`LeafofLegends.html`、`versions/LeafofLegends_v版本.zip`、有改到的 `source/` 檔案）→ 升版號
-- 版本號在 `src/11_menus.js` 第 2 行 `G.VERSION = 'V3.1'`
+- 版本號在 `src/11_menus.js` 第 2 行 `G.VERSION = 'V3.2'`
 - **更新內容（玩家看得到）**：每次發佈前在 `release.json` 的 list 最前面加一筆 `{v, d, n:[…]}`（短句、玩家口吻、不寫技術細節），版本號要和 G.VERSION 一樣
 - 推 main：clone 到 `/home/claude/leafoflegends` → `python3 /home/claude/leafwar/tools/release.py`（複製 index.html＋產生 version.json；保留 `.nojekyll`；音樂有改才更新 `audio/`）→ commit → `git -c push.negotiate=true push origin HEAD:main`，約 1～2 分鐘生效。備援：Pai 在 Mac Terminal 執行 `bash ~/Desktop/Claude/LeafofLegends/deploy_github.sh`
 - 推 source：在 `/home/claude/leafwar` commit（dist/ 已在 .gitignore）→ `git -c push.negotiate=true push origin HEAD:source`
-- **排行榜伺服器**（Pai 要求全自動，不要叫他跑指令）：改 `leaderboard/worker.js` → 本機先測（`cd leaderboard && npm i wrangler@4`，用 `wrangler dev --local` 加假的 database_id 設定檔，curl 測 /board /submit /admin）→ 推 source 即自動部署。新欄位加在 worker.js 的 `SCHEMA`／`UPGRADES`。雲端 shell 連不到 Cloudflare 和 workers.dev：要確認部署就用桌面 App 內建瀏覽器（`mcp__remote-devices__Claude_Browser__*`，已登入 Cloudflare）開 lol-rank → Deployments，或開 /board。**不要用錯的密碼測管理 API**（猜錯 5 次會把 Pai 家的 IP 鎖 1 小時）
+- **排行榜伺服器**（Pai 要求全自動，不要叫他跑指令）：改 `leaderboard/worker.js` → 本機先測（`cd leaderboard && npm i wrangler@4`，用 `wrangler dev --local` 加假的 database_id 設定檔，curl 測 /board /submit /admin）→ 推 source 即自動部署。新欄位加在 worker.js 的 `SCHEMA`／`UPGRADES`。雲端 shell 連不到 Cloudflare 和 workers.dev：要確認部署就用桌面 App 內建瀏覽器（`mcp__remote-devices__Claude_Browser__*`，已登入 Cloudflare）開 lol-rank → Deployments，或開 /board。**不要用錯的密碼測管理 API**（猜錯 5 次會把 Pai 家的 IP 鎖 1 小時；全部合計 30 次會鎖住所有人）。測試場景裡設 `leafwar_adm` 時，一定要同時設 `G.Rank.adm.t=Date.now()+9e9` 並用 `G.RankUI.adm(true,1)`，避免自動去打正式伺服器
 - 長時間指令（文字檢查等）一律用 Bash 的 `run_in_background`，不要用 nohup／`&` 丟著（回合結束會被砍掉），也不要用長 sleep 輪詢；文字檢查（4 支 Chrome 平行）跑的時候不要同時截圖，會逾時
 - 測試：Playwright＋`/usr/bin/google-chrome`；裝置 n（360 寬手機）、m（390 手機）、L（手機橫屏）、d（1280×720）、w/u/t（大視窗／超寬／偏方）。可直接 `G.UI.screen='team'/'book'/'guide'`、`G.UI.start()` 進各畫面；`localStorage.clear()` 模擬新玩家；新增畫面時把場景加進 `tools/tc_scenes.py`（加在最後一行 `json.dump` **之前**，再複製到 /home/claude/tools/），只想重測新場景可把那幾個場景存成小 json 直接跑 `textcheck.py 小.json 裝置`
 - 快速驗證：`python3 /home/claude/tools/probe.py "JS"`（在遊戲裡執行並印出結果，比截圖省很多）。數值平衡可在 probe 裡 `G.UI.start(i)` 後跑 `G.W.update(1/60)` 迴圈模擬幾分鐘（英雄不動）

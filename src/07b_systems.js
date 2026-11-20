@@ -28,8 +28,8 @@ G.SHOP = [
   { id: 'cdr', n: '冷卻藥水', e: '−冷卻', ic: 'p_cdr', cost: 160, k: 'cdr', v: 20, t: 60, d: '{技能冷卻 −20%}，60 秒' },
   { id: 'xp', n: '經驗藥水', e: '+經驗', ic: 'p_xp', cost: 120, k: 'xp', v: 50, t: 60, d: '{獲得經驗 +50%}，60 秒' },
   { id: 'wave', n: '小兵藥水', e: '+出兵', ic: 'p_wave', cost: 200, k: 'wave', v: 50, t: 60, d: '我方{出兵速度 +50%}，60 秒' },
-  { id: 'inv', n: '無敵藥水', e: '無敵', ic: 'p_inv', cost: 280, k: 'inv', v: 0, t: 2.5, d: '{無敵 2.5 秒}：不受傷害與控制' },
-  { id: 'rev', n: '復活藥水', e: '復活', ic: 'p_rev', cost: 350, k: 'rev', v: 50, t: 0, d: '帶在背包，陣亡時{自動使用}：原地復活並{r:回復 50% HP}' }
+  { id: 'inv', n: '無敵藥水', e: '無敵', ic: 'p_inv', cost: 280, k: 'inv', v: 0, t: 2.5, d: '{無敵}：不受傷害與控制，2.5 秒' },
+  { id: 'rev', n: '復活藥水', e: '復活', ic: 'p_rev', cost: 350, k: 'rev', v: 50, t: 0, d: '帶在背包，陣亡時{自動使用}：原地復活、{r:回復 50% HP}，{無敵 2 秒}' }
 ];
 G.SHOP_BY = Object.fromEntries(G.SHOP.map(s => [s.id, s]));
 G.TUNE.gold = { start: 150, perSec: 2, last: 16, near: 5, boss: 120, tower: 150, camp: 60, wild: 250 };
@@ -318,11 +318,11 @@ Object.assign(G.World.prototype, {
     this.stats.potions++; return true;
   },
 
-  // 復活藥水（v2.4）：英雄陣亡瞬間自動使用 → 原地復活、回復 50% HP/MP、無敵 1.5 秒
+  // 復活藥水（v2.4）：英雄陣亡瞬間自動使用 → 原地復活、回復 50% HP/MP、無敵 2 秒（v3.2）
   tryRevive(h) {
     const slot = this.bag.find(b => b.id === 'rev'); if (!slot || this.over || this.attract) return false;
     if (--slot.n <= 0) this.bag.splice(this.bag.indexOf(slot), 1);
-    const it = G.SHOP_BY.rev; h.alive = true; h.hp = Math.round(h.st.hp * it.v / 100); h.mp = Math.max(h.mp, Math.round(h.st.mp * it.v / 100)); h.inv = 1.5; h.stun = 0; h.slow = 0; h.poison = null;
+    const it = G.SHOP_BY.rev; h.alive = true; h.hp = Math.round(h.st.hp * it.v / 100); h.mp = Math.max(h.mp, Math.round(h.st.mp * it.v / 100)); h.inv = 2; h.stun = 0; h.slow = 0; h.poison = null; this.addBuff(h, 'i_inv', {}, 2, 'p_inv', null);   // v3.2 無敵 2 秒（顯示增益圖示）
     G.VFX.potion(this, h, it); this.say({ s: '復活藥水生效！', ic: 'p_rev', col: 19, t: 2.2 }); this.stats.potions++;
     return true;
   },

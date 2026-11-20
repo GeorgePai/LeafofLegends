@@ -103,3 +103,13 @@ D1（SQLite）：players 一張表＋news 一張表
 - **反饋信箱**：POST /fb/send、/fb/mine（要先上榜）；開發者 POST /admin/fb、/admin/fbreply、/admin/fbdel（和管理玩家同一套密碼與防猜）；表 `fb(id, pid, name, ip, body, t, reply, rt, seen)`；刪除帳號（/leave）會一起刪信
 - **負擔估計**：在線回報每位在線玩家每小時 60 次請求、最多 60 次寫入；反饋每人每天幾次。以免費額度（每天 10 萬次請求、10 萬列寫入）計，約可撐每天 500～1000 小時的總遊玩時間
 
+
+## v3.2 系統公告與玩家動態
+- 公告：`ann (id, t, title, body, keys, live, exp)`。GET `/ann` → 有效中最多 30 則（記憶體快取 30 秒）；POST `/admin/ann {key,title,body,keys,days,live}`、`/admin/anndel {key,id}`
+- `/ping` 回傳 `a`＝最新有效公告 id（30 秒快取）；用戶端發現比自己知道的新才 GET /ann，所以平常不會多出請求
+- 玩家動態：`pres` 加 `pid, st, v, m, t0`；同一台 50 秒寫一次，狀態變了最快 10 秒寫一次；保留 3 天
+- `/admin/list` 每位玩家附 `pt, st, v, m, t0`
+- 負擔估算（免費額度：Workers 每天 10 萬次請求、D1 每天 10 萬列寫入、500 萬列讀取）：
+  - 在線玩家每人每分鐘約 1～2 次 /ping（各 1 次寫入）→ 同時 10 人連續玩 2 小時 ≈ 1,800～3,600 次請求與寫入／天，不到額度的 4%
+  - 公告：每則公告每位玩家只會多 1 次 GET /ann（多半命中快取）
+  - 管理玩家：開著這頁每 15 秒 1 次 /admin/list（約 500＋pres 列讀取）；開 1 小時 ≈ 24 萬列讀取，約額度的 5%

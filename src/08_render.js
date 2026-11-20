@@ -207,8 +207,8 @@ G.Render = (() => {
           const h1 = Math.round(s.h * 0.4), h2 = Math.round(s.h * 0.72) - h1, o1 = Math.round(sw * 1.2), o2 = Math.round(sw * 0.55);
           b.drawImage(sn, 0, 0, s.w, h1, ax + o1, ay, s.w, h1); b.drawImage(sn, 0, h1, s.w, h2, ax + o2, ay + h1, s.w, h2); b.drawImage(sn, 0, h1 + h2, s.w, s.h - h1 - h2, ax, ay + h1 + h2, s.w, s.h - h1 - h2);
         } else {
-          if (p.deco) G.pxDisc(b, ax + s.w / 2 + 2, ay + s.h - 1, s.w * 0.45, 2, 0, 0.5);
-          b.drawImage(sn, ax, ay);
+          if (p.deco) { G.pxDisc(b, ax + s.w / 2 + 2, ay + s.h - 1, s.w * 0.45, 2, 0, 0.5); b.drawImage(G.extrudeOf(sn, 2), ax - 1, ay - 3); }   // v3.2 石像／斷柱／燈籠也有厚度
+          b.drawImage(p.deco ? G.shadeOf(sn) : sn, ax, ay);
           if (p.glow) { const fl = 0.75 + 0.15 * Math.sin(rt * 3 + p.x) + 0.1 * Math.sin(rt * 11 + p.y); G.glow(b, ax + s.w / 2, ay + 5, 9, 13, 0.32 * fl); G.glow(b, ax + s.w / 2, ay + s.h, 12, 13, 0.1 * fl, 0.5); }
         }
       } else if (it.u) {
@@ -220,6 +220,7 @@ G.Render = (() => {
         // 影子
         const shR = u.vis.shadow * G.AX * (u.vis.fly ? 0.7 : 1);
         G.pxDisc(b, gx, gy, shR, Math.max(1.5, shR * 0.42), 0, u.static ? 0.7 : 0.55);
+        if (!u.vis.fly) G.pxDisc(b, gx + 1, gy, shR * 0.55, Math.max(1, shR * 0.22), 0, 0.4);   // v3.2 腳底接觸陰影（環境光遮蔽），角色像真的踩在地上
         if (u === h0) G.pxEllipse(b, gx, gy + 1, shR + 3, shR * 0.42 + 2, 9, 5, rt * 12);
         if (u.chg) {                                            // 施法前搖：腳下法陣由小變大、旋轉
           const cp = Math.min(1, u.chg.T / u.chg.dur), E = G.ELEM[u.chg.el] || G.ELEM.arcane, R0 = (shR + (u.chg.big ? 12 : 7)) * (0.35 + 0.65 * Math.sqrt(cp));
@@ -280,10 +281,13 @@ G.Render = (() => {
           b.globalAlpha = 0.25 + 0.6 * cp * (0.75 + 0.25 * Math.sin(rt * 30)); b.drawImage(gl.c, ax - gl.p, ay - gl.p); b.globalAlpha = 1;
         }
         if (u.clone) b.globalAlpha = 0.68 + Math.sin(rt * 9 + u.id) * 0.1;      // 複製體：半透明、微微閃爍
+        // v3.2 立體感：側面厚度（建築 3 層、首領 2 層、其他 1 層）＋正面上亮下暗
+        const ek = u.static ? (u.kind === 'holy' ? 2 : 3) : u.kind === 'boss' || s.h >= 20 ? 2 : 1, vimg = u.flash > 0 ? img : G.shadeOf(img);
+        if (!u.vis.fly || u.static) { const ex = G.extrudeOf(base, ek); if (psx !== 1 || psy !== 1 || psk !== 0) { const fx = ax + s.w / 2, fy = ay + s.h; b.save(); b.setTransform(psx, 0, psk, psy, fx, fy); b.drawImage(ex, -s.w / 2 - 1, -s.h - ek - 1); b.restore(); } else b.drawImage(ex, ax - 1, ay - ek - 1); }
         if (psx !== 1 || psy !== 1 || psk !== 0) {              // 以腳底為支點做擠壓／傾斜
           const fx = ax + s.w / 2, fy = ay + s.h;
-          b.save(); b.setTransform(psx, 0, psk, psy, fx, fy); b.drawImage(img, -s.w / 2, -s.h); b.restore();
-        } else b.drawImage(img, ax, ay);
+          b.save(); b.setTransform(psx, 0, psk, psy, fx, fy); b.drawImage(vimg, -s.w / 2, -s.h); b.restore();
+        } else b.drawImage(vimg, ax, ay);
         b.globalAlpha = 1;
         if (u.chg && u.chg.T > u.chg.dur - 0.06) { b.globalAlpha = 0.8; b.drawImage(G.glowOf(base, 9, 1, 0).tint, ax, ay); b.globalAlpha = 1; }   // 放招瞬間白閃
         if (u.lunge > 0.25 && !u.static) G.FX.swingArc(b, u, ax, ay, s, 1 - u.lunge);
@@ -351,13 +355,8 @@ G.Render = (() => {
       else if (u.side === 2) { b.fillStyle = G.PAL[13]; b.fillRect(x, y, f, 1); }
       else { for (let i = 0; i < f; i++) { b.fillStyle = G.PAL[(i % 3) === 2 ? 7 : 9]; b.fillRect(x + i, y, 1, 1); } }   // 敵方：亮白帶刻痕
       if (u.kind === 'hero') { b.fillStyle = G.PAL[3]; b.fillRect(x, y + 2, bw2, 1); b.fillStyle = G.PAL[11]; b.fillRect(x, y + 2, Math.round(bw2 * u.mp / u.st.mp), 1); b.fillStyle = G.PAL[0]; b.fillRect(x - 1, y + 3, bw2 + 2, 1); }
-      // v3.1 等級徽章（參考傳說對決）：英雄與會升級的敵方獵手，血條左邊一個小方塊寫等級
-      if (u.kind === 'hero' || u.kind === 'jungler') {
-        const ls = String(u.level), tw = G.textW(ls), ow = tw + 4, bx = x - ow;
-        b.fillStyle = G.PAL[0]; b.fillRect(bx, y - 2, ow, 7);
-        b.fillStyle = G.PAL[u.kind === 'hero' ? (u.side === 0 ? 12 : 15) : 15]; b.fillRect(bx + 1, y - 1, ow - 2, 5);
-        G.text(b, ls, bx + 2, y - 1, 9);
-      }
+      // v3.2 等級：血條左邊的白字細黑邊（和跳傷害數字同風格），不加底框
+      if (u.kind === 'hero' || u.kind === 'jungler') { const ls = String(u.level), lx = x - 3 - G.textW(ls); for (const [ox, oy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) G.text(b, ls, lx + ox, y - 1 + oy, 0); G.text(b, ls, lx, y - 1, 9); }   // 四方向細黑邊
       if (u.kind === 'boss') G.text(b, 'BOSS', cx, y - 7, u.side === 1 ? 12 : 13, 1, 0, 0.5);
       if (u.kind === 'jungler') G.text(b, 'HUNTER', cx, y - 7, 14, 1, 0, 0.5);
     }

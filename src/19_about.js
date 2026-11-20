@@ -29,7 +29,7 @@ G.About = (() => {
     lab('開發者'); line('Pai', '#ffffff', 2); gap(22);
     lab('開發工具'); line('Claude by Anthropic', '#ffffff'); gap(46);
     line('雖然漸漸電子陽痿', CREAM); line('但年輕時的遊戲魂還在', CREAM); gap(18);
-    line('希望帶著年輕時沒玩透的遺憾', CREAM); gap(18);
+    line('希望帶著兒時沒玩透的遺憾', CREAM); gap(18);
     line('在這 AI 的列車上', CREAM); line('圓一場遊戲夢。', CREAM); gap(46);
     lab('音樂'); line('引用自小時候瘋過的遊戲', SOFT); gap(14);
     line('Littleroot Town', '#ffffff'); line('Pokémon Omega Ruby & Alpha Sapphire', SOFT); line('Recreation & interpolation', SOFT); line('by Craig Maywell Vlogs Brawlgamemusic', SOFT); gap(14);

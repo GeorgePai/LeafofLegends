@@ -6,6 +6,10 @@
 // v2.8.1：players.hidden＝1 的玩家不出現在排行（可復原）
 // v2.8.4：POST /admin/purge {key, days} 清除 days 天沒上線的帳號（至少 7 天）
 // v2.8.7：一帳號同時一台裝置。players.sess＝目前登入那台的工作階段；POST /claim {id,tok,ss} 換成這台，其他台下次連線收到 err:'moved'（/ping 帶 id+ss 時回 moved:1）
+// v3.2 系統公告：GET /ann → 有效中的公告（記憶體快取 30 秒）；/ping 回傳 a＝最新公告 id，用戶端發現比自己知道的新才來拿
+//      管理：POST /admin/ann {key,title,body,keys,days,live}、/admin/anndel {key,id}
+// v3.2 玩家動態：/ping 多帶 st（目前畫面／戰鬥狀態，短字串）、v（版本）、m（1＝手機）；同一台 50 秒內只寫一次，狀態變了最快 10 秒寫一次
+//      /admin/list 每位玩家附上最近一次的 pres（t、st、v、m、t0＝這次上線開始時間）
 // v2.8.2：管理權限＝遊戲的開發者密碼（key 傳 8 位數密碼，和遊戲用同一個雜湊檢查）；猜錯會被擋：同一個 IP 每小時 5 次、全部合計每小時 30 次
 const CATS = ['heroes', 'minions', 'games', 'wr', 'kda', 'keys', 'dmg', 'time', 'ach'];
 const QUAL = { wr: 'games >= 10', kda: 'games >= 10' };          // 勝率、KDA 至少 10 場才上榜
@@ -99,21 +103,30 @@ async function leave(req, env) {
   return J({ ok: 1 });
 }
 // ---- v2.8.6 即時在線人數：POST /ping {sid} → {n}；同一台 50 秒內只寫一次（記憶體擋），人數快取 15 秒 ----
-const seenW = new Map(); let onN = 0, onT = 0;
+const seenW = new Map(); let onN = 0, onT = 0, annMax = 0, annT = 0, annList = null, annLT = 0;
+const cleanSt = v => String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f<>]/g, '').slice(0, 160);
 async function ping(req, env) {
   let b; try { b = await req.json(); } catch (e) { return J({ err: 'bad' }, 400); }
   const sid = String(b.sid || ''); if (!/^[0-9a-f]{16}$/.test(sid)) return J({ err: 'bad' }, 400);
-  const now = Math.floor(Date.now() / 1000);
-  if (!seenW.has(sid) || now - seenW.get(sid) >= 50) {
-    if (seenW.size > 5000) seenW.clear(); seenW.set(sid, now);
-    const qs = [env.DB.prepare('INSERT INTO pres (sid, t) VALUES (?, ?) ON CONFLICT(sid) DO UPDATE SET t = excluded.t').bind(sid, now)];
-    if (Math.random() < 0.02) qs.push(env.DB.prepare('DELETE FROM pres WHERE t < ?').bind(now - 3600));
+  const now = Math.floor(Date.now() / 1000), st = cleanSt(b.st), ver = cleanSt(b.v).slice(0, 12), mob = b.m ? 1 : 0;
+  const pid = /^[0-9a-f]{16}$/.test(String(b.id || '')) ? String(b.id) : null, last = seenW.get(sid);
+  if (!last || now - last.t >= 50 || (st !== last.st && now - last.t >= 10)) {
+    if (seenW.size > 5000) seenW.clear(); seenW.set(sid, { t: now, st });
+    const qs = [env.DB.prepare('INSERT INTO pres (sid, t, pid, st, v, m, t0) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(sid) DO UPDATE SET t = excluded.t, pid = COALESCE(excluded.pid, pres.pid), st = excluded.st, v = excluded.v, m = excluded.m, t0 = CASE WHEN pres.t < excluded.t - 180 OR pres.t0 IS NULL THEN excluded.t ELSE pres.t0 END').bind(sid, now, pid, st, ver, mob, now)];
+    if (Math.random() < 0.02) qs.push(env.DB.prepare('DELETE FROM pres WHERE t < ?').bind(now - 86400 * 3));   // 保留 3 天（管理玩家看「最後在做什麼」）
     await env.DB.batch(qs);
   }
   if (Date.now() - onT > 15000) { const r = await env.DB.prepare('SELECT COUNT(*) AS n FROM pres WHERE t > ?').bind(now - 120).first(); onN = r.n; onT = Date.now(); }
+  if (Date.now() - annT > 30000) { const r = await env.DB.prepare('SELECT MAX(id) AS a FROM ann WHERE exp > ?').bind(now).first(); annMax = (r && r.a) || 0; annT = Date.now(); }
   let moved = 0;                                                                     // v2.8.7 帶了帳號：順便看是不是被別台登入了（1 列讀取）
-  if (/^[0-9a-f]{16}$/.test(String(b.id || '')) && okSS(String(b.ss || ''))) { const r = await env.DB.prepare('SELECT sess FROM players WHERE id = ?').bind(b.id).first(); moved = r && r.sess && r.sess !== b.ss ? 1 : 0; }
-  return J({ ok: 1, n: Math.max(1, onN), moved });
+  if (pid && okSS(String(b.ss || ''))) { const r = await env.DB.prepare('SELECT sess FROM players WHERE id = ?').bind(pid).first(); moved = r && r.sess && r.sess !== b.ss ? 1 : 0; }
+  return J({ ok: 1, n: Math.max(1, onN), moved, a: annMax });
+}
+// ---- v3.2 系統公告 ----
+async function annGet(env) {
+  if (annList && Date.now() - annLT < 30000) return annList;
+  const now = Math.floor(Date.now() / 1000), r = await env.DB.prepare('SELECT id, t, title, body, keys, live, exp FROM ann WHERE exp > ? ORDER BY id DESC LIMIT 30').bind(now).all();
+  annList = { ok: 1, list: r.results }; annLT = Date.now(); return annList;
 }
 // ---- v2.8.6 反饋信箱：玩家寫信給開發者、開發者回信 ----
 // 玩家：POST /fb/send {id,tok,body}（1～300 字；同一人 60 秒 1 封、未回覆最多 5 封；同 IP 每天 30 封）
@@ -152,7 +165,18 @@ async function admin(req, env, url) {
   if (f[0].results[0].n >= 5 || f[1].results[0].n >= 30) return J({ err: 'locked' }, 429);
   const k = String(key || ''), ok = (env.ADMIN_KEY && k === env.ADMIN_KEY) || (/^[0-9]{8}$/.test(k) && devHash(k) === DEV_H);
   if (!ok) { await env.DB.batch([env.DB.prepare('INSERT INTO fails (ip, t) VALUES (?, ?)').bind(ih, hr + 3600), env.DB.prepare('DELETE FROM fails WHERE t < ?').bind(hr)]); return J({ err: 'auth' }, 403); }
-  if (url.pathname === '/admin/list') { const r = await env.DB.prepare('SELECT id, name, hidden, heroes, minions, games, wins, kills, deaths, assists, keys, dmg, time, ach, wr, kda, created, updated FROM players ORDER BY updated DESC LIMIT 500').all(); return J(r.results); }
+  if (url.pathname === '/admin/list') {
+    const [r, q] = await env.DB.batch([env.DB.prepare('SELECT id, name, hidden, heroes, minions, games, wins, kills, deaths, assists, keys, dmg, time, ach, wr, kda, created, updated FROM players ORDER BY updated DESC LIMIT 500'),
+      env.DB.prepare('SELECT pid, MAX(t) AS t, st, v, m, t0 FROM pres WHERE pid IS NOT NULL GROUP BY pid')]);   // v3.2 每位玩家最近一次的動態
+    const pm = new Map(q.results.map(x => [x.pid, x])); return J(r.results.map(p => { const x = pm.get(p.id); return x ? Object.assign(p, { pt: x.t, st: x.st, v: x.v, m: x.m, t0: x.t0 }) : p; }));
+  }
+  if (url.pathname === '/admin/ann' && isPost) {                                       // v3.2 發布系統公告
+    const title = cleanBody(b.title, 20), body = cleanBody(b.body, 300); if (!title || !body) return J({ err: 'len' }, 422);
+    const now = Math.floor(Date.now() / 1000), days = Math.min(30, Math.max(1, Math.floor(Number(b.days) || 7))), keys = Math.min(50, Math.max(0, Math.floor(Number(b.keys) || 0)));
+    const r = await env.DB.prepare('INSERT INTO ann (t, title, body, keys, live, exp) VALUES (?, ?, ?, ?, ?, ?)').bind(now, title, body, keys, b.live ? 1 : 0, now + days * 86400).run();
+    annList = null; annT = 0; return J({ ok: 1, id: r.meta.last_row_id });
+  }
+  if (url.pathname === '/admin/anndel' && isPost) { const r = await env.DB.prepare('DELETE FROM ann WHERE id = ?').bind(Number(b.id) || 0).run(); annList = null; annT = 0; return J({ ok: 1, changed: r.meta.changes }); }
   if (url.pathname === '/admin/purge' && isPost) {                                    // v2.8.4 清除 N 天（至少 7 天）沒上線的幽靈帳號
     const days = Math.max(7, Math.floor(Number(b.days) || 30)), cut = Math.floor(Date.now() / 1000) - days * 86400;
     await env.DB.prepare('DELETE FROM news WHERE pid IN (SELECT id FROM players WHERE updated < ?)').bind(cut).run();
@@ -177,9 +201,10 @@ const SCHEMA = [
   'CREATE INDEX IF NOT EXISTS i_fb_pid ON fb (pid, id)',
   'CREATE INDEX IF NOT EXISTS i_fb_ip ON fb (ip, t)',
   'CREATE TABLE IF NOT EXISTS pres (sid TEXT PRIMARY KEY, t INTEGER)',
-  'CREATE INDEX IF NOT EXISTS i_pres_t ON pres (t)'
+  'CREATE INDEX IF NOT EXISTS i_pres_t ON pres (t)',
+  'CREATE TABLE IF NOT EXISTS ann (id INTEGER PRIMARY KEY AUTOINCREMENT, t INTEGER, title TEXT, body TEXT, keys INTEGER DEFAULT 0, live INTEGER DEFAULT 1, exp INTEGER)'
 ];
-const UPGRADES = ['ALTER TABLE players ADD COLUMN hidden INTEGER DEFAULT 0', 'ALTER TABLE players ADD COLUMN sess TEXT'];   // 已經有這欄就會報錯，略過即可
+const UPGRADES = ['ALTER TABLE players ADD COLUMN hidden INTEGER DEFAULT 0', 'ALTER TABLE players ADD COLUMN sess TEXT', 'ALTER TABLE pres ADD COLUMN pid TEXT', 'ALTER TABLE pres ADD COLUMN st TEXT', 'ALTER TABLE pres ADD COLUMN v TEXT', 'ALTER TABLE pres ADD COLUMN m INTEGER', 'ALTER TABLE pres ADD COLUMN t0 INTEGER', 'CREATE INDEX IF NOT EXISTS i_pres_pid ON pres (pid, t)'];   // 已經有這欄就會報錯，略過即可
 async function migrate(env) {
   if (migrated) return;
   await env.DB.batch(SCHEMA.map(q => env.DB.prepare(q)));
@@ -196,6 +221,7 @@ export default {
       if (url.pathname === '/submit' && req.method === 'POST') return await submit(req, env);
       if (url.pathname === '/leave' && req.method === 'POST') return await leave(req, env);
       if (url.pathname === '/ping' && req.method === 'POST') return await ping(req, env);
+      if (url.pathname === '/ann' && req.method === 'GET') return J(await annGet(env));
       if (url.pathname === '/claim' && req.method === 'POST') return await claim(req, env);
       if (url.pathname.startsWith('/fb/') && req.method === 'POST') return await fb(req, env, url);
       if (url.pathname.startsWith('/admin/')) return await admin(req, env, url);

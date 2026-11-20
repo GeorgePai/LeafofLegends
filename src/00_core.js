@@ -243,6 +243,35 @@ G.redOf = function (src, n) {
   }
   x.putImageData(d, 0, 0); C.set(src, c); return c;
 };
+// v3.2 立體感（2.5D）：光從左上來
+// G.shadeOf：正面加「上亮下暗」的垂直漸層（頂部受光、腳邊環境光遮蔽），讓角色有圓柱般的體積
+// G.extrudeOf：把剪影往右上疊 k 層、壓暗，做出看得到的側面厚度（斜投影，類似 sprite stacking）
+G._shadeC = new WeakMap(); G._extC = {};
+G.shadeOf = function (src) {
+  let r = G._shadeC.get(src); if (r) return r;
+  const w = src.width, h = src.height, c = G.canvas(w, h), x = c.getContext('2d'); x.drawImage(src, 0, 0);
+  x.globalCompositeOperation = 'source-atop';
+  const g = x.createLinearGradient(0, 0, 0, h); g.addColorStop(0, 'rgba(255,248,230,0.16)'); g.addColorStop(0.3, 'rgba(255,248,230,0)'); g.addColorStop(0.55, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(10,8,20,0.34)');
+  x.fillStyle = g; x.fillRect(0, 0, w, h);
+  const g2 = x.createLinearGradient(0, 0, w, 0); g2.addColorStop(0, 'rgba(0,0,0,0)'); g2.addColorStop(0.6, 'rgba(0,0,0,0)'); g2.addColorStop(1, 'rgba(10,8,20,0.18)');   // 右側背光
+  x.fillStyle = g2; x.fillRect(0, 0, w, h);
+  G._shadeC.set(src, c); return c;
+};
+G.extrudeOf = function (src, k) {
+  const C = G._extC[k] || (G._extC[k] = new WeakMap()); let r = C.get(src); if (r) return r;
+  const w = src.width, h = src.height, c = G.canvas(w + k + 2, h + k + 2), x = c.getContext('2d');
+  // 側面顏色：本體的平均色（不算黑色外框）壓暗到 55%；外框像素也換成這個顏色，側面才不會變成一片黑
+  const sd = src.getContext ? src.getContext('2d').getImageData(0, 0, w, h) : (() => { const t = G.canvas(w, h), tx = t.getContext('2d'); tx.drawImage(src, 0, 0); return tx.getImageData(0, 0, w, h); })();
+  let R = 0, Gg = 0, B = 0, n = 0; for (let i = 0; i < sd.data.length; i += 4) { const a = sd.data; if (a[i + 3] < 128) continue; if (a[i] + a[i + 1] + a[i + 2] < 120) continue; R += a[i]; Gg += a[i + 1]; B += a[i + 2]; n++; }
+  const m = n ? [R / n, Gg / n, B / n] : [60, 60, 70], f = 0.55, col = [Math.round(m[0] * f), Math.round(m[1] * f), Math.round(m[2] * f + 6)];
+  const d = G.canvas(w, h), dx = d.getContext('2d'), od = dx.createImageData(w, h);
+  for (let i = 0; i < sd.data.length; i += 4) { const a = sd.data; if (a[i + 3] < 128) continue; const dark = a[i] + a[i + 1] + a[i + 2] < 120, q = dark ? col : [a[i] * f * 0.8 + col[0] * 0.2, a[i + 1] * f * 0.8 + col[1] * 0.2, a[i + 2] * f * 0.8 + col[2] * 0.2]; od.data[i] = q[0]; od.data[i + 1] = q[1]; od.data[i + 2] = q[2]; od.data[i + 3] = 255; }
+  dx.putImageData(od, 0, 0);
+  const st = G.canvas(w + k, h + k), sx = st.getContext('2d'); for (let i = k; i >= 1; i--) sx.drawImage(d, i, k - i);
+  const ol = G.glowOf(st, 0, 1, 0);                                                    // 整個側面外圍一圈黑框
+  x.drawImage(ol.c, 1 - ol.p, 1 - ol.p); x.drawImage(st, 1, 1);
+  C.set(src, c); return c;
+};
 // 稀有度：0 普通(白) 1 稀有(綠) 2 史詩(紫) 3 傳說(橘)
 // v2.6 新增 4 神話（傳說之上）：外框是流動的七彩光＋鑽石閃光（G.mythGlow），文字用七彩逐字變色（G.cnRb）
 G.RARITY = [{ n: '普通', c: 9 }, { n: '稀有', c: 11 }, { n: '史詩', c: 17 }, { n: '傳說', c: 14 }, { n: '神話', c: 26, myth: true }];

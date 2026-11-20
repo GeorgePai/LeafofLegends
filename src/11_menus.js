@@ -1,5 +1,5 @@
 'use strict';
-G.VERSION = 'V3.1';                                  // 版本號（唯一來源；setup.sh 也從這行讀）
+G.VERSION = 'V3.2';                                  // 版本號（唯一來源；setup.sh 也從這行讀）
 /* =========================================================
    選單：首頁 / 隊伍 / 圖鑑 / 教學
    版面：直屏上下堆疊，橫屏左右分欄
@@ -348,9 +348,9 @@ G.Menus = (() => {
   }
   // 可捲動詳細區：內容超出時可上下拖曳 / 滾輪捲動（主畫面與技能展示各自一組狀態）
   const SM = { s: 0, max: 0, region: null, key: '' }, SD = { s: 0, max: 0, region: null, key: '' };
-  M.scroll = (dy, ux, uy) => { const S = demo ? SD : SM, r = S.region; if (!r || ux < r[0] - 6 || uy < r[1] || uy > r[1] + r[3]) return false; S.s = G.clamp(S.s + dy, 0, S.max); return true; };
+  M.scroll = (dy, ux, uy) => { const S = demo || (G.Mail && U().screen === 'mail' && G.Mail.open()) ? SD : SM, r = S.region; if (!r || ux < r[0] - 6 || uy < r[1] || uy > r[1] + r[3]) return false; S.s = G.clamp(S.s + dy, 0, S.max); return true; };
   // 慣性：手指離開時帶著速度繼續滑，慢慢減速停下
-  M.fling = (v, ux, uy) => { const S = demo ? SD : SM, r = S.region; if (!r || ux < r[0] - 6 || uy < r[1] || uy > r[1] + r[3]) return; S.v = G.clamp(v, -1600, 1600); };
+  M.fling = (v, ux, uy) => { const S = demo || (G.Mail && U().screen === 'mail' && G.Mail.open()) ? SD : SM, r = S.region; if (!r || ux < r[0] - 6 || uy < r[1] || uy > r[1] + r[3]) return; S.v = G.clamp(v, -1600, 1600); };
   M.scrollHold = () => { SM.v = 0; SD.v = 0; };
   function scrollDetail(c, x, y, w, h, key, draw, S = SM) {
     if (key !== S.key) { S.key = key; S.s = 0; S.v = 0; }
@@ -373,12 +373,12 @@ G.Menus = (() => {
 
   // ---------- 首頁 ----------
   const ITEMS = [['單人', 'SOLO', 'i_play', () => G.Solo.open()], ['多人', 'MULTI', 'i_users', () => { modal = 2.2; }], ['隊伍', 'TEAM', 'i_tree', () => go('team')], ['商店', 'SHOP', 'i_key', () => go('store')],
-    ['成就', 'TROPHY', 'i_trophy', () => go('ach')], ['排行', 'RANK', 'i_rank', () => go('rank')], ['圖鑑', 'BOOK', 'i_book', () => go('book')], ['教學', 'GUIDE', 'i_guide', () => M.openGuide(false)], ['帳號', 'ACCOUNT', 'i_save', () => go('save')], ['設定', 'SETTING', 'i_gear', () => { setOpen = true; }], ['反饋', 'MAIL', 'i_mail', () => go('fb')], ['關於', 'ABOUT', 'i_info', () => go('about')]];
+    ['成就', 'TROPHY', 'i_trophy', () => go('ach')], ['排行', 'RANK', 'i_rank', () => go('rank')], ['圖鑑', 'BOOK', 'i_book', () => go('book')], ['教學', 'GUIDE', 'i_guide', () => M.openGuide(false)], ['帳號', 'ACCOUNT', 'i_save', () => go('save')], ['設定', 'SETTING', 'i_gear', () => { setOpen = true; }], ['反饋', 'MAIL', 'i_pen', () => go('fb')], ['關於', 'ABOUT', 'i_info', () => go('about')]];
   // 執行首頁選項：會切換畫面的先播轉場（按鈕撥開 → 光圈展開）；多人、設定是彈窗，直接開
   const runItem = i => { if (G.Trans.busy()) return; const it = ITEMS[i]; if (it[0] === '多人' || it[0] === '設定') it[3](); else G.Trans.start(it[3]); };
   const mw = G.UI.wheel();                                 // 首頁滾輪
   M.menuWheel = mw;
-  function go(s) { U().screen = s; sbKey = ''; skillSel = -1; picker = null; info = null; demo = null; if (s === 'save' && G.SaveUI) G.SaveUI.reset(); if (s === 'ach' && G.AchUI) G.AchUI.reset(); if (s === 'rank' && G.RankUI) G.RankUI.reset(); if (s === 'fb' && G.FbUI) G.FbUI.reset(); if (s === 'about' && G.About) G.About.reset(); }
+  function go(s) { U().screen = s; sbKey = ''; skillSel = -1; picker = null; info = null; demo = null; if (s === 'save' && G.SaveUI) G.SaveUI.reset(); if (s === 'ach' && G.AchUI) G.AchUI.reset(); if (s === 'rank' && G.RankUI) G.RankUI.reset(); if (s === 'fb' && G.FbUI) G.FbUI.reset(); if (s === 'mail' && G.Mail) G.Mail.reset(); if (s === 'about' && G.About) G.About.reset(); }
   let menuT = 0, resetAsk = false, setOpen = false, devAsk = null; const leaves = [];
   // v2.4 開發者模式密碼鎖：只存雜湊值（FNV-1a），原文不寫在程式裡
   const devHash = s => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h; };
@@ -596,11 +596,17 @@ G.Menus = (() => {
     G.Update.corner(c, uw - I.r - 2, uh - I.b - 6);                                      // v2.8.5 版本號＋有新版時「點擊更新」
     // 右上：鑰匙數；左下：開發者模式開關
     // v2.8.6 右上：即時在線人數（綠點慢慢呼吸）；鑰匙數量改在商店頁看
+    // v3.2 右上角信箱（系統公告），有未讀／未領就亮紅點＋數字；在線人數往左挪
+    const mbw = G.Rank && G.Rank.on() ? 18 : 0;
+    if (mbw) { const mx = uw - I.r - mbw, mo = pr('mailBtn') ? 1 : 0, un = G.Mail ? G.Mail.unread() : 0;
+      H().key(c, mx, I.t + mo, mbw, 14, mo, 6); H().icon(c, 'i_mail', mx + 9, I.t + 7 + mo);
+      if (un) { const ns = String(Math.min(9, un)), bx2 = mx + mbw - 4; c.fillStyle = P[0]; c.fillRect(bx2 - 1, I.t - 3, 8, 9); c.fillStyle = P[10]; c.fillRect(bx2, I.t - 2, 6, 7); G.text(c, ns, bx2 + 3, I.t - 1, 9, 1, null, 0.5); }
+      tap('mailBtn', mx, I.t, mbw, 14, () => { go('mail'); G.Audio.play('open'); }); }
     const on = G.Rank && G.Rank.on() ? G.Rank.online.n : null, kt = on == null ? '' : on + ' 人在線', kw = kt ? 18 + G.cnW(kt) : 0;
-    if (kt) { const ox = uw - I.r - kw; H().box(c, ox, I.t, kw, 14, 0, 3, false); const a = 0.55 + 0.45 * Math.sin(gt * 3); c.fillStyle = P[11]; c.globalAlpha = a * 0.35; c.fillRect(ox + 5, I.t + 4, 6, 6); c.globalAlpha = 1; c.fillRect(ox + 6, I.t + 5, 4, 4); c.fillStyle = '#c8ffc8'; c.fillRect(ox + 6, I.t + 5, 1, 1); G.cn(c, kt, uw - I.r - 4, I.t + 1, 9, 1); }
+    if (kt) { const ox = uw - I.r - kw - (mbw ? mbw + 3 : 0); H().box(c, ox, I.t, kw, 14, 0, 3, false); const a = 0.55 + 0.45 * Math.sin(gt * 3); c.fillStyle = P[11]; c.globalAlpha = a * 0.35; c.fillRect(ox + 5, I.t + 4, 6, 6); c.globalAlpha = 1; c.fillRect(ox + 6, I.t + 5, 4, 4); c.fillStyle = '#c8ffc8'; c.fillRect(ox + 6, I.t + 5, 1, 1); G.cn(c, kt, ox + kw - 4, I.t + 1, 9, 1); }
     // v2.8.3 左上：有存檔名稱就打招呼（單純白字、無外框；和右上鑰匙數字同高；放不下就把名字換到第二行，不截斷）
     { const gn = String(G.Team.get().name || '').trim();
-      if (gn) { const avail = uw - I.r - kw - 8 - I.l - 2, s0 = '嗨！' + gn, ls = G.cnW(s0) <= avail ? [s0] : ['嗨！'].concat(G.cnWrap(gn, avail)); ls.forEach((l, i) => G.cn(c, l, I.l + 2, I.t + 1 + i * 13, 9)); } }
+      if (gn) { const avail = uw - I.r - kw - (mbw ? mbw + 3 : 0) - 8 - I.l - 2, s0 = '嗨！' + gn, ls = G.cnW(s0) <= avail ? [s0] : ['嗨！'].concat(G.cnWrap(gn, avail)); ls.forEach((l, i) => G.cn(c, l, I.l + 2, I.t + 1 + i * 13, 9)); } }
     const dv = G.Team.dev, dvw = dv ? 40 : 24, dvx = I.l + 2, dvy = uh - I.b - 13, dvo = pr('dev') ? 1 : 0;
     H().key(c, dvx, dvy + dvo, dvw, 12, dvo, dv ? 14 : 4, dv ? 13 : 1); G.text(c, dv ? 'DEV ON' : 'DEV', dvx + dvw / 2, dvy + 4 + dvo, dv ? 0 : 5, 1, null, 0.5);
     tap('dev', dvx, dvy, dvw, 12, () => { if (G.Team.dev) { G.Team.setDev(false); G.Audio.play('click'); } else { devAsk = { s: '', err: 0 }; G.Audio.play('open'); } });   // 開啟要密碼、關閉不用
@@ -1372,7 +1378,7 @@ G.Menus = (() => {
           }
         },
         {
-          t: '特殊藥水', m: '{無敵藥水}：2.5 秒不受傷。{復活藥水}：帶在身上，陣亡時{原地復活}',
+          t: '特殊藥水', m: '{無敵藥水}：2.5 秒不受傷。{復活藥水}：帶在身上，陣亡時{原地復活}並無敵 2 秒',
           draw(c, x, y, w, h, t) {
             const T = t % 4, gy = Math.round(y + h * 0.72), hx = Math.round(x + w * 0.4), inv = T < 2;
             unit(c, 'leafy', hx, gy, false);
@@ -1820,9 +1826,9 @@ G.Menus = (() => {
     if (s === 'menu' && !resetAsk && !setOpen && modal <= 0 && !(G.SaveUI && G.SaveUI.welcome)) { if (k === 'arrowdown' || k === 's') mw.step(1); if (k === 'arrowup' || k === 'w') mw.step(-1); if (k === 'enter' || k === ' ') runItem(mw.idx()); if (k === '1') U().start(); }
     if (s === 'guide') { if (k === 'arrowright') M.guideTurn(1); if (k === 'arrowleft') M.guideTurn(-1); }
   };
-  M.covers = s => s === 'stages' || s === 'fb' || s === 'about' || s === 'team' || s === 'book' || s === 'guide' || s === 'store' || s === 'ach' || s === 'rank' || s === 'save' || s === 'intro' || s === 'tap';
+  M.covers = s => s === 'stages' || s === 'fb' || s === 'mail' || s === 'about' || s === 'team' || s === 'book' || s === 'guide' || s === 'store' || s === 'ach' || s === 'rank' || s === 'save' || s === 'intro' || s === 'tap';
   // 給其他模組（成就、存檔、開場動畫）共用的元件
-  M.ui = { resetCars: () => { cars.team.inited = false; cars.book.inited = false; }, tick: () => tick(), pr, tap, bg, header, btnPrimary, btnSecondary, tabs, scrollDetail, SM, gt: () => gt, bigTitle: (...a) => bigTitle(...a), logoSize: w => M.logoSize(w), land, sprFit, go: s2 => go(s2) };
+  M.ui = { resetCars: () => { cars.team.inited = false; cars.book.inited = false; }, tick: () => tick(), pr, tap, bg, header, btnPrimary, btnSecondary, tabs, scrollDetail, SM, SD, gt: () => gt, bigTitle: (...a) => bigTitle(...a), logoSize: w => M.logoSize(w), land, sprFit, go: s2 => go(s2) };
   M.guidePageCount = () => CATS.reduce((a, k, i) => a + pagesOf(i).length, 0);
   M.guideKeys = () => CATS.flatMap((k, i) => pagesOf(i).map(p => k.name + '/' + p.t));   // v2.8.4 成就「好學生」只算現在還有的頁面
   M.store = c => { tick(); bg(c); const y0 = header(c, '商店'); G.Store.draw(c, y0, M.dt, gt); };
