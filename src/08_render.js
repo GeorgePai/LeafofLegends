@@ -102,9 +102,10 @@ G.Render = (() => {
 
   // 單位在美術座標的外框（點選用）
   R.unitBox = (u) => {
-    const s = u.spr[0], ax = u.x * G.AX - R.ox, ay = u.y * G.AY - u.z * G.AZ - R.oy;
-    return [ax - s.w / 2, ay - s.h, s.w, s.h];
+    const s = u.spr[0], ax = u.x * G.AX - R.ox, ay = u.y * G.AY - u.z * G.AZ - R.oy, k = R.uScale(u);
+    return [ax - s.w * k / 2, ay - s.h * k, s.w * k, s.h * k];
   };
+  R.uScale = u => u.kind === 'hero' ? G.TUNE.heroScale || 1 : 1;   // v3.8 英雄本體放大（以腳底為中心）
 
   const sprOf = (k) => { const s = G.SPR[k]; return Array.isArray(s) ? s[0] : s; };
 
@@ -239,7 +240,7 @@ G.Render = (() => {
         const s = fr[fi];
         const gx = x * G.AX - ox, gy = y * G.AY - oy;
         // 影子
-        const shR = u.vis.shadow * G.AX * (u.vis.fly ? 0.7 : 1);
+        const UK = R.uScale(u), shR = u.vis.shadow * G.AX * (u.vis.fly ? 0.7 : 1) * UK;
         G.pxDisc(b, q(gx), q(gy), shR, Math.max(1.5, shR * 0.42), 0, u.static ? 0.7 : 0.55);
         if (!u.vis.fly) G.pxDisc(b, q(gx) + 1, q(gy), shR * 0.55, Math.max(1, shR * 0.22), 0, 0.4);   // v3.2 腳底接觸陰影（環境光遮蔽），角色像真的踩在地上
         if (u === h0) G.pxEllipse(b, gx, gy + 1, shR + 3, shR * 0.42 + 2, 9, 5, rt * 12);
@@ -247,6 +248,14 @@ G.Render = (() => {
           const cp = Math.min(1, u.chg.T / u.chg.dur), E = G.ELEM[u.chg.el] || G.ELEM.arcane, R0 = (shR + (u.chg.big ? 12 : 7)) * (0.35 + 0.65 * Math.sqrt(cp));
           G.pxEllipse(b, gx, gy + 1, R0, R0 * 0.42, E.c, 3, rt * 10); G.pxEllipse(b, gx, gy + 1, R0 * 0.62, R0 * 0.26, E.c2, 2, -rt * 14);
           if (u.chg.big) { b.globalAlpha = 0.35 * cp; b.fillStyle = G.PAL[E.c]; b.fillRect(Math.round(gx - 3 - cp * 3), 0, Math.round(6 + cp * 6), Math.round(gy)); b.globalAlpha = 1; }   // 大招：光柱
+          if (u.chg.ult) {                                      // v3.8 大招儀式：三層符文法陣（外圈刻度、六芒星）＋更粗更亮的光柱
+            const RU = (shR + 30) * (0.3 + 0.7 * Math.sqrt(cp)), ry = 0.42;
+            G.glow(b, gx, gy, RU * 1.1, E.c, 0.35 * cp, 0.45);
+            G.pxEllipse(b, gx, gy + 1, RU, RU * ry, E.c2, 2, -rt * 6); G.pxEllipse(b, gx, gy + 1, RU + 3, RU * ry + 1.3, E.c);
+            for (let i = 0; i < 12; i++) { const a = rt * 1.8 + i * Math.PI / 6, px = gx + Math.cos(a) * (RU + 6), py = gy + 1 + Math.sin(a) * (RU + 6) * ry; b.fillStyle = G.PAL[i % 3 ? E.c : 9]; b.fillRect(Math.round(px) - 1, Math.round(py), 3, 1); b.fillRect(Math.round(px), Math.round(py) - 1, 1, 3); }
+            b.fillStyle = G.PAL[E.c2]; for (const off of [0, Math.PI]) { const pts = [0, 1, 2].map(j => { const a = -rt * 2.4 + off + j * 2.094; return [gx + Math.cos(a) * RU * 0.8, gy + 1 + Math.sin(a) * RU * 0.8 * ry]; }); for (let j = 0; j < 3; j++) G.pxLine(b, pts[j][0], pts[j][1], pts[(j + 1) % 3][0], pts[(j + 1) % 3][1], 1); }
+            b.globalAlpha = 0.3 + 0.35 * cp; b.fillStyle = G.PAL[E.c2]; b.fillRect(Math.round(gx - 5 - cp * 6), 0, Math.round(10 + cp * 12), Math.round(gy)); b.fillStyle = G.PAL[9]; b.fillRect(Math.round(gx - 1 - cp * 2), 0, Math.round(2 + cp * 4), Math.round(gy)); b.globalAlpha = 1;
+          }
         }
         const tgt = h0 && h0.target === u && h0.alive;
         const lockedU = h0 && h0.alive && h0.cmd && h0.cmd.lock && h0.cmd.t === u;
@@ -275,10 +284,12 @@ G.Render = (() => {
         const base = G.lookOf(u, u.face < 0 ? s.m : s.n);             // v2.6 受控＝幽魂紫、複製體＝冰青
         const img = u.flash > 0 ? (u.face < 0 ? s.fm : s.f) : base;
         const ax = q(gx - s.w / 2 + ddx), ay = q(gy - zz * G.AZ - s.h + 1 + ddy);
+        if (UK !== 1) { const fx0 = q(gx + ddx), fy0 = ay + s.h; b.save(); b.translate(fx0, fy0); b.scale(UK, UK); b.translate(-fx0, -fy0); }   // v3.8 英雄放大：本體、外框、光暈整組以腳底為中心縮放
+        const ayT = UK !== 1 ? ay + s.h - s.h * UK : ay;                 // 放大後的頭頂（血條、旗子位置）
         // 層次感（v2.3）：光從左上來 → 斜向投影（落在右下方地面）＋左上亮邊＋右下暗邊
         if (!u.vis.fly && u.spawnT <= 0.01) {
           const sil = G.glowOf(base, 0, 1, 0).tint, fx = q(gx + ddx), fy = q(gy) + 1;
-          b.save(); b.globalAlpha = u.static ? 0.32 : 0.26; b.setTransform(SS, 0, -0.55 * SS, -0.32 * SS, (fx - s.w / 2) * SS, fy * SS); b.drawImage(sil, 0, -s.h); b.restore();
+          b.save(); b.globalAlpha = u.static ? 0.32 : 0.26; b.translate(fx - s.w / 2, fy); b.transform(1, 0, -0.55, -0.32, 0, 0); b.drawImage(sil, 0, -s.h); b.restore();
         }
         const shielded = u.protectors && W.isProtected(u);
         // 稀有度外框（我方英雄與小兵）
@@ -296,6 +307,7 @@ G.Render = (() => {
         // 護盾：沿建築剪影外擴的藍色光殼 + 呼吸光暈
         if (shielded) { const gl = G.glowOf(base, 12, 1, 5); b.globalAlpha = 0.6 + Math.sin(rt * 3 + u.id) * 0.25; b.drawImage(gl.c, ax - gl.p, ay - gl.p); b.globalAlpha = 1; }
         G.VFX.auraBack(b, u, ax, ay, base, gx, gy, rt, W);
+        if (u.ultEnd > W.time) G.VFX.ultAura(b, u, ax, ay, base, s, rt, W);   // v3.8 增益大招：火焰光環
         { const gk = G.glowOf(base, 0, 1, 0), gw = G.glowOf(base, 9, 1, 0); b.globalAlpha = 0.55; b.drawImage(gk.tint, ax + 1, ay + 1); b.globalAlpha = (u.side === 1 ? 0.35 : 0.22) * G.RIM; b.drawImage(gw.tint, ax - 1, ay - 1); b.globalAlpha = 1; }   // 右下暗邊、左上亮邊
         if (u.chg) {                                            // 施法前搖：身體發光（越來越亮）
           const cp = Math.min(1, u.chg.T / u.chg.dur), E = G.ELEM[u.chg.el] || G.ELEM.arcane, gl = G.glowOf(base, E.c, 1, 2);
@@ -305,7 +317,7 @@ G.Render = (() => {
         const vimg = u.flash > 0 || !(G.VOL & 1) ? img : G.bevelOf(img);   // v3.2.1 光影浮雕
         if (psx !== 1 || psy !== 1 || psk !== 0) {              // 以腳底為支點做擠壓／傾斜
           const fx = ax + s.w / 2, fy = ay + s.h;
-          b.save(); b.setTransform(psx * SS, 0, psk * SS, psy * SS, fx * SS, fy * SS); b.drawImage(vimg, -s.w / 2, -s.h); b.restore();
+          b.save(); b.translate(fx, fy); b.transform(psx, 0, psk, psy, 0, 0); b.drawImage(vimg, -s.w / 2, -s.h); b.restore();
         } else b.drawImage(vimg, ax, ay);
         b.globalAlpha = 1;
         if (u.chg && u.chg.T > u.chg.dur - 0.06) { b.globalAlpha = 0.8; b.drawImage(G.glowOf(base, 9, 1, 0).tint, ax, ay); b.globalAlpha = 1; }   // 放招瞬間白閃
@@ -319,15 +331,16 @@ G.Render = (() => {
           if (sy > 0 && sy < s.h) { b.save(); b.beginPath(); b.rect(ax - 2, ay + s.h - sy - 2, s.w + 4, 3); b.clip(); b.globalAlpha = 0.5; b.drawImage(gl.tint, ax, ay); b.globalAlpha = 1; b.restore(); }
           if ((W.frame % 10) === 0) W.parts.add(u.x + G.rr(-s.w, s.w) / G.AX * 0.5, u.y + G.rr(-4, 4), G.rr(4, s.h / G.AZ), 0, 0, G.rr(8, 18), 0.9, 12, 9, 1, 0, 0.4);
         }
+        if (UK !== 1) b.restore();
         // 聖所/塔的待機特效
         if (u.kind === 'holy' && u.side === 0 && (W.frame % 6) === 0) W.parts.add(u.x + G.rr(-24, 24), u.y + G.rr(-6, 6), G.rr(20, 60), 0, 0, G.rr(10, 25), 1.2, 9, 7, 1, 0, 0.5);
         if (u.kind === 'holy' && u.side === 1 && (W.frame % 8) === 0) W.parts.add(u.x + G.rr(-12, 12), u.y, G.rr(50, 70), G.rr(-5, 5), 0, G.rr(10, 20), 1.4, 2, 1, 2, -5, 0.5);
         // 血條
         const full = u.hp >= u.st.hp - 0.5;
-        if (!full || u.kind !== 'creep') bars.push([u, q(gx), ay - 3]);
-        if (u.follow) flags.push([q(gx), ay - (full && u.kind === 'creep' ? 2 : 6)]);
+        if (!full || u.kind !== 'creep') bars.push([u, q(gx), ayT - 3]);
+        if (u.follow) flags.push([q(gx), ayT - (full && u.kind === 'creep' ? 2 : 6)]);
         const locked = h0 && h0.alive && h0.cmd && h0.cmd.lock && h0.cmd.t === u;
-        if (!locked && tgt) arrows.push([q(gx), ay - 9 - Math.round(Math.abs(Math.sin(rt * 6)) * 2)]);
+        if (!locked && tgt) arrows.push([q(gx), ayT - 9 - Math.round(Math.abs(Math.sin(rt * 6)) * 2)]);
       } else if (it.j) {
         const p = it.j, s = sprOf(p.o.vis);
         const gx = p.x * G.AX - ox, gy = p.y * G.AY - oy;
@@ -407,6 +420,13 @@ G.Render = (() => {
     if (hd) G.HD.render(ctx, buf, bw, bh, sc, rt, W.themeId || 'forest');   // v3.2.2 HD-2D（透視＋景深＋柔光＋調色＋光束）
     else { ctx.drawImage(buf, 0, 0, bw * SS, bh * SS, -R.fx * sc, -R.fy * sc, bw * sc, bh * sc); if (G.VOL & 2) tilt(ctx, buf, bw, bh, sc); }   // 不支援 WebGL：退回 v3.2.1 的 2D 景深
     ctx.drawImage(vign, 0, 0);
+    // v3.8 大招蓄力：周圍變暗、聚光在英雄身上（放出後 0.6 秒淡掉）
+    if (W.ultDim > 0.01 && h0) {
+      if (!(h0.chg && h0.chg.ult)) W.ultDim = Math.max(0, W.ultDim - 0.035);
+      const [hx, hy] = R.bufToScr(h0.x * G.AX - R.ox, h0.y * G.AY - h0.z * G.AZ - R.oy - 10), r0 = Math.min(R.sw, R.sh) * 0.14, r1 = Math.max(R.sw, R.sh) * 0.75;
+      const gr = ctx.createRadialGradient(hx, hy, r0, hx, hy, r1); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,' + (0.62 * W.ultDim).toFixed(3) + ')');
+      ctx.fillStyle = gr; ctx.fillRect(0, 0, R.sw, R.sh);
+    }
     if (W.flashScreen > 0) { ctx.fillStyle = `rgba(255,255,255,${W.flashScreen * 2.5})`; ctx.fillRect(0, 0, R.sw, R.sh); }
     if (h0 && !W.attract) {
       if (!h0.alive) { ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(0, 0, R.sw, R.sh); }

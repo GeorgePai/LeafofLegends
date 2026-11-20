@@ -81,7 +81,7 @@ G.UI = (() => {
   const tagWheel = wh => { const b = U.btns[U.btns.length - 1]; if (b) b.wheel = wh; };
 
   // ---------- 畫面切換 ----------
-  const leaveBattle = () => { if (G.W && !G.W.attract && G.Ach) G.Ach.commit(G.W); };
+  const leaveBattle = () => { if (G.W && !G.W.attract && G.Ach) { G.Ach.commit(G.W); G.Ach.abandon(G.W); } };   // v3.8 沒打完就離開：這場不算進排行
   U.goTitle = U.goMenu = () => { if (U.screen && U.screen !== 'menu' && U.screen !== 'tap' && U.screen !== 'intro' && G.Trans) G.Trans.reveal(); leaveBattle(); if (G.Menus) G.Menus.resetIntro(); U.screen = 'menu'; U.paused = false; if (!G.W || !G.W.attract) G.newWorld({ attract: true }); R.cam.zoom = 1; G.Audio.setMode('menu'); };
   U.start = st => { if (typeof st === 'number') U.stageI = st; leaveBattle(); U.bagW = null; U.bagUse = null; U.bagEx = 1; U.tpAsk = null; G.Team.sanitize(); const T = G.Team.get(); U.screen = 'battle'; U.paused = false; G.newWorld({ hero: T.hero, loadout: T.loadout, stage: U.stageI || 0 }); R.cam.follow = true; R.cam.zoom = 1; G.Audio.musicRestart('battle'); G.Audio.setMode('battle'); G.Audio.play('level'); };
   // 全畫面暗幕：純黑半透明（不用顆粒，眼睛比較舒服）
@@ -332,6 +332,16 @@ G.UI = (() => {
 
   // ---------- 廣播 ----------
   G.NOTICE_IN = 0.28; G.NOTICE_OUT = 0.3;
+  // v3.8 大招名稱橫幅：從左邊快速滑入、帶元素色的速度線，停 0.9 秒後往右滑出
+  function ultBanner(c) {
+    const B = W.ultBan; B.t += M_DT; const T = B.t, D = 1.5; if (T > D || !B.n) { W.ultBan = null; return; }
+    const E = G.ELEM[B.el] || G.ELEM.arcane, uw = R.uw, I = R.ins, k2 = G.cnW(B.n) * 2 <= uw - 40 ? 2 : 1, h = 14 * k2 + 8, y = Math.round(I.t + (R.uh - I.t - I.b) * 0.26);
+    const inK = Math.min(1, T / 0.16), outK = Math.max(0, (T - (D - 0.25)) / 0.25), off = Math.round((1 - inK) * -uw + outK * uw);
+    c.save(); c.globalAlpha = 0.78; c.fillStyle = P[0]; c.fillRect(off, y, uw, h); c.globalAlpha = 1;
+    c.fillStyle = P[E.c]; c.fillRect(off, y, uw, 1); c.fillRect(off, y + h - 1, uw, 1);
+    for (let i = 0; i < 9; i++) { const ly = y + 2 + ((i * 5) % (h - 4)), lx = off + ((T * 420 + i * 97) % (uw + 60)) - 30, L = 18 + (i * 13) % 30; c.globalAlpha = 0.5; c.fillStyle = P[i % 2 ? E.c : E.c2]; c.fillRect(Math.round(lx), ly, L, 1); }
+    c.globalAlpha = 1; G.cnBig(c, B.n, uw / 2 + off, y + 4, E.c, k2); c.restore();
+  }
   function drawNotices(c) {
     const uw = R.uw, uh = R.uh, T0 = R.ins.t, port = uh > uw;
     const y0 = T0 + (port ? 92 : 56), step = 19, ease = k => 1 - Math.pow(1 - k, 3);
@@ -547,6 +557,7 @@ G.UI = (() => {
     if (U.statP) { statPanel(c); return; }
     // 廣播（擊敗野怪等）：由左滑入 → 停留 → 向右滑出；多則時上下堆疊
     drawNotices(c);
+    if (W.ultBan) ultBanner(c);
     keyFly(c);
     if (U.heroPanel) heroPanel(c);
     if (U.shop) shopPanel(c);
@@ -669,7 +680,8 @@ G.UI = (() => {
     // 每個按鈕都有圖示＋名稱
     const items = [['i_play', '繼續', () => { U.paused = false; }], ['i_guide', '教學', () => G.Menus.openGuide(true)], ['i_retry', '重新開始', () => U.start(U.hero)],
       ['i_tree', '回首頁', () => U.goTitle()]];
-    const bw = Math.max(Math.max(...items.map(q => G.cnW(q[1]))) + 34, Math.min(150, uw - R.ins.l - R.ins.r - 16)), bh = 20, gap = 4, tot = 18 + items.length * (bh + gap) + 4 + 44;
+    const bw = Math.max(Math.max(...items.map(q => G.cnW(q[1]))) + 34, Math.min(150, uw - R.ins.l - R.ins.r - 16)), bh = 20, gap = 4;
+    const note = !G.Team.dev && W && !W.over ? G.cnWrap('重新開始或回首頁：這場不計入排行', bw) : [], tot = 18 + items.length * (bh + gap) + 4 + 44 + (note.length ? note.length * 13 + 4 : 0);   // v3.8
     const x = Math.round(uw / 2 - bw / 2); let y = Math.round(uh / 2 - tot / 2);
     G.cn(c, '暫停', uw / 2, y, 9, 0.5); y += 18;
     items.forEach(([ic, lab, fn], i) => {
@@ -678,6 +690,7 @@ G.UI = (() => {
       btn(id, x, y, bw, bh, () => { U.press[id] = 0.12; G.Audio.play('click'); }, fn);
       y += bh + gap;
     });
+    if (note.length) { note.forEach((l, i) => G.cn(c, l, uw / 2, y + i * 13, 6, 0.5)); y += note.length * 13 + 4; }
     // 音量
     y += 2; box(c, x, y, bw, 44, 1, 4, false); U.volPanel(c, x + 4, y + 2, bw - 8);
   }

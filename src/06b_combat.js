@@ -81,10 +81,12 @@ G.Combat = {
     for (let i = 0; i < 4; i++) W.parts.add(t.x, t.y, t.z + 8, G.rr(-40, 40), G.rr(-30, 30), G.rr(20, 80), 0.3, col, 9, 1, 200, 2);
   },
   shoot(src, t, o) {
-    const sz = (src.vis.fly || 0) + (src.kind === 'tower' ? 44 : src.kind === 'boss' ? 26 : 12);
+    if (this._ultNow && this._ultNow === src && !o.ult) o = Object.assign({}, o, { ult: 1, fxS: true });   // v3.8 大招子彈
+    const sz = (src.vis.fly || 0) + (src.kind === 'tower' ? src.spr[0].h * 0.8 / G.AZ : src.kind === 'boss' ? 26 : 12);   // v3.8 塔變高：從水晶發射
     const tz = (t.vis.fly || 0) + (t.static ? 20 : 8);
     if (o.pierce) {
       const dx = t.x - src.x, dy = t.y - src.y, l = Math.hypot(dx, dy) || 1, L = Math.max(o.pierce, l + 20);
+      if (o.ult) G.VFX.ultSlash(this, src.x, src.y, src.x + dx / l * L, src.y + dy / l * L, L / (o.speed || 400), o.fx);   // v3.8 穿透大招：沿路徑留下斬痕
       this.projs.push({ x0: src.x, y0: src.y, z0: sz, x: src.x, y: src.y, z: sz, tx: src.x + dx / l * L, ty: src.y + dy / l * L, tz: sz, t: 0, dur: L / (o.speed || 400), D: L, src, tgt: null, o, side: src.side, hit: new Set(), done: false, pierce: true, dir: dx >= 0 ? 1 : -1 });
       return;
     }
@@ -96,7 +98,7 @@ G.Combat = {
     if (p.tgt && p.tgt.alive) { p.tx = p.tgt.x; p.ty = p.tgt.y; }
     const k = Math.min(1, p.t / p.dur);
     const nx = G.lerp(p.x0, p.tx, k), ny = G.lerp(p.y0, p.ty, k), nz = G.lerp(p.z0, p.tz, k) + (p.o.arc || 0) * p.D * 2 * k * (1 - k);
-    if (p.o.fx) { (p.hist = p.hist || []).push([p.x, p.y, p.z]); if (p.hist.length > 6) p.hist.shift(); G.VFX.trail(this, p, nx, ny, nz); }
+    if (p.o.fx) { (p.hist = p.hist || []).push([p.x, p.y, p.z]); if (p.hist.length > (p.o.ult ? 12 : 6)) p.hist.shift(); G.VFX.trail(this, p, nx, ny, nz); if (p.o.ult) { G.VFX.trail(this, p, nx, ny, nz); G.VFX.trail(this, p, nx, ny, nz); } }
     const tr = p.o.fx ? 0 : p.o.trail || (p.o.vis === 'seed' || p.o.vis === 'sniperb' ? 0 : 1), tc = p.o.tcol || (p.side === 0 ? 9 : 2);
     for (let i = 0; i < tr; i++) this.parts.add(G.lerp(p.x, nx, i / Math.max(1, tr)), G.lerp(p.y, ny, i / Math.max(1, tr)), nz, G.rr(-10, 10), G.rr(-6, 6), G.rr(-5, 10), G.rr(0.15, 0.35), tc, p.side === 0 ? 6 : 1, p.o.big ? 2 : 1, 0, 3);
     p.x = nx; p.y = ny; p.z = nz;
@@ -114,6 +116,7 @@ G.Combat = {
     this.projEnd(p);
   },
   projEnd(p) {
+    if (p.o.ult && !p.pierce) G.VFX.ultBlast(this, p.x, p.y, p.o.fx, p.o.splash || 50, p.o.hop ? 0.6 : 1);   // v3.8 大招命中大爆發（彈跳的後幾下小一點）
     if (p.o.splash) {
       if (p.o.fx) G.VFX.impact(this, p.o.fx, p.x, p.y, Math.max(4, p.z), p.o, p.o.splash);
       else { G.FX.ring(this, p.x, p.y, 4, p.o.splash, 0.3, p.o.fire ? 14 : 9, 2); G.FX.hit(this, p.x, p.y, 4, true); G.FX.smoke(this, p.x, p.y, 2, 6, 6); G.FX.scorch(this, p.x, p.y, p.o.splash * 0.5, 3); }
@@ -128,7 +131,7 @@ G.Combat = {
         p.hitSet = p.hitSet || new Set(); p.hitSet.add(p.tgt);
         let best = null, bd = 150;
         for (const u of this.units) { if (!u.alive || u.side === p.side || p.hitSet.has(u)) continue; const d = Math.hypot(u.x - p.tgt.x, u.y - p.tgt.y); if (d < bd) { bd = d; best = u; } }
-        if (best) { if (p.o.fx) G.VFX.arc(this, p.tgt, best, 0.22, 17, 6); const o2 = Object.assign({}, p.o, { jumps: p.o.jumps - 1 }); const fake = { x: p.tgt.x, y: p.tgt.y, vis: { fly: 0 }, kind: 'creep', face: 1, side: p.side }; this.shoot(fake, best, o2); const q = this.projs[this.projs.length - 1]; q.src = p.src; q.hitSet = p.hitSet; }
+        if (best) { if (p.o.fx) G.VFX.arc(this, p.tgt, best, 0.22, 17, 6); const o2 = Object.assign({}, p.o, { jumps: p.o.jumps - 1, hop: 1 }); const fake = { x: p.tgt.x, y: p.tgt.y, vis: { fly: 0 }, kind: 'creep', face: 1, side: p.side }; this.shoot(fake, best, o2); const q = this.projs[this.projs.length - 1]; q.src = p.src; q.hitSet = p.hitSet; }
       }
     }
   },
@@ -188,15 +191,18 @@ G.Combat = {
   skFx(fn) {
     const n = this.effects.length, was = G.VFX._sk; G.VFX._sk = true;
     try { fn(); } finally { G.VFX._sk = was; }
-    for (let i = n; i < this.effects.length; i++) { const e = this.effects[i]; if (e.dur && !e.update && !e._sk) { e._sk = 1; e.dur *= G.TUNE.skFx; } }
+    const mul = G.TUNE.skFx * (this._ultNow ? 1.6 : 1);                 // v3.8 大招特效再久一點
+    for (let i = n; i < this.effects.length; i++) { const e = this.effects[i]; if (e.dur && !e.update && !e._sk) { e._sk = 1; e.dur *= mul; } }
   },
   // 施放前搖（v2.3）：先蓄力 dur 秒（站定、腳下法陣、光點往身上聚、身體發光），時間到才真的放出技能
   beginCharge(u, sd, t, lv, dur, refund) {
     const w0 = G.WEAPONS_BY_ID[sd.weapon_id];
     const el = sd.type === 'necro' ? (sd.attribute === 'ctrl' ? 'rage' : sd.attribute === 'clone' ? 'clone' : 'necro') : sd.type === 'buff' ? (sd.attribute === 'armor_per' ? 'shield' : sd.attribute === 'weapon' ? 'zap' : 'rage') : G.elemOf(w0);
-    u.chg = { sd, t, lv, T: 0, dur, el, refund, big: dur >= 0.45 };
+    const ult = u.kind === 'hero' && dur >= G.TUNE.chgUlt - 1e-6;      // v3.8 大招儀式
+    u.chg = { sd, t, lv, T: 0, dur, el, refund, big: dur >= 0.45, ult };
     if (t) u.face = t.x > u.x ? 1 : -1;
     this.sfx(dur >= 0.45 ? 'chargeBig' : 'charge', u.x, u.y);
+    if (ult && !this.attract) { this.ultBan = { n: G.skillName(sd.id), el, t: 0 }; this.sfx('warn', u.x, u.y); }
     return true;
   },
   tickCharge(u, dt) {
@@ -206,22 +212,26 @@ G.Combat = {
     if (c.t) u.face = c.t.x > u.x ? 1 : -1;
     const E = G.ELEM[c.el] || G.ELEM.arcane;
     if (Math.random() < dt * (c.big ? 40 : 24)) { const a = Math.random() * 6.28, r = G.rr(22, 40); this.parts.add(u.x + Math.cos(a) * r, u.y + Math.sin(a) * r * 0.6, G.rr(4, 24), -Math.cos(a) * r * 3, -Math.sin(a) * r * 1.8, 0, 0.32, Math.random() < 0.5 ? E.c : E.c2, E.c, 1, 0, 0); }
+    if (c.ult) { this.ultDim = Math.min(1, c.T / c.dur); if (Math.random() < dt * 30) { const a = Math.random() * 6.28, r = G.rr(50, 80); this.parts.add(u.x + Math.cos(a) * r, u.y + Math.sin(a) * r * 0.6, G.rr(2, 40), -Math.cos(a) * r * 2.4, -Math.sin(a) * r * 1.5, 0, 0.4, E.c2, E.c, 2, 0, 0); } }
     if (c.T >= c.dur) {
       u.chg = null;
+      if (c.ult) G.VFX.ultRelease(this, u, c.el);                    // v3.8 放出瞬間：白閃、衝擊波、停格
       const needT = c.sd.type !== 'buff' && c.sd.type !== 'necro' && !(G.WEAPONS_BY_ID[c.sd.weapon_id] && G.WEAPONS_BY_ID[c.sd.weapon_id].type === 'effect' && G.WEAPONS_BY_ID[c.sd.weapon_id].attack_type === 'round');
       if (needT && !(c.t && c.t.alive)) { if (c.refund) c.refund(); return; }
-      this.skFx(() => this.useSkill(u, c.sd, c.t, c.lv));
+      if (c.ult) this._ultNow = u;
+      try { this.skFx(() => this.useSkill(u, c.sd, c.t, c.lv)); } finally { this._ultNow = null; }
     }
   },
   // ---------- 技能（英雄與首領共用） ----------
   useSkill(u, sd, t, lv = 1) {
     const dmg = sd.value_1 + sd.grow_value_1 * (lv - 1), v2 = sd.value_2 + sd.grow_value_2 * (lv - 1);
     u.cast = 0.3;
-    if (sd.type === 'necro') { G.VFX.cast(this, u, sd.attribute === 'clone' ? 'clone' : 'necro'); return this.necroSkill(u, sd, lv); }   // v2.6 死靈技能
+    if (sd.type === 'necro') { G.VFX.cast(this, u, sd.attribute === 'clone' ? 'clone' : 'necro'); if (this._ultNow === u) G.VFX.ultBlast(this, u.x, u.y, 'clone', 70); return this.necroSkill(u, sd, lv); }   // v2.6 死靈技能（v3.8 大招爆發）
     if (t) u.face = t.x > u.x ? 1 : -1;
     const w0 = G.WEAPONS_BY_ID[sd.weapon_id];
     const el = sd.type === 'buff' ? (sd.attribute === 'armor_per' ? 'shield' : sd.attribute === 'weapon' ? 'zap' : 'rage') : G.elemOf(w0), S = G.elemStrong(w0);
     if (sd.type === 'buff') G.VFX.buffCast(this, u, el); else G.VFX.cast(this, u, el);
+    if (sd.type === 'buff' && this._ultNow === u) { G.VFX.ultBlast(this, u.x, u.y, el, 70); u.ultEnd = this.time + (v2 || 8); u.ultEl = el; }   // v3.8 增益大招：變身爆發＋持續火焰光環
     // 主動增益
     if (sd.type === 'buff') {
       u.buffT = u.buffT || {};

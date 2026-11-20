@@ -56,8 +56,9 @@ G.Rank = (() => {
     const v = G.Team.get(), p = P(), f = x => Math.max(0, Math.floor(+x || 0));
     if (!G.Team.dev) p.keysTot = Math.max(f(p.keysTot), G.Team.keysFloor());   // v3.2.6 累積不會少於持有＋已花
     const stg = p.stg || {}, ab = stg[G.SOLO.length], wk = G.weekId();
-    return { heroes: v.owned.h.length, minions: v.owned.m.length, games: f(p.games), wins: Math.min(f(p.wins), f(p.games)), kills: f(p.kills), deaths: f(p.deaths), assists: f(p.assists), keys: f(p.keysTot), dmg: f(p.dmg), time: f(p.time), ach: G.Ach.doneCount(),
-      stars: Object.values(stg).reduce((a, o) => a + f(o && o.s), 0), spd: ab && ab.c && ab.t ? f(ab.t) : 0, bk: f(p.best && p.best.kills), wst: f(p.wstB), hunt: f(p.bosses) + f(p.hunters),   // v3.6
+    const rs = p.rs || {}, W = G.W, kp = W && !W.attract && !W._fin ? W.keysGot || 0 : 0;   // v3.8 排行只用打完的戰鬥（rs）；正在打的這場撿到的鑰匙先不算
+    return { heroes: v.owned.h.length, minions: v.owned.m.length, games: f(p.games), wins: Math.min(f(p.wins), f(p.games)), kills: f(rs.kills), deaths: f(rs.deaths), assists: f(rs.assists), keys: Math.max(0, f(p.keysTot) - f(p.kx) - kp), dmg: f(rs.dmg), time: f(rs.time), ach: G.Ach.doneCount(),
+      stars: Object.values(stg).reduce((a, o) => a + f(o && o.s), 0), spd: ab && ab.c && ab.t ? f(ab.t) : 0, bk: f(rs.bk), wst: f(p.wstB), hunt: f(rs.bosses) + f(rs.hunters),   // v3.6
       wk: p.wk && p.wk.id === wk ? f(p.wk.n) : 0, wkid: wk };
   };
   K.mine = k => { const s = K.stats(); return k === 'wr' ? (s.games ? Math.round(s.wins / s.games * 1000) / 10 : 0) : k === 'kda' ? Math.round((s.kills + s.assists) / Math.max(1, s.deaths) * 100) / 100 : s[k]; };

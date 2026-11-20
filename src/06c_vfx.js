@@ -187,6 +187,10 @@ G.VFX = {
     if (H.length) { const h = H[0]; const ddx = (p.x - h[0]) * G.AX, ddy = (p.y - h[1]) * G.AY - (p.z - h[2]) * G.AZ; if (Math.hypot(ddx, ddy) > 0.5) { dx = ddx; dy = ddy; } }
     const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
     const hp = (h) => [SX(h[0], o), SY(h[1], h[2], o)], n = H.length;
+    if (p.o.ult) {                                                    // v3.8 大招子彈：外圈大光暈＋環繞光點
+      G.glow(ctx, sx, sy, 26, E.c, 0.5 + 0.15 * Math.sin(rt * 30)); G.glow(ctx, sx, sy, 12, E.c2, 0.5);
+      ctx.fillStyle = G.PAL[E.c2]; for (let j = 0; j < 6; j++) { const a = rt * 10 + j * 1.047; ctx.fillRect(Math.round(sx + Math.cos(a) * 11), Math.round(sy + Math.sin(a) * 7), 2, 2); }
+    }
     switch (el) {
       case 'ice': {
         const L = S ? 7 : 5;
@@ -397,15 +401,17 @@ G.VFX = {
 
   // ===== 隕石 =====
   meteor(W, tx, ty, R, onImpact, el, fall = 0.65) {
-    const tree = el === 'treemeteor', c = tree ? 11 : 14;
-    // 預告圈：外圈虛線旋轉 + 向內收縮的紅環 + 填色漸增
+    const tree = el === 'treemeteor', hz = el === 'hazard', c = tree ? 11 : 14;
+    // 預告圈：外圈虛線旋轉 + 向內收縮的紅環 + 填色漸增（v3.8 場景熔岩彈 hazard：藍白色，岩漿地上才看得清楚；越接近落地閃越快）
+    const rc = hz ? 12 : 10, fc = hz ? 12 : 15;
     W.effects.push({
       t: 0, dur: fall, layer: 0, draw(ctx, o) {
-        const p = this.t / fall, cx = SX(tx, o), cy = SY(ty, 0, o), rx = R * G.AX, ry = R * G.AY;
-        G.pxDisc(ctx, cx, cy, rx * p, ry * p, 15, 0.3 + 0.3 * p); G.pxDisc(ctx, cx, cy, rx * 0.35 * p, ry * 0.35 * p, 0, 0.5);
-        G.pxEllipse(ctx, cx, cy, rx, ry, (((this.t * 16) | 0) & 1) ? 9 : 10, 4, this.t * 30);
-        const q = 1 - ((this.t * 3) % 1); G.pxEllipse(ctx, cx, cy, rx * q, ry * q, 10);
-        G.glow(ctx, cx, cy, rx, 10, 0.25 * p, 0.75);
+        const p = this.t / fall, cx = SX(tx, o), cy = SY(ty, 0, o), rx = R * G.AX, ry = R * G.AY, bl = hz ? 6 + p * 18 : 16;
+        G.pxDisc(ctx, cx, cy, rx * p, ry * p, fc, (hz ? 0.22 : 0.3) + 0.3 * p); G.pxDisc(ctx, cx, cy, rx * 0.35 * p, ry * 0.35 * p, hz ? 9 : 0, hz ? 0.35 : 0.5);
+        G.pxEllipse(ctx, cx, cy, rx, ry, (((this.t * bl) | 0) & 1) ? 9 : rc, 4, this.t * 30);
+        if (hz) G.pxEllipse(ctx, cx, cy, rx + 1, ry + 1, 0);
+        const q = 1 - ((this.t * (hz ? 1.5 : 3)) % 1); G.pxEllipse(ctx, cx, cy, rx * q, ry * q, rc);
+        G.glow(ctx, cx, cy, rx, rc, (hz ? 0.35 : 0.25) * p, 0.75);
       }
     });
     W.effects.push({
@@ -424,6 +430,56 @@ G.VFX = {
       }
     });
     G.VFX.later(W, fall, onImpact);
+  },
+  // ===== v3.8 大招儀式 =====
+  // 放出瞬間：白閃、三圈衝擊波、停格、光芒，接著 1.6 秒的餘燼往上飄
+  ultRelease(W, u, el) {
+    const E = EL(el), x = u.x, y = u.y;
+    W.flashScreen = Math.max(W.flashScreen, 0.14); W.shake(0.6); W.hitstop = Math.max(W.hitstop || 0, 0.09);
+    G.VFX.light(W, x, y, 14, 70, E.c, 0.7, 0.95, 1); G.VFX.groundLight(W, x, y, 60, E.c, 1.0, 0.8);
+    [[60, 0.45, E.c2, 3], [90, 0.6, E.c, 2], [120, 0.75, 9, 1]].forEach(([r, d, c, th], i) => G.VFX.later(W, i * 0.06, () => G.FX.ring(W, x, y, 4, r, d, c, th)));
+    G.VFX.ringAir(W, x, y, 14, 6, 44, 0.35, 9, 2); G.VFX.lines(W, x, y, 14, 12, 40, E.c2);
+    G.VFX.burst(W, x, y, 10, 30, E.c, E.c2, 80, 240, 0.4, 0.9, 0, 3, [1, 2], 40, 200);
+    W.effects.push({ t: 0, dur: 1.6, layer: 1, update() { if (Math.random() < 0.7) { const a = Math.random() * 6.28, r = G.rr(8, 50); W.parts.add(x + Math.cos(a) * r, y + Math.sin(a) * r * 0.6, G.rr(2, 10), G.rr(-6, 6), 0, G.rr(25, 60), G.rr(0.7, 1.2), Math.random() < 0.5 ? E.c : E.c2, E.cd, G.ri(1, 2), -10, 1); } } });
+  },
+  // 大招命中的大爆發：光柱、雙層衝擊環、放射光線、碎片、餘燼、地面裂痕與焦痕
+  ultBlast(W, x, y, el, R = 60, k = 1) {
+    const E = EL(el === 'clone' ? 'ice' : el), r = R * k, rx = r * G.AX;
+    W.flashScreen = Math.max(W.flashScreen, 0.09 * k); W.shake(0.5 * k); W.hitstop = Math.max(W.hitstop || 0, 0.06 * k);
+    G.VFX.light(W, x, y, 12, rx * 1.7, E.c, 0.8, 0.9, 1); G.VFX.groundLight(W, x, y, rx * 1.5, E.c, 1.3, 0.8);
+    G.VFX.ringAir(W, x, y, 6, 6, rx * 1.7, 0.45, E.c2, 3); G.VFX.ringAir(W, x, y, 6, 4, rx * 1.15, 0.55, E.c, 2);
+    G.FX.ring(W, x, y, 4, r * 1.7, 0.6, E.c, 3); G.FX.ring(W, x, y, 4, r * 1.15, 0.45, 9, 1); G.FX.wave(W, x, y, r * 1.5, 0.55);
+    G.VFX.lines(W, x, y, 8, 14, rx * 1.3, E.c2);
+    G.VFX.burst(W, x, y, 8, Math.round(40 * k), E.c, E.c2, 80, 280, 0.5, 1.1, 260, 1.5, [1, 3], 80, 300);
+    G.VFX.burst(W, x, y, 6, Math.round(20 * k), 9, E.c, 30, 120, 0.8, 1.6, -80, 2, 1, 40, 160);
+    G.VFX.cracks(W, x, y, r * 0.9, 2.2, 8); G.FX.scorch(W, x, y, r * 0.7, 6);
+    W.effects.push({ t: 0, dur: 0.75, layer: 1, draw(ctx, o) {        // 光柱
+      const p = this.t / 0.75, cx = SX(x, o), cy = SY(y, 0, o), w = Math.max(2, Math.round((16 + 12 * (1 - p)) * k)), H = 240;
+      ctx.globalAlpha = 0.55 * (1 - p); ctx.fillStyle = G.PAL[E.c]; ctx.fillRect(Math.round(cx - w / 2), Math.round(cy - H), w, H);
+      ctx.fillStyle = G.PAL[9]; const w2 = Math.max(1, Math.round(w / 3)); ctx.fillRect(Math.round(cx - w2 / 2), Math.round(cy - H), w2, H); ctx.globalAlpha = 1;
+      G.glow(ctx, cx, cy - 10, 44 * k, E.c, 0.55 * (1 - p));
+    } });
+  },
+  // 穿透大招：沿路徑長出一道光帶（前端發亮），結束後慢慢消失；途中每段迸出火花
+  ultSlash(W, x0, y0, x1, y1, D, el) {
+    const E = EL(el), FADE = 0.9;
+    W.effects.push({ t: 0, dur: D + FADE, layer: 1, draw(ctx, o) {
+      const k = Math.min(1, this.t / D), f = this.t < D ? 1 : 1 - (this.t - D) / FADE;
+      const ax = SX(x0, o), ay = SY(y0, 12, o), bx = SX(x0 + (x1 - x0) * k, o), by = SY(y0 + (y1 - y0) * k, 12, o);
+      ctx.globalAlpha = 0.7 * f; ctx.fillStyle = G.PAL[E.c]; G.pxLine(ctx, ax, ay, bx, by, 7); ctx.fillStyle = G.PAL[E.c2]; G.pxLine(ctx, ax, ay, bx, by, 4);
+      ctx.globalAlpha = f; ctx.fillStyle = G.PAL[9]; G.pxLine(ctx, ax, ay, bx, by, 1); ctx.globalAlpha = 1;
+      if (this.t < D) G.glow(ctx, bx, by, 30, E.c, 0.7);
+    } });
+    for (let i = 1; i <= 6; i++) G.VFX.later(W, D * i / 6, () => { const px = x0 + (x1 - x0) * i / 6, py = y0 + (y1 - y0) * i / 6; G.VFX.spark(W, px, py, 12, 10, E.c2); G.VFX.ringAir(W, px, py, 12, 3, 22, 0.3, E.c, 2); G.VFX.burst(W, px, py, 12, 8, E.c, 9, 60, 180, 0.3, 0.6, 0, 4); });
+    G.VFX.later(W, D, () => G.VFX.ultBlast(W, x1, y1, el, 45, 0.7));
+  },
+  // 增益大招期間：全身火焰光環＋往上竄的火星
+  ultAura(ctx, u, ax, ay, base, s, rt, W) {
+    const E = EL(u.ultEl || 'rage'), left = u.ultEnd - W.time; if (left <= 0) return;
+    const a = Math.min(1, left / 0.6), gl = G.glowOf(base, E.c, 1, 3);
+    G.glow(ctx, ax + s.w / 2, ay + s.h * 0.55, s.h * 1.3, E.c, (0.28 + 0.1 * Math.sin(rt * 9)) * a, 1.2);
+    ctx.globalAlpha = (0.55 + 0.25 * Math.sin(rt * 14 + u.id)) * a; ctx.drawImage(gl.c, ax - gl.p, ay - gl.p - 1); ctx.globalAlpha = 1;
+    if ((W.frame & 1) === 0) W.parts.add(u.x + G.rr(-10, 10), u.y + G.rr(-3, 3), G.rr(4, 24), G.rr(-8, 8), 0, G.rr(40, 80), G.rr(0.4, 0.7), Math.random() < 0.5 ? E.c : E.c2, E.cd, G.ri(1, 2), -20, 1);
   },
   meteorImpact(W, x, y, R, el) {
     const tree = el === 'treemeteor', c = tree ? 11 : 14, rx = R * G.AX;

@@ -9,6 +9,7 @@
 G.TUNE = {
   foeMul: 3, foeGap: 0.25, foeCap: 60, towerOne: 2,   // v3.7 單路：三路的敵兵併成一路（×2→×3）、出兵間隔 0.25 秒、單路地圖塔血 ×2（塔從 10 座變 4 座）
     // v3.4 Pai：敵方每波數量 ×2（小兵點數上限 24 之後敵方太弱）、同一路出兵間隔 0.45→0.3 秒、場上敵兵上限 40→60 — 暫定
+  heroScale: 1.5,          // v3.8 英雄本體放大倍率（Pai：英雄太小）
   waveInterval: 20,        // 兵線間隔（秒）— 暫定
   firstAllyWave: 2,
   firstEnemyWave: 6,
@@ -30,7 +31,7 @@ G.TUNE = {
   potionCd: 15,            // 藥水冷卻（秒），無數量限制 — 暫定
   creepSpeedMul: 0.5,      // 小兵移動速度倍率（原著數值 ×0.5）— 依手感調整
   chgSkill: 0.28,          // v2.3 英雄一般技能前搖（蓄力）秒數
-  chgUlt: 0.5,             // v2.3 英雄大招前搖秒數
+  chgUlt: 0.9,             // v2.3 英雄大招前搖秒數（v3.8 0.5→0.9：大招儀式）
   chgBoss: 0.45,           // v2.3 首領技能前搖秒數（讓玩家看得出來要放招）
   skFx: 1.35               // v2.3 技能特效持續時間倍率
 };
@@ -214,7 +215,7 @@ G.MAPS.lanes5 = (() => {
 // v3.7 Pai：中立資源全部放在雙方外塔之間的交戰區（半路的 55%～95%），搶野怪就會碰到對方、容易打起團戰
 // camps：[種類, 沿半路的位置 0~1, 在路的哪一側 ±1, 離路中心幾格]；boss：[離路中心幾格, 沿路方向偏移]
 G.laneMap = spec => {
-  const W = 72, H = 54, C = [W / 2, H / 2], mir = p => [+(W - p[0]).toFixed(2), +(H - p[1]).toFixed(2)], R = spec.r || 5;
+  const W = 72, H = 54, C = [W / 2, H / 2], mir = p => [+(W - p[0]).toFixed(2), +(H - p[1]).toFixed(2)], R = spec.r || 7.5;   // v3.8 路寬 ×1.5（半徑 5→7.5 格）
   // Catmull-Rom 平滑：控制點之間各插 4 點
   const cr = (pts, n = 4) => { const o = []; for (let i = 0; i < pts.length - 1; i++) { const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
     for (let k = 0; k < n; k++) { const t = k / n, t2 = t * t, t3 = t2 * t, f = (a, b, c2, d) => 0.5 * (2 * b + (-a + c2) * t + (2 * a - 5 * b + 4 * c2 - d) * t2 + (-a + 3 * b - 3 * c2 + d) * t3); o.push([+f(p0[0], p1[0], p2[0], p3[0]).toFixed(2), +f(p0[1], p1[1], p2[1], p3[1]).toFixed(2)]); } }
@@ -241,7 +242,7 @@ G.laneMap = spec => {
     const m = mir(c); if (Math.hypot(c[0] - m[0], c[1] - m[1]) < 2 * r + 2) return false; return clears.every(q => Math.hypot(c[0] - q[0], c[1] - q[1]) >= r + q[2] + 2 && Math.hypot(m[0] - q[0], m[1] - q[1]) >= r + q[2] + 2); };
   for (const [k, f, sd, d] of spec.camps) {
     let pick = null, best = 1e9;                                     // 交戰區（半路 55%～100%）網格搜尋，挑最接近指定位置的合法點
-    for (const lo of [0.55, 0.4]) { if (pick) break; for (let ff = lo; ff <= 1.0001; ff += 0.02) for (let dd = 8.5; dd <= 17; dd += 0.5) for (const side of [1, -1]) {
+    for (const lo of [0.55, 0.4, 0.25]) { if (pick) break; for (let ff = lo; ff <= 1.0001; ff += 0.02) for (let dd = 8.5; dd <= 21; dd += 0.5) for (const side of [1, -1]) {
       const sc = Math.abs(ff - f) * 30 + Math.abs(dd - d) + (side !== sd ? 3 : 0); if (sc >= best) continue;
       const a = along(lane, Lh * ff), c = [+(a.p[0] - a.u[1] * side * dd).toFixed(2), +(a.p[1] + a.u[0] * side * dd).toFixed(2)];
       if (ok(c, 3.1)) { best = sc; pick = [a.p, c]; }
@@ -252,11 +253,11 @@ G.laneMap = spec => {
   return { w: W, h: H, seed: spec.seed, holy: { player: hp, enemy: mir(hp) }, towers3: { player: pt, enemy: et }, bossHome: mir(along(lane, 12).p),
     lanes: [{ r: R, pts: lane }].concat(necks), laneCount: 1, river, wild, clear: [[...hp, 8], [...mir(hp), 8], [...C, 4], ...clears], one: 1 };
 };
-G.MAPS.l1 = G.laneMap({ seed: 31, half: [[8, 46], [16, 42.5], [22, 35.5], [29, 31.5]], camps: [['red', 0.84, 1, 11], ['blue', 0.76, -1, 12], ['exp', 0.68, 1, 11]] });   // 翠葉森林：左下 → 右上，緩 S 彎
-G.MAPS.l2 = G.laneMap({ seed: 37, half: [[8, 8], [18, 8.5], [24, 15.5], [28, 23.5]], camps: [['red', 0.84, 1, 11], ['blue', 0.76, -1, 12], ['exp', 0.68, 1, 11]] });         // 楓紅山谷：左上 → 右下，長長的山谷彎
-G.MAPS.l3 = G.laneMap({ seed: 41, half: [[64, 8], [59, 15.5], [51, 17.5], [43, 20.5]], camps: [['red', 0.84, 1, 11], ['blue', 0.76, -1, 12], ['exp', 0.68, 1, 11]] });       // 霜雪凍原：右上 → 左下，冰原上的折線
-G.MAPS.l4 = G.laneMap({ seed: 43, half: [[64, 46], [63, 36], [56, 30.5], [46, 30]], camps: [['red', 0.84, 1, 11], ['blue', 0.76, -1, 12], ['exp', 0.68, 1, 11]] });        // 熔岩火山：右下 → 左上，繞過火山口的大弧
-G.MAPS.l5 = G.laneMap({ seed: 47, half: [[8, 46], [19, 47], [27, 41], [29.5, 33]], camps: [['red', 0.84, 1, 11], ['blue', 0.76, -1, 12], ['exp', 0.68, 1, 11]] });          // 幽冥深淵：左下 → 右上，Z 字折返
+G.MAPS.l1 = G.laneMap({ seed: 31, half: [[10, 44], [17, 40.5], [22.5, 35], [29, 31.5]], camps: [['red', 0.84, 1, 11], ['blue', 0.76, -1, 12], ['exp', 0.68, 1, 11]] });   // 翠葉森林：左下 → 右上，緩 S 彎
+G.MAPS.l2 = G.laneMap({ seed: 37, half: [[10, 10], [18.5, 10.5], [24, 16], [28, 23.5]], camps: [['red', 0.84, 1, 11], ['blue', 0.76, -1, 12], ['exp', 0.68, 1, 11]] });         // 楓紅山谷：左上 → 右下，長長的山谷彎
+G.MAPS.l3 = G.laneMap({ seed: 41, half: [[62, 10], [57.5, 16], [50.5, 18], [43, 20.5]], camps: [['red', 0.84, 1, 11], ['blue', 0.76, -1, 12], ['exp', 0.68, 1, 11]] });       // 霜雪凍原：右上 → 左下，冰原上的折線
+G.MAPS.l4 = G.laneMap({ seed: 43, half: [[62, 44], [61, 36], [55, 31], [46, 30]], camps: [['red', 0.84, 1, 11], ['blue', 0.76, -1, 12], ['exp', 0.68, 1, 11]] });        // 熔岩火山：右下 → 左上，繞過火山口的大弧
+G.MAPS.l5 = G.laneMap({ seed: 47, half: [[10, 44], [19, 44.5], [26.5, 40], [29.5, 33]], camps: [['red', 0.84, 1, 11], ['blue', 0.76, -1, 12], ['exp', 0.68, 1, 11]] });          // 幽冥深淵：左下 → 右上，Z 字折返
 
 // ---------- 關卡 ----------
 // enemies 取原著 stage_001 第 3 難度；boss 為雛形展示用（原著第 1 關沒有）

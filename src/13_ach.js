@@ -105,7 +105,10 @@ G.Ach = (() => {
     if (!p.stg || typeof p.stg !== 'object' || Array.isArray(p.stg)) p.stg = {};   // v3.0 關卡紀錄 {關卡: {c 通關次數, s 最佳星數, t 最快秒數}}
     if (!p.best) p.best = {}; for (const k of BEST) if (typeof p.best[k] !== 'number') p.best[k] = 0;
     if (!v.ach) v.ach = {};
-    if (typeof p.gift !== 'number') p.gift = v.name ? 1 : 0;   // v3.3 建帳號送鑰匙：已有名字的舊帳號視為領過
+    if (typeof p.gift !== 'number') p.gift = v.name ? 1 : 0;
+    // v3.8 排行用的戰鬥數據（只在結算時累加；中途離開的那場不算）。第一次用目前的累計值起算
+    if (!p.rs || typeof p.rs !== 'object') p.rs = { kills: p.kills, deaths: p.deaths, assists: p.assists, dmg: p.dmg, time: p.time, bosses: p.bosses, hunters: p.hunters, bk: p.best.kills || 0 };
+    if (typeof p.kx !== 'number') p.kx = 0;                        // 中途離開那幾場撿到的鑰匙（不算進排行的累積鑰匙）   // v3.3 建帳號送鑰匙：已有名字的舊帳號視為領過
     return p;
   };
   A.off = () => G.Team.dev;
@@ -164,12 +167,14 @@ G.Ach = (() => {
     W._achT += dt; if (W._achT < 2) return; W._achT = 0;
     A.commit(W); A.check(null, W);
   };
+  A.abandon = W => { if (!W || W.attract || W._fin || A.off()) return; W._fin = true; const P = A.P(); P.kx += W.keysGot || 0; G.Team.save(); };   // v3.8 中途離開／重新開始
   A.final = W => {
     if (W._fin || W.attract) return; W._fin = true;
     if (G.SoloW) G.SoloW.finish(W, !!W.over.win);        // v3.0 關卡星等、獎勵（開發者模式也算星，但不給獎勵）
     if (A.off()) return;
     A.commit(W);
     const P = A.P(), win = !!W.over.win; P.games++; if (win) P.wins++;
+    { const st = W.stats, rs = P.rs; for (const k of ['kills', 'deaths', 'assists', 'dmg', 'time', 'bosses', 'hunters']) rs[k] = (rs[k] || 0) + (st[k] || 0); rs.bk = Math.max(rs.bk || 0, st.kills || 0); }   // v3.8 打完才算進排行
     P.wst = win ? P.wst + 1 : 0; P.wstB = Math.max(P.wstB, P.wst);                        // v3.6 連勝
     if (win) { const wk = G.weekId(); if (!P.wk || P.wk.id !== wk) P.wk = { id: wk, n: 0 }; P.wk.n++; }   // v3.6 本週勝場（每週一換週）
     const hr = new Date().getHours(); if (hr < 5) P.night++; if (hr >= 5 && hr < 8) P.morning++;

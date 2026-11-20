@@ -534,7 +534,7 @@ G.SaveUI = (() => {
     }
     const [gcx, gy, gw] = G.Menus.greetPos || [uw / 2, uh - 40, uw - 16];
     const a = Math.min(1, Math.max(0, (menuT - 0.6) / 0.4)); if (a <= 0) return;
-    c.globalAlpha = a; S.giftBtn(c, 'gaBar', gcx, gy + 18, gw - 8, true); c.globalAlpha = 1;
+    c.globalAlpha = a; S.giftBtn(c, 'gaBar', gcx, gy + 18, Math.min(uw - 16, Math.max(gw - 8, G.cnW('建立帳號送 ' + GIFT + ' 把鑰匙') + 30)), true); c.globalAlpha = 1;   // v3.8 一行放得下就不換行
   };
   // 黃色「建立帳號送鑰匙」按鈕（首頁、商店共用）：柔光呼吸＋掃光＋鑰匙跳動。bottom＝按鈕底邊
   S.giftBtn = (c, id, cx, bottom, maxW, big) => {

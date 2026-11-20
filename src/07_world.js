@@ -87,6 +87,7 @@ G.World = class {
       // 外塔(0) → 中塔(1) → 內塔(2) → 主塔(9)
       const name = side === 0 ? 'player_tower' : ['enemy_tower', 'enemy_tower2', 'enemy_tower3'][tier] || 'enemy_tower4';
       const u = this.add(new G.Unit(this, name, side, p[0] * T, p[1] * T, 1, 'tower')); u.lane = lane; u.tier = tier; this.towers[side].push(u);
+      if (side === 0 && G.TOWER_VIS && G.TOWER_VIS[tier]) { const sp = G.TOWER_VIS[tier], big = tier === 9; u.vis = Object.assign({}, u.vis, { spr: sp, r: big ? 30 : 22, shadow: big ? 30 : 21 }); u.spr = G.SPR[sp]; }   // v3.8 我方塔依層級換大圖
       if (tier === 9) { const m = G.ORIG.towers.enemy_tower4; Object.assign(u.st, { hp: m.hp, power: m.power, armor: m.armor, range: m.range, delay: m.delay / 1000 }); u.hp = u.st.hp; u.main = true; }
       if (side === 1 && this.dif) { u.st.hp = Math.round(u.st.hp * this.dif.tower); u.hp = u.st.hp; }   // v3.0 敵塔血量倍率
       if (md.one && G.TUNE.towerOne) { u.st.hp = Math.round(u.st.hp * G.TUNE.towerOne); u.hp = u.st.hp; }   // v3.7 單路地圖塔變少 → 塔血加厚（雙方都加）
@@ -211,7 +212,7 @@ G.World = class {
       const lane = Math.min(q.lane ?? 1, this.nLanes - 1), [x, y] = q.at || this.laneSpawn[q.side][lane];
       // 雙生花：兩隻同時、左右並排出生（各自獨立行動）
       let sx = x + G.rr(-10, 10), sy = y + G.rr(-10, 10);
-      const lo = q.side < 2 && this.nLanes > 1 ? this.nextLo(q.side) : null;
+      const lo = q.side < 2 ? this.nextLo(q.side) : null;   // v3.8 單路地圖也要橫向分散（原本只在多路時生效）
       if (lo != null && !q.at) {                              // v3.2.5 出生點也照橫向位置錯開
         const T = G.TILE, k = this.M.laneNear(lane, x / T, y / T);
         if (k) { const W = Math.max(0, k.r - G.TUNE.laneEdge) * lo * T, ox = x - k.uy * W + G.rr(-4, 4), oy = y + k.ux * W + G.rr(-4, 4); if (this.M.isWalk(ox, oy)) { sx = ox; sy = oy; } }
@@ -289,7 +290,7 @@ G.World = class {
     const li = Math.min(u.lane ?? 1, this.nLanes - 1), d = this.M.flowDir(this.flow[u.side][li], u.x, u.y);   // v3.7 單路地圖：超出路數的一律走第 0 路
     if (!d) { this.brake(u, dt); return; }
     // v3.2.5 小兵分散在路面上：沿著路的中心線走，維持出生時分到的橫向位置 u.lo（−1 左緣～1 右緣），不再全部貼著彎道內側排隊
-    if (u.lo != null && this.nLanes > 1) {
+    if (u.lo != null) {
       const T = G.TILE, tx = u.x / T, ty = u.y / T, q = this.M.laneNear(li, tx, ty);
       if (q && q.d < q.r + 0.6) {
         let ux = q.ux, uy = q.uy; if (ux * d[0] + uy * d[1] < 0) { ux = -ux; uy = -uy; }

@@ -1,5 +1,5 @@
 'use strict';
-G.VERSION = 'V3.7';                                  // 版本號（唯一來源；setup.sh 也從這行讀）
+G.VERSION = 'V3.8';                                  // 版本號（唯一來源；setup.sh 也從這行讀）
 /* =========================================================
    選單：首頁 / 隊伍 / 圖鑑 / 教學
    版面：直屏上下堆疊，橫屏左右分欄
@@ -1037,11 +1037,12 @@ G.Menus = (() => {
   // 每頁：t 標題、m 手機說明、d 電腦說明（省略則同 m）、only 只在某平台顯示、draw 示範動畫
   const yBtn = (c, x, y, w, h, label) => { const glow = Math.sin(gt * 6) > 0; c.fillStyle = P[glow ? 13 : 14]; c.fillRect(x - 1, y - 1, w + 2, h + 2); H().box(c, x, y, w, h, 13, 0); G.cn(c, label, x + w / 2, y + Math.round((h - 12) / 2), 0, 0.5); };
   const mCard = (c, x, y, sz, name, on, badge) => { H().key(c, x, y, sz, sz, on, on ? 9 : 4); c.save(); c.beginPath(); c.rect(x + 1, y + 1, sz - 2, sz - 2); c.clip(); sprFit(c, name, x + sz / 2, y + sz - 3, sz - 4, sz - 5); c.restore(); if (badge) { c.fillStyle = P[13]; c.fillRect(x + sz - 7, y + 1, 6, 6); G.text(c, badge, x + sz - 6, y + 1, 0); } };
-  const tower = (c, name, x, by, shield, flash) => {
-    const s = G.SPR[G.VIS[name].spr][0], ax = Math.round(x - s.w / 2), ay = by - s.h + 1; shadow(c, x, by, 8);
-    if (shield) { const gl = G.glowOf(s.n, 12, 1, 5); c.globalAlpha = 0.6 + Math.sin(gt * 3) * 0.25; c.drawImage(gl.c, ax - gl.p, ay - gl.p); c.globalAlpha = 1; }
-    c.drawImage(flash ? s.f : s.n, ax, ay);
-    if (shield) { c.globalAlpha = 0.15; c.drawImage(G.glowOf(s.n, 12, 1, 5).tint, ax, ay); c.globalAlpha = 1; }
+  const tower = (c, name, x, by, shield, flash) => {                  // v3.8 塔變大：示範框裡等比縮到約 30 高
+    const s = G.SPR[G.VIS[name].spr][0], k = Math.min(1, 30 / s.h), w = Math.round(s.w * k), h = Math.round(s.h * k), ax = Math.round(x - w / 2), ay = by - h + 1; shadow(c, x, by, 8);
+    const sm = img => { if (k === 1) return img; img._sm = img._sm || {}; if (!img._sm[h]) { const cv = document.createElement('canvas'); cv.width = w; cv.height = h; const x2 = cv.getContext('2d'); x2.imageSmoothingEnabled = true; x2.drawImage(img, 0, 0, w, h); img._sm[h] = cv; } return img._sm[h]; };
+    if (shield) { const gl = G.glowOf(sm(s.n), 12, 1, 5); c.globalAlpha = 0.6 + Math.sin(gt * 3) * 0.25; c.drawImage(gl.c, ax - gl.p, ay - gl.p); c.globalAlpha = 1; }
+    c.drawImage(sm(flash ? s.f : s.n), ax, ay);
+    if (shield) { c.globalAlpha = 0.15; c.drawImage(G.glowOf(sm(s.n), 12, 1, 5).tint, ax, ay); c.globalAlpha = 1; }
   };
   // 場景頁（z:1）是先畫一半大小再放大 2 倍；文字和介面框若直接畫會跟著變 2 倍、擋住重點
   // → 改用 zcn/ztext/zdraw：先記下來，等放大後再以原尺寸畫在大畫布上（座標 ×2）

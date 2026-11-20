@@ -116,13 +116,13 @@ G.SOLO = [   // v3.5 首通鑰匙 10/15/25/40/60 → 5/6/8/10/12
   { theme: 'forest', n: '翠葉森林', en: 'SPRING WOODS', d: 1, rule: '', hz: null, rew: 5,
     dif: { lv: 0, hp: 1, pow: 0.95, tower: 0.9, wave: 1.1, boss: 4, cnt: [3, 6] }   /* v3.7 單路後原本太弱（小兵自己 2 分鐘就推完）：hp/pow 0.75→1/0.95、tower 0.8→0.9、wave 1.2→1.1、cnt [1,4]→[3,6] */, hunt: { n: 0 },
     roster: [['babybear', 'mouse', 'shroom'], ['babybear', 'chipmunk', 'boar', 'shroom'], ['bear', 'eagle', 'boar', 'shroom', 'chipmunk']], boss: 'bigbear', fresh: ['shroom'] },
-  { theme: 'autumn', n: '楓紅山谷', en: 'MAPLE VALLEY', d: 2, rule: '{秋風}每 50 秒吹起，8 秒內全場跑速 {+30%}', hz: 'wind', rew: 6,
+  { theme: 'autumn', n: '楓紅山谷', en: 'MAPLE VALLEY', d: 2, rule: '{秋風}每 30 秒吹起，8 秒內全場跑速 {+30%}', hz: 'wind', rew: 6,
     dif: { lv: 0, hp: 1, pow: 1, tower: 1, wave: 1, boss: 3, cnt: [2, 5] }, hunt: { n: 1, first: 90, re: 75 },
     roster: [['boar', 'monkey', 'hedgehog'], ['hedgehog', 'raven', 'smartmonkey', 'boar'], ['kangaroo', 'buffalo', 'hedgehog', 'smartmonkey', 'raven']], boss: 'stagking', fresh: ['hedgehog', 'stagking'] },
-  { theme: 'snow', n: '霜雪凍原', en: 'FROST TUNDRA', d: 3, rule: '{暴風雪}每 60 秒颳起，10 秒內全場跑速、攻速 {−25%}', hz: 'blizzard', rew: 8,
+  { theme: 'snow', n: '霜雪凍原', en: 'FROST TUNDRA', d: 3, rule: '{暴風雪}每 30 秒颳起，10 秒內全場跑速、攻速 {−25%}', hz: 'blizzard', rew: 8,
     dif: { lv: 1, hp: 1.1, pow: 1.05, tower: 1.15, wave: 1, boss: 3, cnt: [2, 5] }, hunt: { n: 2, first: 90, re: 70 },
     roster: [['snowhare', 'whitemouse', 'penguin'], ['snowhare', 'penguin', 'madwolf', 'turtle'], ['snowhare', 'madwolf', 'polarbear', 'penguin', 'turtle']], boss: 'yeti', fresh: ['snowhare', 'yeti'] },
-  { theme: 'lava', n: '熔岩火山', en: 'MOLTEN PEAK', d: 4, rule: '{火山噴發}每 35 秒落下熔岩彈，{紅圈}內敵我都會受傷', hz: 'lava', rew: 10,
+  { theme: 'lava', n: '熔岩火山', en: 'MOLTEN PEAK', d: 4, rule: '{火山噴發}每 35 秒落下熔岩彈，{b:藍圈}內敵我都扣{最大生命 18%}', hz: 'lava', rew: 10,
     dif: { lv: 2, hp: 1.25, pow: 1.15, tower: 1.3, wave: 0.95, boss: 2, cnt: [2, 6] }, hunt: { n: 2, first: 75, re: 60 },
     roster: [['salamander', 'firegnome', 'crocodile'], ['salamander', 'firebear', 'splashbuffalo', 'crocodile'], ['salamander', 'firebear', 'firegnome', 'splashbuffalo', 'smartmonkey']], boss: 'magmagolem', fresh: ['salamander', 'magmagolem'] },
   { theme: 'abyss', n: '幽冥深淵', en: 'THE ABYSS', d: 5, rule: '{亡者復甦}敵兵倒下時有 {25%} 機率化成幽魂。{視野縮小}', hz: 'revive', rew: 12,
@@ -132,7 +132,7 @@ G.SOLO = [   // v3.5 首通鑰匙 10/15/25/40/60 → 5/6/8/10/12
 G.STAGES[0].n = '經典戰場'; G.STAGES[0].theme = 'forest';
 G.SOLO.forEach((s, i) => G.STAGES.push(Object.assign({ map: 'l' + (i + 1), allyLevel: 1, loadout: G.STAGES[0].loadout, bossLevel: 2 + s.dif.lv }, s)));   // v3.7 每關各自的單路地圖（02_config G.MAPS.l1～l5）
 G.SOLO_STAR = 2;   // v3.5 5 → 2                                 // 每多拿一顆星的鑰匙
-G.SOLO_HZ = { wind: { every: 50, dur: 8, k: 1.3 }, blizzard: { every: 60, dur: 10, k: 0.75, atk: 1.25 }, lava: { every: 35, n: 5, r: 36, pct: 18, warn: 1.1 }, revive: { p: 25, hp: 40 } };
+G.SOLO_HZ = { wind: { every: 30, dur: 8, k: 1.3 }, blizzard: { every: 30, dur: 10, k: 0.75, atk: 1.25 }, lava: { every: 35, n: 5, r: 36, pct: 18, warn: 2.2 }, revive: { p: 25, hp: 40 } };   // v3.8 秋風／暴風雪 50/60→30 秒；熔岩彈預警 1.1→2.2 秒
 
 // ---------- 戰場掛勾（World 會呼叫） ----------
 G.SoloW = {
@@ -161,14 +161,14 @@ G.SoloW = {
     const mob = W.units.filter(u => u.alive && !u.static && u.side !== 2);
     while (pts.length < C.n && mob.length) { const u = mob[(Math.random() * mob.length) | 0]; pts.push([u.x + G.rr(-30, 30), u.y + G.rr(-20, 20)]); }
     if (!pts.length) return;
-    W.say({ s: '火山噴發！避開紅圈', ic: 'i_fire', col: 10, t: 2.4 }); G.Audio.play('warn');
+    W.say({ s: '火山噴發！快離開藍圈', ic: 'i_fire', col: 12, t: 2.4 }); G.Audio.play('warn');
     const src = { side: -1, kind: 'hazard', name: 'lava', x: 0, y: 0, alive: false, st: { crit: 0 }, melee: false };
     pts.forEach(([x, y], i) => setTimeout(() => { if (G.W !== W || W.over) return;
       G.VFX.meteor(W, x, y, C.r, () => {
         src.x = x; src.y = y - 1;
         for (const u of W.units) if (u.alive && !u.static && u.side !== 2 && Math.hypot(u.x - x, (u.y - y) * 1.3) < C.r + u.r * 0.5) W.damage(src, u, u.st.hp * C.pct / 100 + u.st.armor * (u.bArm || 1), { fire: 1, big: 1, skill: true });
-        W.shake(0.35);
-      }, 'fire', C.warn);
+        W.shake(0.35); G.VFX.meteorImpact(W, x, y, C.r, 'fire');        // v3.8 補上落地爆炸
+      }, 'hazard', C.warn);
     }, i * 220));
   },
   // 亡者復甦：敵兵倒下 → 有機會變成幽魂

@@ -140,6 +140,71 @@ G.BESTIARY = {
 };
 delete G.BESTIARY.babybear2;
 
+// ---------- v3.8 大塔（Pai：塔太小、存在感低 → 重畫約 3 倍大）----------
+// 共用畫法：石磚塔身（左亮右暗、磚縫錯開）＋ 底座 ＋ 城垛 ＋ 頂部造型（tier：0 外塔 1 中塔 2 內塔）＋ 水晶
+// K：配色 { s 石, hi 亮面, lo 暗面, m 磚縫, a 點綴, a2 點綴暗, c 水晶, cc 水晶亮, w 窗內 }
+G.towerArt = (W, H, tier, K, main) => P => {
+  const cx = W / 2, bw = main ? W - 22 : Math.round(W * 0.5), top = main ? Math.round(H * 0.42) : Math.round(H * (tier === 2 ? 0.42 : tier === 1 ? 0.38 : 0.34));
+  const brick = (x, y, w, h) => {                                    // 石磚：左 2 欄亮、右 2 欄暗、每 4 列一道縫、直縫錯開
+    for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) {
+      const X = x + xx, Y = y + yy, row = Math.floor(yy / 4), mor = yy % 4 === 3 || ((xx + (row % 2) * 3) % 6 === 5 && yy % 4 !== 3);
+      P.px(X, Y, mor ? K.m : xx < 2 ? K.hi : xx >= w - 2 ? K.lo : K.s);
+    } };
+  const crystal = (x, y, h, w) => {                                  // 菱形水晶：中間亮線＋左上反光
+    for (let i = 0; i <= h; i++) { const k = 1 - Math.abs(i - h * 0.45) / (h * 0.55), hw = Math.max(0, Math.round(w / 2 * Math.max(0, k))); for (let d = -hw; d <= hw; d++) P.px(x + d, y + i, d < 0 ? K.c : K.a2); }
+    for (let i = 2; i < h - 1; i++) P.px(x, y + i, K.cc); P.px(x - 1, y + Math.round(h * 0.3), 9); P.px(x - 2, y + Math.round(h * 0.4), K.cc);
+  };
+  // 底座（三層台階）
+  P.r(Math.round(cx - bw / 2 - 5), H - 4, bw + 10, 4, K.lo); P.r(Math.round(cx - bw / 2 - 3), H - 7, bw + 6, 3, K.s); P.r(Math.round(cx - bw / 2 - 3), H - 7, bw + 6, 1, K.hi);
+  if (main) {
+    // 主塔：中央城樓＋左右兩座副塔＋城門
+    const sw = 13, sh = Math.round(H * 0.62);
+    for (const sx of [2, W - sw - 2]) { brick(sx, H - 7 - sh + 6, sw, sh - 6); P.r(sx - 1, H - 7 - sh + 2, sw + 2, 4, K.s); P.r(sx - 1, H - 7 - sh + 2, sw + 2, 1, K.hi); for (let x = sx - 1; x < sx + sw + 1; x += 4) P.r(x, H - 7 - sh - 1, 2, 3, K.s);
+      P.r(sx + 5, H - 7 - sh + 12, 3, 6, K.w); P.px(sx + 6, H - 7 - sh + 13, K.a); }
+    brick(Math.round(cx - bw / 2), top, bw, H - 7 - top);
+    P.r(Math.round(cx - bw / 2) - 3, top - 4, bw + 6, 5, K.s); P.r(Math.round(cx - bw / 2) - 3, top - 4, bw + 6, 1, K.hi);
+    for (let x = Math.round(cx - bw / 2) - 3; x < cx + bw / 2 + 3; x += 5) P.r(x, top - 8, 3, 4, K.s);
+    // 城門（拱形）＋門上旗幟
+    P.e(cx, H - 15, 6, 7, K.m); P.r(Math.round(cx - 6), H - 15, 12, 8, K.m); P.e(cx, H - 15, 5, 6, K.w); P.r(Math.round(cx - 5), H - 15, 10, 8, K.w);
+    for (let x = Math.round(cx - 4); x <= cx + 4; x += 2) P.l(x, H - 20, x, H - 8, K.lo);
+    P.r(Math.round(cx - 9), top + 6, 4, 12, K.a); P.r(Math.round(cx + 5), top + 6, 4, 12, K.a); P.px(cx - 7, top + 17, K.a2); P.px(cx + 7, top + 17, K.a2);
+    // 屋頂尖塔＋大水晶
+    for (let i = 0; i < 12; i++) P.r(Math.round(cx - 1 - i * 0.7), top - 9 - 12 + i, Math.round(2 + i * 1.4), 1, i < 2 ? K.a : K.lo);
+    crystal(cx, 0, Math.round(top - 22), 10);
+    return;
+  }
+  // 塔身
+  brick(Math.round(cx - bw / 2), top, bw, H - 7 - top);
+  // 箭孔窗、腰帶
+  const wy = top + Math.round((H - 7 - top) * 0.35);
+  P.r(Math.round(cx - 1), wy, 3, 6, K.w); P.px(cx, wy + 1, K.a);
+  if (tier >= 1) { P.r(Math.round(cx - bw / 2 + 3), wy + 2, 2, 4, K.w); P.r(Math.round(cx + bw / 2 - 5), wy + 2, 2, 4, K.w); }
+  const band = top + Math.round((H - 7 - top) * 0.68); P.r(Math.round(cx - bw / 2) - 1, band, bw + 2, 3, K.a); P.r(Math.round(cx - bw / 2) - 1, band + 2, bw + 2, 1, K.a2);
+  // 平台＋城垛
+  const pw = bw + 8; P.r(Math.round(cx - pw / 2), top - 5, pw, 5, K.s); P.r(Math.round(cx - pw / 2), top - 5, pw, 1, K.hi); P.r(Math.round(cx - pw / 2), top - 1, pw, 1, K.lo);
+  for (let x = Math.round(cx - pw / 2); x < cx + pw / 2; x += 5) P.r(x, top - 9, 3, 4, K.s);
+  if (tier === 0) crystal(cx, Math.round(top * 0.12), Math.round(top * 0.7), 9);                 // 外塔：一顆浮空水晶
+  if (tier === 1) {                                                                                 // 中塔：兩支角＋水晶
+    for (let i = 0; i < 10; i++) { P.px(cx - 8 - i * 0.35, top - 10 - i, K.a); P.px(cx + 8 + i * 0.35, top - 10 - i, K.a); P.px(cx - 7 - i * 0.35, top - 10 - i, K.a2); P.px(cx + 7 + i * 0.35, top - 10 - i, K.a2); }
+    crystal(cx, Math.round(top * 0.08), Math.round(top * 0.68), 11);
+  }
+  if (tier === 2) {                                                                                 // 內塔：尖頂屋＋大水晶＋兩側旗
+    const rh = Math.round(top * 0.4); for (let i = 0; i < rh; i++) { const hw = Math.round((pw / 2) * (i / rh)); P.r(Math.round(cx - hw), top - 9 - rh + i, hw * 2, 1, i % 3 === 0 ? K.lo : K.a); }
+    crystal(cx, 0, Math.round(top - 9 - rh + 2), 12);
+    for (const sd of [-1, 1]) { const fx = Math.round(cx + sd * (pw / 2 + 1)); P.l(fx, top - 14, fx, top - 1, K.lo); P.r(sd < 0 ? fx - 5 : fx + 1, top - 14, 5, 4, K.a); }
+  }
+};
+{
+  const E = { s: 2, hi: 3, lo: 1, m: 0, a: 15, a2: 10, c: 10, cc: 13, w: 0 };                  // 敵方：暗石、深紅點綴、紅水晶
+  const A = { s: 7, hi: 8, lo: 5, m: 4, a: 16, a2: 11, c: 11, cc: 9, w: 3 };                    // 我方：淺石、綠葉點綴、綠水晶
+  Object.assign(G.BESTIARY, {
+    tw_e0: { w: 42, h: 57, tower: 1, draw: G.towerArt(42, 57, 0, E) }, tw_e1: { w: 44, h: 66, tower: 1, draw: G.towerArt(44, 66, 1, E) },
+    tw_e2: { w: 46, h: 75, tower: 1, draw: G.towerArt(46, 75, 2, E) }, tw_em: { w: 64, h: 84, tower: 1, draw: G.towerArt(64, 84, 9, E, 1) },
+    tw_p0: { w: 42, h: 57, tower: 1, draw: G.towerArt(42, 57, 0, A) }, tw_p1: { w: 44, h: 66, tower: 1, draw: G.towerArt(44, 66, 1, A) },
+    tw_p2: { w: 46, h: 75, tower: 1, draw: G.towerArt(46, 75, 2, A) }, tw_pm: { w: 64, h: 84, tower: 1, draw: G.towerArt(64, 84, 9, A, 1) }
+  });
+}
+
 // 外觀表補齊（半徑依圖寬推算）
 G.buildBestiary = function () {
   for (const k in G.BESTIARY) {
@@ -151,8 +216,10 @@ G.buildBestiary = function () {
     }
     G.SPR[k] = frames;
   }
-  const towerSpr = { player_tower: 'ptower', enemy_tower: 'etower', enemy_tower2: 'etower2', enemy_tower3: 'etower3', enemy_tower4: 'etower4', mushroom_tower: 'mtower' };
-  for (const name in towerSpr) if (!G.VIS[name]) G.VIS[name] = { spr: towerSpr[name], r: name === 'enemy_tower4' ? 22 : 16, shadow: name === 'enemy_tower4' ? 19 : 13 };
+  const towerSpr = { player_tower: 'tw_p0', enemy_tower: 'tw_e0', enemy_tower2: 'tw_e1', enemy_tower3: 'tw_e2', enemy_tower4: 'tw_em', mushroom_tower: 'mtower' };   // v3.8 大塔
+  for (const name in towerSpr) { const big = name === 'enemy_tower4'; G.VIS[name] = Object.assign({}, G.VIS[name] || {}, { spr: towerSpr[name], r: big ? 30 : name === 'mushroom_tower' ? 16 : 22, shadow: big ? 30 : name === 'mushroom_tower' ? 13 : 21 }); }
+  // 我方塔依層級換圖（world 建塔時用）
+  G.TOWER_VIS = { 0: 'tw_p0', 1: 'tw_p1', 2: 'tw_p2', 9: 'tw_pm' };
   for (const name in G.ORIG.units) {
     if (G.VIS[name]) continue;
     const s = G.SPR[name]; if (!s) continue;
