@@ -11,7 +11,7 @@
 G.HD = (() => {
   // v3.2.3 效能：模糊／柔光改成「半解析預先模糊」兩小張貼圖，主畫面每點只取 5～9 次；
   //   輸出像素有預算（手機 100 萬、電腦 220 萬），掉幀時自動降解析度 H.q（0.55～1），順了再慢慢升回來
-  const H = { on: true, P: 0.16, ok: null, q: 1, slow: 0, fast: 0, dof: 0 };   // v3.2.4 Pai：拿掉上下緣景深模糊（dof 0；要找回來設 1）
+  const H = { on: true, P: 0.16, ok: null, q: 1, slow: 0, fast: 0, dof: 0, bloom: 0.45 };   // v3.5 Pai：柔光太強、白色角色看不清 → 0.45   // v3.2.4 Pai：拿掉上下緣景深模糊（dof 0；要找回來設 1）
   const RAY = { forest: [1.0, 0.88, 0.62, 0.11], autumn: [1.0, 0.72, 0.42, 0.12], snow: [0.82, 0.92, 1.0, 0.1], lava: [1.0, 0.55, 0.3, 0.1], abyss: [0.66, 0.56, 1.0, 0.08] };
   const TOUCH = matchMedia('(pointer: coarse)').matches, BUDGET = TOUCH ? 3.2e6 : 4.2e6;   // v3.4 原生解析度（手機 1170×2532≈300 萬也放得下）；掉幀才降
   let gl = null, cv = null, prog = null, lowP = null, tex = null, L = {}, LL = {}, motes = [], dot = null;
@@ -132,7 +132,7 @@ void main() {
     const ry = RAY[themeId] || RAY.forest;
     gl.uniform2f(L.uScr, SW, SH); gl.uniform1f(L.uSc, sc); gl.uniform1f(L.uP, R.ps); gl.uniform2f(L.uCB, R.cbx, R.cby); gl.uniform2f(L.uBuf, bw, bh);
     gl.uniform2f(L.uLow, lw * 2, lh * 2); gl.uniform1f(L.uSS, R.SS || 1); gl.uniform1f(L.uOut, gw / SW);
-    gl.uniform1f(L.uT, rt); gl.uniform4f(L.uRay, ry[0], ry[1], ry[2], ry[3]); gl.uniform3f(L.uFx, H.dof, 1, 1);
+    gl.uniform1f(L.uT, rt); gl.uniform4f(L.uRay, ry[0], ry[1], ry[2], ry[3]); gl.uniform3f(L.uFx, H.dof, H.bloom, 1);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     ctx.imageSmoothingEnabled = gw !== SW; ctx.drawImage(cv, 0, 0, gw, gh, 0, 0, SW, SH); ctx.imageSmoothingEnabled = false;   // 原生解析度 1:1；降解析度時平滑放大（內容已經是銳利雙線性）
     drawMotes(ctx, SW, SH, rt, ry);

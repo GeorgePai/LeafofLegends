@@ -13,7 +13,7 @@
 // v3.4 /admin/list?g=1 → { list, guests }：guests＝最近 30 分鐘有連線、沒綁帳號的裝置（gid＝sid 雜湊前 8 碼）
 // v2.8.2：管理權限＝遊戲的開發者密碼（key 傳 8 位數密碼，和遊戲用同一個雜湊檢查）；猜錯會被擋：同一個 IP 每小時 5 次、全部合計每小時 30 次
 const CATS = ['heroes', 'minions', 'games', 'wr', 'kda', 'keys', 'dmg', 'time', 'ach'];
-const QUAL = { wr: 'games >= 10', kda: 'games >= 10' };          // 勝率、KDA 至少 10 場才上榜
+const MING = { wr: 10, kda: 3 }, QUAL = Object.fromEntries(Object.entries(MING).map(([k, n]) => [k, 'games >= ' + n]));   // 勝率至少 10 場、KDA 至少 3 場才上榜（v3.5）
 const FIELDS = ['heroes', 'minions', 'games', 'wins', 'kills', 'deaths', 'assists', 'keys', 'dmg', 'time', 'ach'];
 const MAX = { heroes: 40, minions: 80, ach: 200, games: 1e6, wins: 1e6, kills: 1e8, deaths: 1e8, assists: 1e8, keys: 1e7, dmg: 1e12, time: 1e9 };
 const TOP = 20, CACHE_MS = 10000, GAP_S = 30, NEW_PER_IP_H = 3, DMG_PS = 1000;
@@ -44,7 +44,7 @@ async function board(env) {
   return cache;
 }
 async function ranks(env, p) {
-  const qs = CATS.map(k => (p.hidden || (QUAL[k] ? p.games < 10 : !(p[k] > 0))) ? null
+  const qs = CATS.map(k => (p.hidden || (QUAL[k] ? p.games < MING[k] : !(p[k] > 0))) ? null
     : env.DB.prepare(`SELECT COUNT(*) AS n FROM players WHERE hidden = 0 AND ${QUAL[k] ? QUAL[k] + ' AND ' : ''}(${k} > ?1 OR (${k} = ?1 AND created < ?2))`).bind(p[k], p.created));
   const live = qs.filter(Boolean), rs = live.length ? await env.DB.batch(live) : [], out = {}; let j = 0;
   CATS.forEach((k, i) => { out[k] = qs[i] ? rs[j++].results[0].n + 1 : 0; });

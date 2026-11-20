@@ -112,26 +112,26 @@ G.themeImg = (img, id) => {
 // ---------- 關卡 ----------
 // dif：lv 敵人等級加成、hp／pow 敵人血量／攻擊倍率、tower 敵塔血量倍率、wave 出兵間隔倍率、boss 每幾波來一隻首領、cnt [起始, 上限] 每路每波隻數
 // hunt：n 獵手數、first 第一次出動（秒）、re 倒下後再來（秒）；hz 特殊規則；rew 首次通關鑰匙；roster [前期, 中期, 後期] 敵人
-G.SOLO = [
-  { theme: 'forest', n: '翠葉森林', en: 'SPRING WOODS', d: 1, rule: '', hz: null, rew: 10,
+G.SOLO = [   // v3.5 首通鑰匙 10/15/25/40/60 → 5/6/8/10/12
+  { theme: 'forest', n: '翠葉森林', en: 'SPRING WOODS', d: 1, rule: '', hz: null, rew: 5,
     dif: { lv: 0, hp: 0.75, pow: 0.75, tower: 0.8, wave: 1.2, boss: 4, cnt: [1, 4] }, hunt: { n: 0 },
     roster: [['babybear', 'mouse', 'shroom'], ['babybear', 'chipmunk', 'boar', 'shroom'], ['bear', 'eagle', 'boar', 'shroom', 'chipmunk']], boss: 'bigbear', fresh: ['shroom'] },
-  { theme: 'autumn', n: '楓紅山谷', en: 'MAPLE VALLEY', d: 2, rule: '{秋風}每 50 秒吹起，8 秒內全場跑速 {+30%}', hz: 'wind', rew: 15,
+  { theme: 'autumn', n: '楓紅山谷', en: 'MAPLE VALLEY', d: 2, rule: '{秋風}每 50 秒吹起，8 秒內全場跑速 {+30%}', hz: 'wind', rew: 6,
     dif: { lv: 0, hp: 1, pow: 1, tower: 1, wave: 1, boss: 3, cnt: [2, 5] }, hunt: { n: 1, first: 90, re: 75 },
     roster: [['boar', 'monkey', 'hedgehog'], ['hedgehog', 'raven', 'smartmonkey', 'boar'], ['kangaroo', 'buffalo', 'hedgehog', 'smartmonkey', 'raven']], boss: 'stagking', fresh: ['hedgehog', 'stagking'] },
-  { theme: 'snow', n: '霜雪凍原', en: 'FROST TUNDRA', d: 3, rule: '{暴風雪}每 60 秒颳起，10 秒內全場跑速、攻速 {−25%}', hz: 'blizzard', rew: 25,
+  { theme: 'snow', n: '霜雪凍原', en: 'FROST TUNDRA', d: 3, rule: '{暴風雪}每 60 秒颳起，10 秒內全場跑速、攻速 {−25%}', hz: 'blizzard', rew: 8,
     dif: { lv: 1, hp: 1.1, pow: 1.05, tower: 1.15, wave: 1, boss: 3, cnt: [2, 5] }, hunt: { n: 2, first: 90, re: 70 },
     roster: [['snowhare', 'whitemouse', 'penguin'], ['snowhare', 'penguin', 'madwolf', 'turtle'], ['snowhare', 'madwolf', 'polarbear', 'penguin', 'turtle']], boss: 'yeti', fresh: ['snowhare', 'yeti'] },
-  { theme: 'lava', n: '熔岩火山', en: 'MOLTEN PEAK', d: 4, rule: '{火山噴發}每 35 秒落下熔岩彈，{紅圈}內敵我都會受傷', hz: 'lava', rew: 40,
+  { theme: 'lava', n: '熔岩火山', en: 'MOLTEN PEAK', d: 4, rule: '{火山噴發}每 35 秒落下熔岩彈，{紅圈}內敵我都會受傷', hz: 'lava', rew: 10,
     dif: { lv: 2, hp: 1.25, pow: 1.15, tower: 1.3, wave: 0.95, boss: 2, cnt: [2, 6] }, hunt: { n: 2, first: 75, re: 60 },
     roster: [['salamander', 'firegnome', 'crocodile'], ['salamander', 'firebear', 'splashbuffalo', 'crocodile'], ['salamander', 'firebear', 'firegnome', 'splashbuffalo', 'smartmonkey']], boss: 'magmagolem', fresh: ['salamander', 'magmagolem'] },
-  { theme: 'abyss', n: '幽冥深淵', en: 'THE ABYSS', d: 5, rule: '{亡者復甦}敵兵倒下時有 {25%} 機率化成幽魂。{視野縮小}', hz: 'revive', rew: 60,
+  { theme: 'abyss', n: '幽冥深淵', en: 'THE ABYSS', d: 5, rule: '{亡者復甦}敵兵倒下時有 {25%} 機率化成幽魂。{視野縮小}', hz: 'revive', rew: 12,
     dif: { lv: 3, hp: 1.4, pow: 1.25, tower: 1.5, wave: 0.9, boss: 2, cnt: [3, 6] }, hunt: { n: 3, first: 70, re: 55 },
     roster: [['wraith', 'vampirebat', 'blackvulture'], ['wraith', 'madwolf', 'vampirebat', 'gnome'], ['wraith', 'lion', 'madwolf', 'blackvulture', 'gnome']], boss: 'cerberus', fresh: ['wraith', 'cerberus'] }
 ];
 G.STAGES[0].n = '經典戰場'; G.STAGES[0].theme = 'forest';
 G.SOLO.forEach(s => G.STAGES.push(Object.assign({ map: 'lanes5', allyLevel: 1, loadout: G.STAGES[0].loadout, bossLevel: 2 + s.dif.lv }, s)));
-G.SOLO_STAR = 5;                                 // 每多拿一顆星的鑰匙
+G.SOLO_STAR = 2;   // v3.5 5 → 2                                 // 每多拿一顆星的鑰匙
 G.SOLO_HZ = { wind: { every: 50, dur: 8, k: 1.3 }, blizzard: { every: 60, dur: 10, k: 0.75, atk: 1.25 }, lava: { every: 35, n: 5, r: 36, pct: 18, warn: 1.1 }, revive: { p: 25, hp: 40 } };
 
 // ---------- 戰場掛勾（World 會呼叫） ----------

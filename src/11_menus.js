@@ -1,5 +1,5 @@
 'use strict';
-G.VERSION = 'V3.4';                                  // 版本號（唯一來源；setup.sh 也從這行讀）
+G.VERSION = 'V3.5';                                  // 版本號（唯一來源；setup.sh 也從這行讀）
 /* =========================================================
    選單：首頁 / 隊伍 / 圖鑑 / 教學
    版面：直屏上下堆疊，橫屏左右分欄
@@ -1563,7 +1563,7 @@ G.Menus = (() => {
           }
         },
         {
-          t: '免費寶箱', m: '賭徒寶箱{每 5 分鐘免費開一次}',
+          t: '免費寶箱', m: '賭徒寶箱{每 10 分鐘免費開一次}',
           draw(c, x, y, w, h, t) {
             const T = t % 4, gy = Math.round(y + h * 0.62), cx = Math.round(x + w * 0.32), on = T > 1.6, bw = 52, bx = Math.round(x + w * 0.58), by = gy - 22;
             G.Store.drawChest(c, 'gamble', cx, gy - (on ? Math.round(Math.abs(Math.sin(t * 6)) * 3) : 0), 2, false, on ? 11 : null, 0.7);

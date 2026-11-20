@@ -2,6 +2,7 @@
 /* =========================================================
    繪製：低解析像素緩衝 → 整數放大 + 次像素平移（鏡頭平滑）
    ========================================================= */
+G.RIM = 0.4;   // 左上受光白邊的強度倍率（v3.5 Pai：反光太強 1→0.4）
 G.Render = (() => {
   const R = {
     cam: { x: 0, y: 0, zoom: 1, follow: true, vx: 0, vy: 0 },
@@ -293,7 +294,7 @@ G.Render = (() => {
         // 護盾：沿建築剪影外擴的藍色光殼 + 呼吸光暈
         if (shielded) { const gl = G.glowOf(base, 12, 1, 5); b.globalAlpha = 0.6 + Math.sin(rt * 3 + u.id) * 0.25; b.drawImage(gl.c, ax - gl.p, ay - gl.p); b.globalAlpha = 1; }
         G.VFX.auraBack(b, u, ax, ay, base, gx, gy, rt, W);
-        { const gk = G.glowOf(base, 0, 1, 0), gw = G.glowOf(base, 9, 1, 0); b.globalAlpha = 0.55; b.drawImage(gk.tint, ax + 1, ay + 1); b.globalAlpha = u.side === 1 ? 0.35 : 0.22; b.drawImage(gw.tint, ax - 1, ay - 1); b.globalAlpha = 1; }   // 右下暗邊、左上亮邊
+        { const gk = G.glowOf(base, 0, 1, 0), gw = G.glowOf(base, 9, 1, 0); b.globalAlpha = 0.55; b.drawImage(gk.tint, ax + 1, ay + 1); b.globalAlpha = (u.side === 1 ? 0.35 : 0.22) * G.RIM; b.drawImage(gw.tint, ax - 1, ay - 1); b.globalAlpha = 1; }   // 右下暗邊、左上亮邊
         if (u.chg) {                                            // 施法前搖：身體發光（越來越亮）
           const cp = Math.min(1, u.chg.T / u.chg.dur), E = G.ELEM[u.chg.el] || G.ELEM.arcane, gl = G.glowOf(base, E.c, 1, 2);
           b.globalAlpha = 0.25 + 0.6 * cp * (0.75 + 0.25 * Math.sin(rt * 30)); b.drawImage(gl.c, ax - gl.p, ay - gl.p); b.globalAlpha = 1;

@@ -52,7 +52,7 @@ G.BESTIARY.hunter = { w: 19, h: 14, draw(P, f) { G.quad(P, f, { bx: 8, by: 8, br
 G.TUNE.jungle = { first: 90, respawn: 75, bossLv: 7, bossTime: 300, maxLv: 10, gold: 100 };
 G.HUNTER_INFO = '・開場 {90 秒}出動，倒下 {75 秒}後再來\n・清野怪變強：紅營{加攻擊}、藍營{回血加防禦}、鱷魚營{升級}\n・開場 {5 分鐘}後、{Lv7} 以上會搶野生首領\n・擊倒可得 {100 金幣}';
 // ---------- 鑰匙掉落（%：英雄親手擊倒；友軍擊倒減半）----------
-G.KEY_RATE = { creep: 2, camp: 8, boss: 15, hunter: 25, towerOut: 30, wboss: 35, towerMid: 40, towerIn: 50, towerMain: 60, holy: 100 };
+G.KEY_RATE = { creep: 1, camp: 4, boss: 8, hunter: 12, towerOut: 15, wboss: 18, towerMid: 20, towerIn: 25, towerMain: 30, holy: 100 };   // v3.5 掉落機率減半（聖所維持 100%）
 // 主塔數值（原著要塞太強，改成合理值；雙方共用）
 Object.assign(G.ORIG.towers.enemy_tower4, { hp: 1800, power: 55, armor: 8, range: 210, delay: 1500 });   // v2.4 射程 190 → 210
 G.keyCat = u => u.kind === 'holy' ? 'holy' : u.static ? ['towerOut', 'towerMid', 'towerIn'][u.tier] || 'towerMain' : u.wild ? (u.wild.kind === 'wboss' ? 'wboss' : 'camp') : u.kind === 'jungler' ? 'hunter' : u.kind === 'boss' ? 'boss' : 'creep';

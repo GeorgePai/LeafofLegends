@@ -17,6 +17,7 @@ G.RANK_CATS = [                       // [欄位, 短名（分類格）, 全名,
   ['wr', '勝率', '勝率', ''], ['kda', 'KDA', 'KDA', ''], ['keys', '鑰匙', '累積鑰匙', '把'],
   ['dmg', '傷害', '總傷害', ''], ['time', '時長', '遊玩時長', ''], ['ach', '成就', '成就數', '個']
 ];
+G.RANK_MIN = { wr: 10, kda: 3 };       // v3.5 上榜最少場數（KDA 10→3 場；勝率維持 10 場）
 G.Rank = (() => {
   const K = {}, CN = Object.fromEntries(G.RANK_CATS.map(c => [c[0], c[2]]));
   let board = null, boardT = 0, lastPoll = -1e12, lastSub = -1e12, busy = 0, pend = true, state = 'idle', ranks = null, sig = '', sigT = 0;
@@ -338,7 +339,7 @@ G.RankUI = (() => {
     else if (!Kk.joined()) { if (Kk.name()) lines = ['正在加入排行…', Kk.name()]; else { lines = ['先取個玩家名稱', '就會自動上榜']; btn = ['rkSave', '前往帳號', () => M.go('save'), 1]; } }
     else {
       col = 13; const r = Kk.ranks()[k] || 0, my = Kk.mine(k), g = Kk.stats().games;
-      if ((k === 'wr' || k === 'kda') && g < 10) lines = ['你：還沒上榜', '還差 ' + (10 - g) + ' 場才上榜'];
+      if (G.RANK_MIN[k] && g < G.RANK_MIN[k]) lines = ['你：還沒上榜', '還差 ' + (G.RANK_MIN[k] - g) + ' 場才上榜'];
       else if (!r) lines = ['你：還沒上榜', '目前 ' + Kk.fmt(k, my)];
       else { const rt = '你：' + (r > 20 ? '20 名以外' : '第 ' + r + ' 名'), vt = Kk.fmt(k, my); lines = G.cnW(rt + '　' + vt) <= W - 70 ? [rt + '　' + vt] : [rt, '目前 ' + vt]; }
       btn = ['rkMe', '跳至自己', () => { jmp = { st: 'ask' }; G.Audio.play('click'); }, 0, myI < 0];   // 不在前 20 名：按鈕變灰
@@ -346,7 +347,7 @@ G.RankUI = (() => {
     const bh = bar(c, x, B, W, lines, col, btn), listH = B - bh - 3 - y;
     // ---- 清單（每列固定 15 高；名字放不下用「…」）----
     if (!b || !rows.length) {
-      const msg = !Kk.on() ? '排行榜準備中，敬請期待' : st === 'quota' ? '今天的排行額度用完了，早上 8 點恢復' : st === 'err' ? '暫時連不上排行榜，稍後會自動再試' : !b ? '讀取中…' : (k === 'wr' || k === 'kda') ? '還沒有人打滿 10 場，快來搶第一！' : '還沒有人上榜';
+      const msg = !Kk.on() ? '排行榜準備中，敬請期待' : st === 'quota' ? '今天的排行額度用完了，早上 8 點恢復' : st === 'err' ? '暫時連不上排行榜，稍後會自動再試' : !b ? '讀取中…' : G.RANK_MIN[k] ? '還沒有人打滿 ' + G.RANK_MIN[k] + ' 場，快來搶第一！' : '還沒有人上榜';
       G.cnWrap(msg, lw - 12).forEach((l, i) => G.cn(c, l, lx + lw / 2 - 3, y + 16 + i * 13, 6, 0.5));
       return;
     }
