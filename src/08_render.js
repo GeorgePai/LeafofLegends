@@ -207,8 +207,8 @@ G.Render = (() => {
           const h1 = Math.round(s.h * 0.4), h2 = Math.round(s.h * 0.72) - h1, o1 = Math.round(sw * 1.2), o2 = Math.round(sw * 0.55);
           b.drawImage(sn, 0, 0, s.w, h1, ax + o1, ay, s.w, h1); b.drawImage(sn, 0, h1, s.w, h2, ax + o2, ay + h1, s.w, h2); b.drawImage(sn, 0, h1 + h2, s.w, s.h - h1 - h2, ax, ay + h1 + h2, s.w, s.h - h1 - h2);
         } else {
-          if (p.deco) { G.pxDisc(b, ax + s.w / 2 + 2, ay + s.h - 1, s.w * 0.45, 2, 0, 0.5); b.drawImage(G.extrudeOf(sn, 2), ax - 1, ay - 3); }   // v3.2 石像／斷柱／燈籠也有厚度
-          b.drawImage(p.deco ? G.shadeOf(sn) : sn, ax, ay);
+          if (p.deco) G.pxDisc(b, ax + s.w / 2 + 2, ay + s.h - 1, s.w * 0.45, 2, 0, 0.5);
+          b.drawImage(p.deco && G.VOL & 1 ? G.bevelOf(sn) : sn, ax, ay);
           if (p.glow) { const fl = 0.75 + 0.15 * Math.sin(rt * 3 + p.x) + 0.1 * Math.sin(rt * 11 + p.y); G.glow(b, ax + s.w / 2, ay + 5, 9, 13, 0.32 * fl); G.glow(b, ax + s.w / 2, ay + s.h, 12, 13, 0.1 * fl, 0.5); }
         }
       } else if (it.u) {
@@ -281,9 +281,7 @@ G.Render = (() => {
           b.globalAlpha = 0.25 + 0.6 * cp * (0.75 + 0.25 * Math.sin(rt * 30)); b.drawImage(gl.c, ax - gl.p, ay - gl.p); b.globalAlpha = 1;
         }
         if (u.clone) b.globalAlpha = 0.68 + Math.sin(rt * 9 + u.id) * 0.1;      // 複製體：半透明、微微閃爍
-        // v3.2 立體感：側面厚度（建築 3 層、首領 2 層、其他 1 層）＋正面上亮下暗
-        const ek = u.static ? (u.kind === 'holy' ? 2 : 3) : u.kind === 'boss' || s.h >= 20 ? 2 : 1, vimg = u.flash > 0 ? img : G.shadeOf(img);
-        if (!u.vis.fly || u.static) { const ex = G.extrudeOf(base, ek); if (psx !== 1 || psy !== 1 || psk !== 0) { const fx = ax + s.w / 2, fy = ay + s.h; b.save(); b.setTransform(psx, 0, psk, psy, fx, fy); b.drawImage(ex, -s.w / 2 - 1, -s.h - ek - 1); b.restore(); } else b.drawImage(ex, ax - 1, ay - ek - 1); }
+        const vimg = u.flash > 0 || !(G.VOL & 1) ? img : G.bevelOf(img);   // v3.2.1 光影浮雕
         if (psx !== 1 || psy !== 1 || psk !== 0) {              // 以腳底為支點做擠壓／傾斜
           const fx = ax + s.w / 2, fy = ay + s.h;
           b.save(); b.setTransform(psx, 0, psk, psy, fx, fy); b.drawImage(vimg, -s.w / 2, -s.h); b.restore();
@@ -386,6 +384,7 @@ G.Render = (() => {
     // 輸出到螢幕
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(buf, 0, 0, bw, bh, -R.fx * sc, -R.fy * sc, bw * sc, bh * sc);
+    if (G.VOL & 2) tilt(ctx, buf, bw, bh, sc);                       // v3.2.1 微縮景深（tilt-shift）
     ctx.drawImage(vign, 0, 0);
     if (W.flashScreen > 0) { ctx.fillStyle = `rgba(255,255,255,${W.flashScreen * 2.5})`; ctx.fillRect(0, 0, R.sw, R.sh); }
     if (h0 && !W.attract) {
@@ -393,6 +392,23 @@ G.Render = (() => {
       else if (h0.hp / h0.st.hp < 0.3) { const a = (0.3 - h0.hp / h0.st.hp) * (0.8 + Math.sin(rt * 8) * 0.4); ctx.globalAlpha = G.clamp(a * 2.5, 0, 0.8); ctx.drawImage(vign, 0, 0); ctx.drawImage(vign, 0, 0); ctx.globalAlpha = 1; }
     }
   };
+  // v3.2.1 微縮景深：畫面上下緣逐漸模糊（縮小再放大＝便宜的模糊），中間清楚，像在看一座微縮模型；再加一層暖色頂光
+  let blurC = null;
+  function tilt(ctx, buf, bw, bh, sc) {
+    const q = 4, w = Math.ceil(bw / q), h = Math.ceil(bh / q);
+    if (!blurC || blurC.width !== w || blurC.height !== h) blurC = G.canvas(w, h);
+    const bx = blurC.getContext('2d'); bx.imageSmoothingEnabled = true; bx.clearRect(0, 0, w, h); bx.drawImage(buf, 0, 0, bw, bh, 0, 0, w, h);
+    ctx.imageSmoothingEnabled = true;
+    const N = 14, SH = R.sh, band = SH * 0.36;
+    for (let k = 0; k < N; k++) {
+      const a = Math.pow(1 - k / N, 1.6) * 0.95, y0 = k * band / N, hh = band / N + 1;
+      ctx.globalAlpha = a;
+      for (const yy of [y0, SH - y0 - hh]) { const sy = (yy + R.fy * sc) / sc / q, sh2 = hh / sc / q; ctx.drawImage(blurC, R.fx / q, sy, R.sw / sc / q, sh2, 0, yy, R.sw, hh); }
+    }
+    ctx.globalAlpha = 1; ctx.imageSmoothingEnabled = false;
+    const g = ctx.createLinearGradient(0, 0, 0, SH); g.addColorStop(0, 'rgba(255,226,170,0.10)'); g.addColorStop(0.45, 'rgba(255,226,170,0)'); g.addColorStop(1, 'rgba(20,10,40,0.16)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, R.sw, SH);
+  }
   // 需要原生解析度的 UI（小地圖、大地圖）：在 UI 畫完後直接畫到螢幕；之後若有遮罩蓋上就不畫（保留 UI 畫布上的低解析版本）
   R.hi = [];
   R.hiQ = fn => R.hi.push({ fn, cov: false });

@@ -246,7 +246,24 @@ G.redOf = function (src, n) {
 // v3.2 立體感（2.5D）：光從左上來
 // G.shadeOf：正面加「上亮下暗」的垂直漸層（頂部受光、腳邊環境光遮蔽），讓角色有圓柱般的體積
 // G.extrudeOf：把剪影往右上疊 k 層、壓暗，做出看得到的側面厚度（斜投影，類似 sprite stacking）
-G._shadeC = new WeakMap(); G._extC = {};
+G._shadeC = new WeakMap(); G._extC = {}; G._bevC = new WeakMap();
+G.VOL = 0;   // v3.2.1 立體感方案（試作）：0 原本、1 光影浮雕、2 微縮景深、3 兩者
+// 光影浮雕（自動法線打光的簡化版）：外框內側，朝左上的邊亮、朝右下的邊暗，像有圓潤的體積；黑色外框不動
+G.bevelOf = function (src) {
+  let r = G._bevC.get(src); if (r) return r;
+  const w = src.width, h = src.height, sd = (src.getContext ? src : (() => { const t = G.canvas(w, h); t.getContext('2d').drawImage(src, 0, 0); return t; })()).getContext('2d').getImageData(0, 0, w, h), a = sd.data;
+  const solid = (x, y) => { if (x < 0 || y < 0 || x >= w || y >= h) return false; const i = (y * w + x) * 4; return a[i + 3] > 128 && a[i] + a[i + 1] + a[i + 2] >= 110; };
+  const out = new Uint8ClampedArray(a);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (!solid(x, y)) continue; const i = (y * w + x) * 4;
+    const tl1 = !solid(x - 1, y) || !solid(x, y - 1), br1 = !solid(x + 1, y) || !solid(x, y + 1), tl2 = !solid(x - 2, y) || !solid(x, y - 2) || !solid(x - 1, y - 1), br2 = !solid(x + 2, y) || !solid(x, y + 2) || !solid(x + 1, y + 1);
+    let k = 0; if (tl1 && !br1) k = 0.3; else if (br1 && !tl1) k = -0.32; else if (tl2 && !br2) k = 0.12; else if (br2 && !tl2) k = -0.14;
+    if (!k) continue;
+    const T = k > 0 ? [255, 246, 222] : [18, 14, 34], f = Math.abs(k);
+    out[i] = a[i] + (T[0] - a[i]) * f; out[i + 1] = a[i + 1] + (T[1] - a[i + 1]) * f; out[i + 2] = a[i + 2] + (T[2] - a[i + 2]) * f;
+  }
+  const c = G.canvas(w, h); c.getContext('2d').putImageData(new ImageData(out, w, h), 0, 0); G._bevC.set(src, c); return c;
+};
 G.shadeOf = function (src) {
   let r = G._shadeC.get(src); if (r) return r;
   const w = src.width, h = src.height, c = G.canvas(w, h), x = c.getContext('2d'); x.drawImage(src, 0, 0);
