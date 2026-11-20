@@ -117,14 +117,15 @@ async function ping(req, env) {
     await env.DB.batch(qs);
   }
   if (Date.now() - onT > 15000) { const r = await env.DB.prepare('SELECT COUNT(*) AS n FROM pres WHERE t > ?').bind(now - 120).first(); onN = r.n; onT = Date.now(); }
-  if (Date.now() - annT > 30000) { const r = await env.DB.prepare('SELECT MAX(id) AS a FROM ann WHERE exp > ?').bind(now).first(); annMax = (r && r.a) || 0; annT = Date.now(); }
+  if (Date.now() - annT > 10000) { const r = await env.DB.prepare('SELECT MAX(id) AS a FROM ann WHERE exp > ?').bind(now).first(); annMax = (r && r.a) || 0; annT = Date.now(); }
   let moved = 0;                                                                     // v2.8.7 帶了帳號：順便看是不是被別台登入了（1 列讀取）
   if (pid && okSS(String(b.ss || ''))) { const r = await env.DB.prepare('SELECT sess FROM players WHERE id = ?').bind(pid).first(); moved = r && r.sess && r.sess !== b.ss ? 1 : 0; }
   return J({ ok: 1, n: Math.max(1, onN), moved, a: annMax });
 }
 // ---- v3.2 系統公告 ----
-async function annGet(env) {
-  if (annList && Date.now() - annLT < 30000) return annList;
+async function annGet(env, want = 0) {
+  // v3.2.4 用戶端帶 a＝它從 /ping 知道的最新公告 id；快取裡沒有那麼新的就重新查（避免別台節點的舊快取讓新公告晚 1～2 分鐘才播）
+  if (annList && Date.now() - annLT < 30000 && !(want > annList.list.reduce((a, m) => Math.max(a, m.id), 0))) return annList;
   const now = Math.floor(Date.now() / 1000), r = await env.DB.prepare('SELECT id, t, title, body, keys, live, exp FROM ann WHERE exp > ? ORDER BY id DESC LIMIT 30').bind(now).all();
   annList = { ok: 1, list: r.results }; annLT = Date.now(); return annList;
 }
@@ -221,7 +222,7 @@ export default {
       if (url.pathname === '/submit' && req.method === 'POST') return await submit(req, env);
       if (url.pathname === '/leave' && req.method === 'POST') return await leave(req, env);
       if (url.pathname === '/ping' && req.method === 'POST') return await ping(req, env);
-      if (url.pathname === '/ann' && req.method === 'GET') return J(await annGet(env));
+      if (url.pathname === '/ann' && req.method === 'GET') return J(await annGet(env, Number(url.searchParams.get('a')) || 0));
       if (url.pathname === '/claim' && req.method === 'POST') return await claim(req, env);
       if (url.pathname.startsWith('/fb/') && req.method === 'POST') return await fb(req, env, url);
       if (url.pathname.startsWith('/admin/')) return await admin(req, env, url);

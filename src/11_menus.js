@@ -1,5 +1,5 @@
 'use strict';
-G.VERSION = 'V3.2.3';                                  // 版本號（唯一來源；setup.sh 也從這行讀）
+G.VERSION = 'V3.2.4';                                  // 版本號（唯一來源；setup.sh 也從這行讀）
 /* =========================================================
    選單：首頁 / 隊伍 / 圖鑑 / 教學
    版面：直屏上下堆疊，橫屏左右分欄
@@ -701,24 +701,30 @@ G.Menus = (() => {
   // 三路陣容：三欄並排（上／中／下），選中的那欄亮黃；虛線格＝下一隻會放的位置
   // lists：[[name...]×3]；onLane/onRemove 省略 = 純展示（教學用）
   function laneCols(c, x, y, w, lists, sel, onLane, onRemove, hotIdx) {
-    const gap = 3, cw = Math.floor((w - gap * 2) / 3), sz = 16, per = Math.max(1, Math.floor((cw - 4) / (sz + 2)));
-    const rows = Math.max(1, ...lists.map((l, i) => Math.ceil((l.length + (i === sel ? 1 : 0)) / per))), hh = 15 + rows * (sz + 2) + 3;
+    // v3.2.4 欄位高度固定三列（點數集中一路也不會把版面撐開）：同一種小兵合成一格＋右下數量；種類太多才把格子縮小
+    const gap = 3, cw = Math.floor((w - gap * 2) / 3), ROWS = 3, SZ = 16, hh = 15 + ROWS * (SZ + 2) + 3;
+    const groups = lists.map(l => { const m = new Map(); l.forEach(e => { const n = e.n || e; if (!m.has(n)) m.set(n, []); m.get(n).push(e); }); return [...m.entries()].map(([n, es]) => ({ n, es })); });
     for (let l = 0; l < 3; l++) {
-      const on = sel === l, xx = x + l * (cw + gap);
+      const on = sel === l, xx = x + l * (cw + gap), g = groups[l], need = g.length + (on ? 1 : 0);
+      let sz = SZ, per = 1;
+      for (;;) { per = Math.max(1, Math.floor((cw - 2) / (sz + 2))); if (per * ROWS >= need || sz <= 8) break; sz--; }
+      const rows = Math.min(ROWS, Math.max(1, Math.ceil(need / per))), st = sz + 2;
       H().box(c, xx, y, cw, hh, on ? 1 : 0, on ? 13 : 3, false);
       c.fillStyle = P[on ? 13 : 2]; c.fillRect(xx + 1, y + 1, cw - 2, 13);
       G.cn(c, LANES[l], xx + cw / 2, y + 1, on ? 0 : 6, 0.5);
       if (onLane) tap('ln' + l, xx, y, cw, hh, () => onLane(l));
-      const ox = xx + Math.round((cw - per * (sz + 2) + 2) / 2);
-      lists[l].forEach((e, k) => {
-        const cx = ox + (k % per) * (sz + 2), cy = y + 15 + ((k / per) | 0) * (sz + 2);
-        chip(c, 'ch' + l + '_' + k, cx, cy, sz, e.n || e, onRemove ? () => onRemove(e) : null, hotIdx && hotIdx(e));
+      const ox = xx + Math.round((cw - per * st + 2) / 2), oy = y + 15 + (sz < SZ ? Math.round((ROWS * (SZ + 2) - rows * st) / 2) : 0);
+      g.forEach((gr, k) => {
+        if (k >= per * ROWS) return;
+        const cx = ox + (k % per) * st, cy = oy + ((k / per) | 0) * st, n = gr.es.length;
+        chip(c, 'ch' + l + '_' + k, cx, cy, sz, gr.n, onRemove ? () => onRemove(gr.es[n - 1]) : null, hotIdx && gr.es.some(hotIdx));
+        if (n > 1) { const t = String(n), tw = G.textW(t); c.fillStyle = P[0]; c.fillRect(cx + sz - tw - 2, cy + sz - 6, tw + 2, 6); G.text(c, t, cx + sz - 1, cy + sz - 5, 13, 1, null, 1); }   // 數量
       });
-      if (on) {                                                  // 下一個位置（虛線）
-        const k = lists[l].length, cx = ox + (k % per) * (sz + 2), cy = y + 15 + ((k / per) | 0) * (sz + 2);
+      if (on && g.length < per * ROWS) {                       // 下一個位置（虛線）
+        const k = g.length, cx = ox + (k % per) * st, cy = oy + ((k / per) | 0) * st, m = Math.floor(sz / 2);
         c.fillStyle = P[((gt * 3) | 0) % 2 ? 13 : 6];
         for (let q = 0; q < sz; q += 2) { c.fillRect(cx + q, cy, 1, 1); c.fillRect(cx + q, cy + sz - 1, 1, 1); c.fillRect(cx, cy + q, 1, 1); c.fillRect(cx + sz - 1, cy + q, 1, 1); }
-        c.fillRect(cx + 7, cy + 5, 2, 6); c.fillRect(cx + 5, cy + 7, 6, 2);
+        const a = Math.max(2, Math.round(sz * 0.375)); c.fillRect(cx + m - 1, cy + m - a, 2, a * 2); c.fillRect(cx + m - a, cy + m - 1, a * 2, 2);
       }
     }
     return y + hh;
@@ -1577,7 +1583,7 @@ G.Menus = (() => {
           }
         },
         {
-          t: '植物點數', m: '每隻小兵要花點數，隊伍{最多 12 點}',
+          t: '植物點數', m: '每隻小兵要花點數，隊伍{最多 24 點}',
           draw(c, x, y, w, h, t) {
             const used = 2 + ((t * 1.5) | 0) % 11, max = 12, pw = 8, x0 = Math.round(x + w / 2 - max * (pw + 1) / 2), y0 = Math.round(y + h / 2 - 4);
             for (let i = 0; i < max; i++) { c.fillStyle = P[0]; c.fillRect(x0 + i * (pw + 1), y0, pw, 8); c.fillStyle = P[i < used ? (used >= max ? 14 : 13) : 3]; c.fillRect(x0 + i * (pw + 1), y0 + 1, pw, 6); }

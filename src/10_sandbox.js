@@ -150,7 +150,7 @@ G.cnBlock = (ctx, s, x, y, maxW, col = 7, lh = 13, maxLines = 9) => {   // v2.8.
   const ls = G.cnWrap(s, maxW).slice(0, maxLines); ls.forEach((l, i) => G.cn(ctx, l, x, y + i * lh, col)); return ls.length * lh; };
 
 // ---------- 隊伍（存在瀏覽器本機） ----------
-G.TUNE.plantPoints = 12;            // 隊伍點數上限（取原著後期關卡的 12 點）
+G.TUNE.plantPoints = 24;            // 隊伍點數上限（v3.2.4 Pai：12 → 24）
 G.ROSTER = {
   minions: Object.keys(G.ORIG.units).filter(n => ['npc', 'mercenary'].includes(G.ORIG.units[n].type)),
   bosses: Object.keys(G.BOSS_SKILL),

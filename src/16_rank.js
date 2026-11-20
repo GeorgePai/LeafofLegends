@@ -152,7 +152,7 @@ G.Rank = (() => {
   K.tick = () => {
     if (!K.on()) return;
     { const sc = G.UI.screen + (G.UI.paused ? 'p' : '') + (G.UI.shop ? 's' : '') + (G.W && G.W.over ? 'o' : ''); if (sc !== lastSc && Date.now() - K.online.t > 12000 && !K.online.busy) { lastSc = sc; K.online.t = -1e12; } }   // v3.2 換畫面就提早回報（最快 12 秒一次）
-    if (!document.hidden && !K.online.busy && Date.now() - K.online.t > 60000) ping();
+    if (!document.hidden && !K.online.busy && Date.now() - K.online.t > (G.UI.screen === 'battle' ? 60000 : 30000)) ping();   // v3.2.4 戰鬥外 30 秒一次（公告更快收到）
     const sc = G.UI.screen; if (sc === 'battle' || sc === 'intro' || sc === 'tap' || document.hidden) return;
     const now = Date.now();
     if (K.moved) { if (G.SaveUI && G.SaveUI.kicked) G.SaveUI.kicked(); return; }   // v2.8.7 被別台登入：到帳號畫面登出（戰鬥中先不打斷）

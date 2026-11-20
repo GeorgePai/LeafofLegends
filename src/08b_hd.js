@@ -11,7 +11,7 @@
 G.HD = (() => {
   // v3.2.3 效能：模糊／柔光改成「半解析預先模糊」兩小張貼圖，主畫面每點只取 5～9 次；
   //   輸出像素有預算（手機 100 萬、電腦 220 萬），掉幀時自動降解析度 H.q（0.55～1），順了再慢慢升回來
-  const H = { on: true, P: 0.16, ok: null, q: 1, slow: 0, fast: 0 };
+  const H = { on: true, P: 0.16, ok: null, q: 1, slow: 0, fast: 0, dof: 0 };   // v3.2.4 Pai：拿掉上下緣景深模糊（dof 0；要找回來設 1）
   const RAY = { forest: [1.0, 0.88, 0.62, 0.11], autumn: [1.0, 0.72, 0.42, 0.12], snow: [0.82, 0.92, 1.0, 0.1], lava: [1.0, 0.55, 0.3, 0.1], abyss: [0.66, 0.56, 1.0, 0.08] };
   const TOUCH = matchMedia('(pointer: coarse)').matches, BUDGET = TOUCH ? 1.0e6 : 2.2e6;
   let gl = null, cv = null, prog = null, lowP = null, tex = null, L = {}, LL = {}, motes = [], dot = null;
@@ -119,7 +119,7 @@ void main() {
     // 1. 半解析預先模糊（模糊色＋亮部）
     lowSize(bw, bh); filt(gl.LINEAR);
     gl.useProgram(lowP); gl.uniform2f(LL.uBuf, bw, bh); gl.viewport(0, 0, lw, lh);
-    for (let i = 0; i < 2; i++) { gl.bindFramebuffer(gl.FRAMEBUFFER, low[i].f); gl.uniform1f(LL.uMode, i); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4); }
+    for (let i = H.dof ? 0 : 1; i < 2; i++) { gl.bindFramebuffer(gl.FRAMEBUFFER, low[i].f); gl.uniform1f(LL.uMode, i); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4); }
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     // 2. 主畫面：透視＋景深＋柔光＋調色＋光束
     if (!lin) filt(gl.NEAREST);
@@ -130,7 +130,7 @@ void main() {
     const ry = RAY[themeId] || RAY.forest;
     gl.uniform2f(L.uScr, SW, SH); gl.uniform1f(L.uSc, sc); gl.uniform1f(L.uP, R.ps); gl.uniform2f(L.uCB, R.cbx, R.cby); gl.uniform2f(L.uBuf, bw, bh);
     gl.uniform2f(L.uLow, lw * 2, lh * 2); gl.uniform1f(L.uLin, lin ? 1 : 0);
-    gl.uniform1f(L.uT, rt); gl.uniform4f(L.uRay, ry[0], ry[1], ry[2], ry[3]); gl.uniform3f(L.uFx, 1, 1, 1);
+    gl.uniform1f(L.uT, rt); gl.uniform4f(L.uRay, ry[0], ry[1], ry[2], ry[3]); gl.uniform3f(L.uFx, H.dof, 1, 1);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     ctx.imageSmoothingEnabled = gw < SW * 0.6; ctx.drawImage(cv, 0, 0, gw, gh, 0, 0, SW, SH); ctx.imageSmoothingEnabled = false;
     drawMotes(ctx, SW, SH, rt, ry);

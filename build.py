@@ -6,6 +6,9 @@ from fontTools.ttLib import TTFont
 root = pathlib.Path(__file__).parent
 srcs = sorted((root / "src").glob("*.js"))
 js = "\n".join(f"// ===== {p.name} =====\n" + p.read_text(encoding="utf-8") for p in srcs)
+# v3.2.4 更新內容一起打包（「查看更新內容」離線、作品頁也看得到）
+import json
+js += "\n// ===== release.json =====\nG.RELEASE = " + json.dumps(json.loads((root / "release.json").read_text(encoding="utf-8"))["list"][:12], ensure_ascii=False) + ";\n"
 chars = set(c for c in js if ord(c) > 0x2000 or 0xa0 < ord(c) < 0x180) | set(chr(i) for i in range(0x20, 0x7f)) | set("０１２３４５６７８９？！：．／，。（）")
 # 玩家自訂名稱：內嵌 Big5 常用字（約 5400 字），讓名字也用像素字顯示
 for hi in range(0xA4, 0xC7):

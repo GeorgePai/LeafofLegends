@@ -438,8 +438,20 @@ G.UI = (() => {
     const cx2 = Rt - 13 - 8, cy2 = B - 26 - 16 - 20;
     box(c, cx2, cy2, 16, 16, R.cam.follow ? 1 : 3, R.cam.follow ? 5 : 9); icon(c, 'i_center', cx2 + 8, cy2 + 8);
     btn('center', cx2, cy2, 16, 16, () => { R.cam.follow = true; G.Audio.play('click'); });
-    // v2.5 一鍵解散跟隨：有跟隨小兵時才出現（視角置中鈕左邊；傳送冷卻圖示在時再往左）
-    { const nf = W.followCount(); if (nf) { const dx = cx2 - (W.tp && W.tp.cd > 0 ? 38 : 19), o = U.press.unf > 0 ? 1 : 0;
+    // v3.2.4 放大／縮小：視角置中鈕左邊（[−][＋][置中]），到極限變暗
+    [[-1, 'zout', 'i_zout', 38], [1, 'zin', 'i_zin', 19]].forEach(([dir, id, ic, off]) => {
+      const zx = cx2 - off, ok = R.zoomAt(dir), o = U.press[id] > 0 ? 1 : 0;
+      if (!ok) c.globalAlpha = 0.45;
+      box(c, zx, cy2 + o, 16, 16, 0, 5); icon(c, ic, zx + 8, cy2 + 8 + o);
+      c.globalAlpha = 1;
+      btn(id, zx, cy2, 16, 16, () => { U.press[id] = 0.12; }, () => { if (R.zoomBy(dir)) G.Audio.play('tick'); else deny(id); });
+    });
+    // 傳送冷卻、解散排在縮放鈕左邊；左邊道具欄展開會太擠時（窄手機直屏）改排到縮放鈕正上方一列
+    const tpOn = !!(W.tp && W.tp.cd > 0), bagR = W.bag.length ? L + 3 + 18 + Math.max(...G.SHOP.map(d => G.cnW(d.e || d.n))) + 6 + 8 : L + 24;
+    const up = cx2 - 38 - 19 * ((tpOn ? 1 : 0) + (W.followCount() ? 1 : 0)) < bagR + 4;
+    const tpX = up ? cx2 - 38 : cx2 - 57, tpY = up ? cy2 - 19 : cy2, ufX = up ? cx2 - 38 + (tpOn ? 19 : 0) : cx2 - 57 - (tpOn ? 19 : 0);
+    // v2.5 一鍵解散跟隨：有跟隨小兵時才出現
+    { const nf = W.followCount(); if (nf) { const dx = ufX, cy2 = tpY, o = U.press.unf > 0 ? 1 : 0;
       box(c, dx, cy2 + o, 16, 16, 0, 13);
       c.fillStyle = P[6]; c.fillRect(dx + 5, cy2 + 3 + o, 1, 10); c.fillStyle = P[13]; c.fillRect(dx + 6, cy2 + 3 + o, 5, 4);   // 黃旗
       c.fillStyle = P[10]; for (let k = 0; k < 9; k++) c.fillRect(dx + 3 + k, cy2 + 3 + k + o, 2, 1);                           // 紅色斜線
@@ -448,7 +460,7 @@ G.UI = (() => {
     // 傳送：冷卻中 → 準心鈕上方顯示塔圖示 + 秒數；引導中 → 畫面中下方進度條
     const tp = W.tp;
     if (tp && tp.cd > 0) {
-      const tx = cx2 - 19, ty = cy2, ts = G.SPR.ptower[0], k = Math.min(1, 14 / ts.h);
+      const tx = tpX, ty = tpY, ts = G.SPR.ptower[0], k = Math.min(1, 14 / ts.h);
       box(c, tx, ty, 16, 16, 0, 4); c.globalAlpha = 0.45; c.drawImage(ts.n, Math.round(tx + 8 - ts.w * k / 2), Math.round(ty + 15 - ts.h * k), Math.round(ts.w * k), Math.round(ts.h * k)); c.globalAlpha = 1;
       G.text(c, Math.ceil(tp.cd), tx + 8, ty + 6, 13, 1, 0, 0.5);
     }
@@ -964,6 +976,7 @@ G.UI = (() => {
     cv.addEventListener('pointerup', upf); cv.addEventListener('pointercancel', upf);
     cv.addEventListener('wheel', e => {
       e.preventDefault();
+      if (G.Update && G.Update.isOpen && G.Update.isOpen()) { G.Update.wheel(e.deltaY * 0.25); return; }   // v3.2.4 更新內容卡可用滾輪捲動
       { const [ux, uy] = evXY(e).map(v => v / R.uiS); for (let i = U.btns.length - 1; i >= 0; i--) { const b = U.btns[i]; if (b.wheel && ux >= b.x && ux < b.x + b.w && uy >= b.y && uy < b.y + b.h) { const now = performance.now(); if (now - (U.wheelT || 0) > 90) { U.wheelT = now; b.wheel.step(Math.sign(e.deltaY || e.deltaX)); } return; } } }
       if (G.Menus && G.Menus.hscroll && (Math.abs(e.deltaX) > Math.abs(e.deltaY) || e.shiftKey) && G.Menus.hscroll(e.shiftKey && !e.deltaX ? e.deltaY * 0.5 : e.deltaX * 0.5, ...evXY(e).map(v => v / R.uiS))) return;   // v2.7 表格左右滑動
       if ((U.screen === 'team' || U.screen === 'book') && G.Menus && G.Menus.inCar(...evXY(e).map(v => v / R.uiS))) { const now = performance.now(); if (now - (U.wheelT || 0) > 90) { U.wheelT = now; G.Menus.carStep(Math.sign(e.deltaY || e.deltaX)); } return; }

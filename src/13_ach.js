@@ -259,8 +259,24 @@ G.Menus.ach = c => G.AchUI.draw(c);
 // ---------- 選單畫面上的成就通知（戰鬥中改用廣播） ----------
 G.Ach.bq = [];
 G.Ach.queueBanner = b => { if (G.Ach.banner) G.Ach.bq.push(b); else G.Ach.banner = b; };
+// v3.2.4 更新完第一次打開：頂端通知條「已更新到 V○○！」＋「查看更新內容」按鈕（停 10 秒；放不下一行就上下兩行）
+G.Ach.drawUpd = (c, b) => {
+  const R = G.Render, P = G.PAL, dt = G.Menus.dt || 1 / 60; b.t += dt;
+  const T = 10, inK = Math.min(1, b.t / 0.25), outK = Math.max(0, (b.t - T) / 0.3); if (outK >= 1) { G.Ach.banner = G.Ach.bq.shift() || null; return; }
+  const s = '已更新到 ' + G.VERSION + '！', bl = '查看更新內容', sw = G.cnW(s) + 16, bw = G.cnW(bl) + 12, one = sw + 6 + bw <= R.uw - 12;
+  const h = R.ins.t + (one ? 19 : 37), al = Math.min(inK, 1 - outK);
+  G.UI.h.box(c, -2, -2, R.uw + 4, h + 2, 1, 11, false);
+  c.globalAlpha = al;
+  const tx = one ? Math.round(R.uw / 2 - (sw + 6 + bw) / 2) : Math.round(R.uw / 2 - sw / 2), ty = R.ins.t + 3;
+  G.UI.h.icon(c, 'i_info', tx + 5, ty + 6); G.cn(c, s, tx + 16, ty, 11);
+  const bx = one ? tx + sw + 6 : Math.round(R.uw / 2 - bw / 2), by = one ? ty - 1 : ty + 17;
+  G.Menus.ui.btnPrimary(c, 'updSee', bx, by, bw, 15, bl, () => { G.Ach.banner = G.Ach.bq.shift() || null; G.Update.show('done', b.upd); });
+  c.globalAlpha = 1;
+};
 G.Ach.drawBanner = c => {
   const b = G.Ach.banner; if (!b || G.UI.screen === 'battle' || G.UI.screen === 'intro' || G.UI.screen === 'tap') return;
+  if (G.Update && G.Update.isOpen && G.Update.isOpen()) return;   // v3.2.4 更新內容卡開著：通知條先暫停（不蓋到卡片）
+  if (b.upd) return G.Ach.drawUpd(c, b);
   const dt = G.Menus.dt || 1 / 60; b.t += dt;
   const nL = b.rk ? G.cnWrap(b.rk.s, G.Render.uw - 32).length : 1;
   const T = b.rk ? 2.2 * nL : b.free ? 3.5 : 2.8, inK = Math.min(1, b.t / 0.25), outK = Math.max(0, (b.t - T) / 0.3); if (outK >= 1) { G.Ach.banner = G.Ach.bq.shift() || null; return; }

@@ -1,7 +1,7 @@
 // ============================================================
 // v3.2 系統公告＋信箱（參考手遊的「公告／系統信」）
 // - 開發者（開發者模式）在信箱按「發布」：標題、內容、附件鑰匙、有效天數、要不要跑馬燈
-// - 在線玩家：/ping 每 60 秒（換畫面會提早）回傳最新公告 id → 發現新公告就拿清單，畫面上方跑馬燈播一次
+// - 在線玩家：/ping 戰鬥外每 30 秒、戰鬥中 60 秒（換畫面會提早）回傳最新公告 id → 發現新公告就拿清單，畫面上方跑馬燈播一次
 // - 不在線的玩家：之後上線，首頁右上角信箱出現紅點，點開看；有附件就按「領取」（領過記在存檔裡，存檔碼會帶著）
 // - 伺服器：GET /ann、/admin/ann、/admin/anndel（leaderboard/worker.js）
 // ============================================================
@@ -16,17 +16,19 @@ G.Mail = (() => {
   const flat = s => String(s || '').replace(/\s*\n+\s*/g, ' ');
   const when = t => { const d = new Date(t * 1000), z = n => String(n).padStart(2, '0'); return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + z(d.getHours()) + ':' + z(d.getMinutes()); };
   const say = (s, col = 6) => { msg = { s, col, t: Date.now() }; };
+  let want = 0, retryT = 0;   // v3.2.4 /ping 說有新公告但清單還沒拿到 → 10 秒後再拿一次
   async function load() {
     if (busy || !G.Rank || !G.Rank.on()) return; busy = 1; loadT = Date.now();
-    let j; try { const r = await fetch(G.RANK_URL + '/ann'); j = await r.json(); } catch (e) { j = null; } busy = 0;
-    if (!j || !j.ok) return;
+    let j; try { const r = await fetch(G.RANK_URL + '/ann?a=' + want + '&t=' + Date.now(), { cache: 'no-store' }); j = await r.json(); } catch (e) { j = null; } busy = 0;
+    if (!j || !j.ok) { if (want > (known || 0)) retryT = Date.now() + 10000; return; }
     S.list = j.list || [];
     const mx = S.list.reduce((a, m) => Math.max(a, m.id), 0);
+    retryT = want > mx ? Date.now() + 10000 : 0;
     if (known != null) S.list.filter(m => m.id > known && m.live).reverse().forEach(m => cast.push(m));   // 第一次開遊戲：舊公告不播跑馬燈，只亮紅點
     if (known == null || mx > known) { known = mx; ls('annmax', known); }
   }
   // /ping 回報最新公告 id
-  S.seen = a => { if ((a && (known == null || a > known)) || (S.list == null && Date.now() - loadT > 60000)) load(); };
+  S.seen = a => { if (a > want) want = a; if ((a && (known == null || a > known)) || (S.list == null && Date.now() - loadT > 60000)) load(); };
   S.open = () => sel != null;
   S.unread = () => { if (!S.list) return 0; const r = readSet(), g = got(); return S.list.filter(m => !r.has(m.id) || (m.keys > 0 && !g.includes(m.id))).length; };
   S.reset = () => { sel = null; comp = null; askDel = 0; msg = null; if (!S.list || Date.now() - loadT > 20000) load(); };
@@ -37,6 +39,7 @@ G.Mail = (() => {
 
   // ---- 跑馬燈（所有畫面最上層；戰鬥中放在 HUD 下面，不能點）----
   S.drawCast = (c, dt) => {
+    if (retryT && Date.now() > retryT && !busy) { retryT = 0; load(); }
     if (!cur && cast.length && U().screen !== 'intro' && U().screen !== 'tap') { cur = { m: cast.shift(), t: 0 }; G.Audio.play('open'); }
     if (!cur) return;
     cur.t += Math.min(dt, 0.05);

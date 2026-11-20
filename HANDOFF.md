@@ -2,7 +2,7 @@
 
 > 新 session 只要讀這份。排行榜相關再看 `LEADERBOARD.md`。**做任何新設計前，先對照第 8 節「設計守則」**。
 > 各版完成內容在 `CHANGELOG.md`、暫定數值在 `VALUES.md`，需要時用 grep 找到段落再讀，不要整份讀。
-> 最後更新：2026-11-20，版本 **v3.2.3**
+> 最後更新：2026-11-20，版本 **v3.2.4**
 
 ## 1. 專案是什麼
 - Pai 的 HTML5 瀏覽器遊戲，仿 Gamevil《Plants War》（三路推塔＋英雄操作＋小兵兵線）
@@ -66,7 +66,7 @@
 | 14_save | **存檔碼（v1.7）**：`G.SaveCode`（`make/read/clean/apply/summary`）、`G.Dom`（疊在 canvas 上的 input/textarea，每幀 `place`，沒用到自動隱藏）、`G.SaveUI`（存檔畫面 home/name/code/load/confirm、`drawWelcome` 歡迎回來、`drawGreet` 開啟問候） |
 | 15_intro | **開場動畫（v1.7）**：`G.Intro`（`draw/skip/reset/drawFlash`），約 2.45 秒＋白光淡出 |
 | 16_rank | **線上排行榜（v3.2 玩家動態 `K.state`、管理玩家詳細 `det`／`_det`）（v2.8；v2.8.4 強制參加、跳至自己 `jmp`、`remove/forget/uid`、幽靈清除 `admPurge`）**：`G.RANK_URL`、`G.RANK_CATS`（9 分類）、`G.Rank`（poll/submit/join/leave/autoJoin、通知 diff/news、管理 admLoad/admAct、測試 `_mock/_set`）、`G.RankUI`（分類滾輪 `cw`、清單、底部名次列、管理玩家 `admin()`）。身分 `P.rk={id,tok}`、累積鑰匙 `P.keysTot` |
-| 17_update | **版本更新通知（v2.8.5）**：`G.Update`（check/tick/corner/card、`_set/_open/force` 測試用）、讀 `version.json` |
+| 17_update | **版本更新通知（v2.8.5）**：`G.Update`（check/tick/corner/card、`show(mode,from)`：'new' 有新版／'done' 已更新的內容卡，內容可捲動；`_set/_open/_show/_sc/force` 測試用）、讀 `version.json`，離線用 build 打包的 `G.RELEASE`；更新後通知條 `G.Ach.drawUpd` |
 | 18_feedback | **反饋信箱（v2.8.6）**：`G.FbUI`（玩家寫信／看回覆；開發者模式＝玩家信箱）；連線在 16_rank 的 `K.fb*` |
 | 19_about | **關於（v2.8.6）**：`G.About` 片尾名單＋櫻花、結尾淡出回首頁（`post` 在首頁最後畫淡入）|
 | 20_solo | **選關畫面（v3.0）**：`G.Solo`（open/draw/key/stars、`_go` 測試用），畫面 `stages`；v3.1 甩動換關 |
@@ -94,6 +94,7 @@
 - v2.8.7：首頁聚光改橢圓、存檔→帳號／玩家名稱、說明文字重點上色、一帳號同時一台（/claim、moved）
 - v2.9：全部 71 個角色的專屬叫聲（轉盤停下／點中間角色）
 - v3.0：單人五關（場景、難度、特殊規則、9 個新敵人、選關畫面、星等獎勵、8 個成就；成就共 68 個）
+- v3.2.4：拿掉上下景深模糊（`G.HD.dof=0`、`G.VOL=0`）、戰場放大／縮小鈕（`R.zoomBy`，平滑 `cam.zt`）、小兵點數 24、三路欄位固定三列＋同種合併數量、公告即時送達（/ann?a=、重試、戰鬥外 ping 30 秒）、更新通知條「查看更新內容」＋更新內容卡可捲動（build 打包 `G.RELEASE`）
 - v3.2.3：HD-2D 效能（半解析預先模糊、像素預算、掉幀自動降解析度 `G.HD.q`）
 - v3.2.2：WebGL HD-2D 鏡頭後製（透視傾斜＋景深＋柔光＋調色＋光束＋光塵，`08b_hd.js`）、光暈改平滑微透、復活藥水倒地 2 秒
 - v3.2.1：拿掉側面厚度，改成 HD-2D 微縮景深＋柔光（`G.VOL`，現在只當不支援 WebGL 時的退路）
@@ -119,6 +120,7 @@
 - （v2.8.7）一帳號同時一台：被別台登入的裝置會被登出，登出前顯示這台的存檔碼可複製；沒帶工作階段的舊版用戶端不擋。等 Pai 實機兩台測試
 - （v2.9）角色叫聲：Pai 聽過後可指定哪幾隻要改（`04b_cry.js` 的 `V` 表調音高／長度／基底）
 - （v3.1）出發過場長度、選關甩動手感、敵人暗色調與細紅邊、等級徽章配色（VALUES.md 6s）待 Pai 實機確認
+- （v3.2.4）新暫定數值見 VALUES 6x（縮放每步 ×1.35、點數 24、欄位三列、ping 30 秒、通知條 10 秒）；點數 24 會讓我方兵線變多、遊戲變簡單（敵方波次不跟著加），等 Pai 實際玩再決定要不要調敵方
 - （v3.2.3）HD-2D 強度 Pai 已認可；效能優化後請 Pai 再實機確認縮小視角是否還卡、會不會發燙（VALUES 6w）；仍不行再加「省電畫面」開關（`G.HD.on`／降 `BUDGET`）
 - （v3.2）公告與動態數值（VALUES.md 6t）待 Pai 實機確認；公告／動態的伺服器功能要等 Cloudflare 自動部署完才會生效
 - （v3.2.2）「死亡後 2 秒才復活」目前做成：有復活藥水時倒地 2 秒再原地站起來；若 Pai 指的是一般回聖樹重生，要再改 `G.TUNE.heroRespawn*`

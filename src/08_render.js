@@ -50,11 +50,16 @@ G.Render = (() => {
   };
   // 最小縮放：可以縮到整張地圖都在畫面內
   R.zoomMin = () => { const W = G.W; if (!W || !W.M) return 0.6; const fit = Math.min(R.sw / (W.M.ww * G.AX), R.sh / (W.M.wh * G.AY)) / R.base; return Math.min(0.6, fit * 0.98); };
-  R.setZoom = z => { R.cam.zoom = G.clamp(z, R.zoomMin(), 2.0); };
+  R.setZoom = z => { R.cam.zt = null; R.cam.zoom = G.clamp(z, R.zoomMin(), 2.0); };
+  // v3.2.4 放大／縮小按鈕：每按一下 ×1.35（平滑過去）；回傳 false＝已到極限
+  R.ZSTEP = 1.35;
+  R.zoomBy = dir => { const c = R.cam, lo = R.zoomMin(), base = c.zt != null ? c.zt : c.zoom, t = G.clamp(base * (dir > 0 ? R.ZSTEP : 1 / R.ZSTEP), lo, 2.0); if (Math.abs(t - base) < 0.001) return false; c.zt = t; return true; };
+  R.zoomAt = dir => { const c = R.cam, z = c.zt != null ? c.zt : c.zoom; return dir > 0 ? z < 2.0 - 0.001 : z > R.zoomMin() + 0.001; };
 
   // 鏡頭
   R.updateCam = function (W, dt) {
     const c = R.cam, h = W.hero;
+    if (c.zt != null) { c.zoom += (c.zt - c.zoom) * G.damp(12, dt); if (Math.abs(c.zt - c.zoom) < 0.002) { c.zoom = c.zt; c.zt = null; } }   // v3.2.4 按鈕縮放：平滑過去
     let tx = c.x, ty = c.y;
     if (W.attract) { const t = W.time * 0.05; tx = W.M.ww * (0.5 + Math.sin(t) * 0.28); ty = W.M.wh * (0.5 - Math.sin(t) * 0.22); }
     else if (c.follow) {

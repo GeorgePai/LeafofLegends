@@ -242,7 +242,7 @@ G.redOf = function (src, n) {
 // G.shadeOf：正面加「上亮下暗」的垂直漸層（頂部受光、腳邊環境光遮蔽），讓角色有圓柱般的體積
 // G.extrudeOf：把剪影往右上疊 k 層、壓暗，做出看得到的側面厚度（斜投影，類似 sprite stacking）
 G._shadeC = new WeakMap(); G._extC = {}; G._bevC = new WeakMap();
-G.VOL = 2;   // v3.2.1 立體感：0 關、1 光影浮雕（試作，未採用）、2 微縮景深（HD-2D 風格，採用）、3 兩者
+G.VOL = 0;   // v3.2.4 Pai 要求拿掉上下景深模糊（不支援 WebGL 時也不畫）；原本 2   // v3.2.1 立體感：0 關、1 光影浮雕（試作，未採用）、2 微縮景深（HD-2D 風格，採用）、3 兩者
 // 光影浮雕（自動法線打光的簡化版）：外框內側，朝左上的邊亮、朝右下的邊暗，像有圓潤的體積；黑色外框不動
 G.bevelOf = function (src) {
   let r = G._bevC.get(src); if (r) return r;
