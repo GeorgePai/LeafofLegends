@@ -105,6 +105,24 @@ G.Render = (() => {
     const s = u.spr[0], ax = u.x * G.AX - R.ox, ay = u.y * G.AY - u.z * G.AZ - R.oy, k = R.uScale(u);
     return [ax - s.w * k / 2, ay - s.h * k, s.w * k, s.h * k];
   };
+  // 施法前搖：腳下法陣由小變大、旋轉；大招多三層符文法陣＋光柱
+  R.chgFloor = function (b, u, gx, gy, shR, rt) {
+      const cp = Math.min(1, u.chg.T / u.chg.dur), E = G.ELEM[u.chg.el] || G.ELEM.arcane, R0 = (shR + (u.chg.big ? 12 : 7)) * (0.35 + 0.65 * Math.sqrt(cp));
+      G.pxEllipse(b, gx, gy + 1, R0, R0 * 0.42, E.c, 3, rt * 10); G.pxEllipse(b, gx, gy + 1, R0 * 0.62, R0 * 0.26, E.c2, 2, -rt * 14);
+      if (u.chg.big) { b.globalAlpha = 0.35 * cp; b.fillStyle = G.PAL[E.c]; b.fillRect(Math.round(gx - 3 - cp * 3), 0, Math.round(6 + cp * 6), Math.round(gy)); b.globalAlpha = 1; }   // 大招：光柱
+      if (u.chg.ult) {                                      // v3.8 大招儀式：三層符文法陣（外圈刻度、六芒星）＋更粗更亮的光柱
+        const RU = (shR + 30) * (0.3 + 0.7 * Math.sqrt(cp)), ry = 0.42;
+        G.glow(b, gx, gy, RU * 1.1, E.c, 0.35 * cp, 0.45);
+        G.pxEllipse(b, gx, gy + 1, RU, RU * ry, E.c2, 2, -rt * 6); G.pxEllipse(b, gx, gy + 1, RU + 3, RU * ry + 1.3, E.c);
+        for (let i = 0; i < 12; i++) { const a = rt * 1.8 + i * Math.PI / 6, px = gx + Math.cos(a) * (RU + 6), py = gy + 1 + Math.sin(a) * (RU + 6) * ry; b.fillStyle = G.PAL[i % 3 ? E.c : 9]; b.fillRect(Math.round(px) - 1, Math.round(py), 3, 1); b.fillRect(Math.round(px), Math.round(py) - 1, 1, 3); }
+        b.fillStyle = G.PAL[E.c2]; for (const off of [0, Math.PI]) { const pts = [0, 1, 2].map(j => { const a = -rt * 2.4 + off + j * 2.094; return [gx + Math.cos(a) * RU * 0.8, gy + 1 + Math.sin(a) * RU * 0.8 * ry]; }); for (let j = 0; j < 3; j++) G.pxLine(b, pts[j][0], pts[j][1], pts[(j + 1) % 3][0], pts[(j + 1) % 3][1], 1); }
+        b.globalAlpha = 0.3 + 0.35 * cp; b.fillStyle = G.PAL[E.c2]; b.fillRect(Math.round(gx - 5 - cp * 6), 0, Math.round(10 + cp * 12), Math.round(gy)); b.fillStyle = G.PAL[9]; b.fillRect(Math.round(gx - 1 - cp * 2), 0, Math.round(2 + cp * 4), Math.round(gy)); b.globalAlpha = 1;
+      }
+  };
+  R.chgBody = function (b, u, base, ax, ay, rt) {
+      const cp = Math.min(1, u.chg.T / u.chg.dur), E = G.ELEM[u.chg.el] || G.ELEM.arcane, gl = G.glowOf(base, E.c, 1, 2);
+      b.globalAlpha = 0.25 + 0.6 * cp * (0.75 + 0.25 * Math.sin(rt * 30)); b.drawImage(gl.c, ax - gl.p, ay - gl.p); b.globalAlpha = 1;
+  };
   R.uScale = u => u.kind === 'hero' ? G.TUNE.heroScale || 1 : 1;   // v3.8 英雄本體放大（以腳底為中心）
 
   const sprOf = (k) => { const s = G.SPR[k]; return Array.isArray(s) ? s[0] : s; };
@@ -244,19 +262,7 @@ G.Render = (() => {
         G.pxDisc(b, q(gx), q(gy), shR, Math.max(1.5, shR * 0.42), 0, u.static ? 0.7 : 0.55);
         if (!u.vis.fly) G.pxDisc(b, q(gx) + 1, q(gy), shR * 0.55, Math.max(1, shR * 0.22), 0, 0.4);   // v3.2 腳底接觸陰影（環境光遮蔽），角色像真的踩在地上
         if (u === h0) G.pxEllipse(b, gx, gy + 1, shR + 3, shR * 0.42 + 2, 9, 5, rt * 12);
-        if (u.chg) {                                            // 施法前搖：腳下法陣由小變大、旋轉
-          const cp = Math.min(1, u.chg.T / u.chg.dur), E = G.ELEM[u.chg.el] || G.ELEM.arcane, R0 = (shR + (u.chg.big ? 12 : 7)) * (0.35 + 0.65 * Math.sqrt(cp));
-          G.pxEllipse(b, gx, gy + 1, R0, R0 * 0.42, E.c, 3, rt * 10); G.pxEllipse(b, gx, gy + 1, R0 * 0.62, R0 * 0.26, E.c2, 2, -rt * 14);
-          if (u.chg.big) { b.globalAlpha = 0.35 * cp; b.fillStyle = G.PAL[E.c]; b.fillRect(Math.round(gx - 3 - cp * 3), 0, Math.round(6 + cp * 6), Math.round(gy)); b.globalAlpha = 1; }   // 大招：光柱
-          if (u.chg.ult) {                                      // v3.8 大招儀式：三層符文法陣（外圈刻度、六芒星）＋更粗更亮的光柱
-            const RU = (shR + 30) * (0.3 + 0.7 * Math.sqrt(cp)), ry = 0.42;
-            G.glow(b, gx, gy, RU * 1.1, E.c, 0.35 * cp, 0.45);
-            G.pxEllipse(b, gx, gy + 1, RU, RU * ry, E.c2, 2, -rt * 6); G.pxEllipse(b, gx, gy + 1, RU + 3, RU * ry + 1.3, E.c);
-            for (let i = 0; i < 12; i++) { const a = rt * 1.8 + i * Math.PI / 6, px = gx + Math.cos(a) * (RU + 6), py = gy + 1 + Math.sin(a) * (RU + 6) * ry; b.fillStyle = G.PAL[i % 3 ? E.c : 9]; b.fillRect(Math.round(px) - 1, Math.round(py), 3, 1); b.fillRect(Math.round(px), Math.round(py) - 1, 1, 3); }
-            b.fillStyle = G.PAL[E.c2]; for (const off of [0, Math.PI]) { const pts = [0, 1, 2].map(j => { const a = -rt * 2.4 + off + j * 2.094; return [gx + Math.cos(a) * RU * 0.8, gy + 1 + Math.sin(a) * RU * 0.8 * ry]; }); for (let j = 0; j < 3; j++) G.pxLine(b, pts[j][0], pts[j][1], pts[(j + 1) % 3][0], pts[(j + 1) % 3][1], 1); }
-            b.globalAlpha = 0.3 + 0.35 * cp; b.fillStyle = G.PAL[E.c2]; b.fillRect(Math.round(gx - 5 - cp * 6), 0, Math.round(10 + cp * 12), Math.round(gy)); b.fillStyle = G.PAL[9]; b.fillRect(Math.round(gx - 1 - cp * 2), 0, Math.round(2 + cp * 4), Math.round(gy)); b.globalAlpha = 1;
-          }
-        }
+        if (u.chg) R.chgFloor(b, u, gx, gy, shR, rt);        // 施法前搖：腳下法陣（v3.9 抽成共用，隊伍展示也用）
         const tgt = h0 && h0.target === u && h0.alive;
         const lockedU = h0 && h0.alive && h0.cmd && h0.cmd.lock && h0.cmd.t === u;
         if (tgt && !lockedU) { G.pxEllipse(b, gx, gy + 1, shR + 3, shR * 0.42 + 2, 9); G.pxEllipse(b, gx, gy + 1, shR + 2, shR * 0.42 + 1.5, 0); }
@@ -309,10 +315,7 @@ G.Render = (() => {
         G.VFX.auraBack(b, u, ax, ay, base, gx, gy, rt, W);
         if (u.ultEnd > W.time) G.VFX.ultAura(b, u, ax, ay, base, s, rt, W);   // v3.8 增益大招：火焰光環
         { const gk = G.glowOf(base, 0, 1, 0), gw = G.glowOf(base, 9, 1, 0); b.globalAlpha = 0.55; b.drawImage(gk.tint, ax + 1, ay + 1); b.globalAlpha = (u.side === 1 ? 0.35 : 0.22) * G.RIM; b.drawImage(gw.tint, ax - 1, ay - 1); b.globalAlpha = 1; }   // 右下暗邊、左上亮邊
-        if (u.chg) {                                            // 施法前搖：身體發光（越來越亮）
-          const cp = Math.min(1, u.chg.T / u.chg.dur), E = G.ELEM[u.chg.el] || G.ELEM.arcane, gl = G.glowOf(base, E.c, 1, 2);
-          b.globalAlpha = 0.25 + 0.6 * cp * (0.75 + 0.25 * Math.sin(rt * 30)); b.drawImage(gl.c, ax - gl.p, ay - gl.p); b.globalAlpha = 1;
-        }
+        if (u.chg) R.chgBody(b, u, base, ax, ay, rt);        // 施法前搖：身體發光（越來越亮）
         if (u.clone) b.globalAlpha = 0.68 + Math.sin(rt * 9 + u.id) * 0.1;      // 複製體：半透明、微微閃爍
         const vimg = u.flash > 0 || !(G.VOL & 1) ? img : G.bevelOf(img);   // v3.2.1 光影浮雕
         if (psx !== 1 || psy !== 1 || psk !== 0) {              // 以腳底為支點做擠壓／傾斜

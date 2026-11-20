@@ -291,7 +291,7 @@ G.UI = (() => {
     for (const u of W.units) {
       if (!u.alive || u === hero || !W.seen(0, u)) continue;
       const px = X0 + u.x * sx, py = Y0 + u.y * sy, ally = u.side === 0;
-      if (u.kind === 'holy') { sq(px, py, d * 2.2, ally ? 12 : 10, 0); sq(px, py, d * 0.9, 9); }
+      if (u.kind === 'holy') { const dia = (r, col) => { c.fillStyle = P[col]; c.beginPath(); c.moveTo(Math.round(px), Math.round(py - r)); c.lineTo(Math.round(px + r), Math.round(py)); c.lineTo(Math.round(px), Math.round(py + r)); c.lineTo(Math.round(px - r), Math.round(py)); c.closePath(); c.fill(); }; dia(d * 3.1 + S, 0); dia(d * 3.1, 13); dia(d * 2.1, ally ? 12 : 10); dia(d * 0.8, 9); }   // v3.9 聖域：金邊菱形（和方形的塔分開，不會看成第五座塔）
       else if (u.static) sq(px, py, d * 1.5, ally ? 12 : 10, 0);
       else if (u.side === 2) sq(px, py, d * (u.kind === 'boss' ? 1.3 : 0.8), 13, 0);
       else if (u.kind === 'jungler') sq(px, py, d * 1.2, 14, 0);
@@ -315,10 +315,10 @@ G.UI = (() => {
     dim(c, 0.75);
     U.btns = []; btn('bigBg', 0, 0, uw, uh, () => { U.bigMap = false; G.Audio.play('click'); });   // 點地圖外 → 關閉
     // 圖例先排版（放不下就換行），再決定地圖大小
-    const LEG = [[12, '我方'], [10, '敵方'], [13, '野怪'], [14, '獵人']];
+    const LEG = [[12, '我方'], [10, '敵方'], [13, '野怪'], [14, '獵人'], [-1, '聖所']];   // v3.9 聖所＝金邊菱形
     const legLayout = (w) => { const out = []; let lx = 0, ly = 0; for (const [col, s2] of LEG) { const iw = 8 + G.cnW(s2); if (lx && lx + iw > w) { lx = 0; ly += 13; } out.push([lx, ly, col, s2]); lx += iw + 8; } return { out, h: ly + 13 }; };
     let w = uw - I.l - I.r - 16, h = Math.round(w / ar), lg = legLayout(w); const hMax = () => uh - I.t - I.b - 30 - lg.h - 8;
-    if (h > hMax()) { h = hMax(); w = Math.round(h * ar); lg = legLayout(w); if (h > hMax()) { h = hMax(); w = Math.round(h * ar); } }
+    for (let k = 0; k < 4 && h > hMax(); k++) { h = hMax(); w = Math.round(h * ar); lg = legLayout(w); }   // v3.9 地圖縮窄後圖例重新換行（之前第二次縮窄沒重排，橫屏「獵人」超出框）
     const tot = 20 + h + 4 + lg.h + 4, x = Math.round(uw / 2 - w / 2), y = Math.round(I.t + (uh - I.t - I.b) / 2 - tot / 2) + 20;
     box(c, x - 4, y - 20, w + 8, tot, 1, 7);
     G.cn(c, '地圖', x, y - 17, 9);
@@ -327,7 +327,7 @@ G.UI = (() => {
     mapDraw(c, x, y, w, h, 1, true);
     R.hiQ(ctx => mapDraw(ctx, x, y, w, h, R.uiS, true));
     btn('bigIn', x, y, w, h, (ux, uy) => { R.cam.follow = false; R.cam.x = (ux - x) / w * W.M.ww; R.cam.y = (uy - y) / h * W.M.wh; U.bigMap = false; G.Audio.play('tick'); });
-    for (const [lx, ly, col, s2] of lg.out) { const xx = x + lx, yy = y + h + 4 + ly; c.fillStyle = P[0]; c.fillRect(xx, yy + 3, 6, 6); c.fillStyle = P[col]; c.fillRect(xx + 1, yy + 4, 4, 4); G.cn(c, s2, xx + 8, yy, 7); }
+    for (const [lx, ly, col, s2] of lg.out) { const xx = x + lx, yy = y + h + 4 + ly; if (col < 0) { for (const [r, k] of [[4, 0], [3, 13], [1, 9]]) { c.fillStyle = P[k]; for (let dy = -r; dy <= r; dy++) c.fillRect(xx + 3 - (r - Math.abs(dy)), yy + 6 + dy, (r - Math.abs(dy)) * 2 + 1, 1); } } else { c.fillStyle = P[0]; c.fillRect(xx, yy + 3, 6, 6); c.fillStyle = P[col]; c.fillRect(xx + 1, yy + 4, 4, 4); } G.cn(c, s2, xx + 8, yy, 7); }
   }
 
   // ---------- 廣播 ----------

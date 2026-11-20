@@ -224,6 +224,7 @@ G.groundStrip = (w, h) => {
 G.Sandbox = class {
   constructor() { this.parts = new G.Particles(1800); this.trauma = 0; this.effects = []; this.decals = []; this.projs = []; this.units = []; this.flashScreen = 0; this.frame = 0; this.t = 0; this.w = 0; this.hitstop = 0; this.soundT = 0; }
   size(w, h) { if (w === this.w && h === this.h) return; this.w = w; this.h = h; this.c = G.canvas(w, h); this.x = this.c.getContext('2d'); if (this.name) this.setup(this.name, this.side, this.sid); }
+  get time() { return this.t; }                     // v3.9 戰鬥程式用 W.time（增益大招光環倒數）
   sfx(name) { if (this.soundT > 0 && !this.mute) G.Audio.play(name); }
   shake(v) { this.trauma = Math.min(1, (this.trauma || 0) + v); }
   kill(t) { t.hp = t.st.hp; t.alive = true; }      // 展示用：誰都不會死
@@ -236,7 +237,7 @@ G.Sandbox = class {
     this.name = name; this.side = side; this.sid = sid == null ? null : sid;
     const kind = G.kindOf(name), hd = G.HEROES.find(h => h.name === name);
     const W = this.w / G.AX, H = this.h / G.AY; this.W = W; this.H = H;
-    this.effects = []; this.decals = []; this.projs = []; this.parts.c = 0; this.trauma = 0; this.hitstop = 0; this.flashScreen = 0;
+    this.effects = []; this.decals = []; this.projs = []; this.parts.c = 0; this.trauma = 0; this.hitstop = 0; this.flashScreen = 0; this.ultBan = null; this.ultDim = 0;
     this.cap = null; this.bars = null; this.rows = null; this.rings = null; this.t = 0; this.n = 0; this.soundT = 0.3;
     this.hd = hd; this.kind = kind;
     this.A = this.mk(name, side, W * 0.3, H * 0.72, kind === 'boss' ? 'boss' : kind, hd ? hd.passives : null);
@@ -249,9 +250,12 @@ G.Sandbox = class {
   }
   // 小工具
   dummy(x, y, name, side) { const D = this.mk(name || this.dname, side == null ? 1 - this.side : side, x, y); this.units.push(D); return D; }
-  atk(u, t) { if (u.atkT <= 0 && u.windup <= 0) { u.face = t.x >= u.x ? 1 : -1; u.windup = u.st.range <= 40 ? 0.13 : 0.09; u.wTarget = t; u.atkT = 9; if (u.onAtk) u.onAtk(); return true; } return false; }
+  atk(u, t) { if (u.chg) return false; if (u.atkT <= 0 && u.windup <= 0) { u.face = t.x >= u.x ? 1 : -1; u.windup = u.st.range <= 40 ? 0.13 : 0.09; u.wTarget = t; u.atkT = 9; if (u.onAtk) u.onAtk(); return true; } return false; }
   gap(A, D) { return G.clamp(A.st.range + A.r * 0.4 + D.r - 2, 34, this.W * 0.62); }
   pop(u, s, col) { G.FX.popText(this, u.x + G.rr(-4, 4), u.y, (u.vis.fly || 0) + 30, s, col); }
+  // v3.9 施放：大招（英雄最後一招、Lv1≥5）走跟戰鬥一樣的大招儀式（蓄力法陣→變暗→白閃→大招特效）
+  isUlt(sd) { const hd = this.hd; return !!(hd && sd && hd.skills[hd.skills.length - 1] === sd.id && sd.lv1 >= 5); }
+  cast(A, sd, tgt) { if (A.chg) return; if (this.isUlt(sd)) this.beginCharge(A, sd, tgt, 1, G.TUNE.chgUlt); else this.useSkill(A, sd, tgt, 1); }
   firstActive() { const hd = this.hd; return hd ? G.ORIG.skills[hd.skills[0]] : null; }
   // ----- 普通攻擊 -----
   scBasic() {
@@ -302,7 +306,7 @@ G.Sandbox = class {
     }
     A.home = [A.x, A.y];
     const P = w.type === '2d_drop' ? 3.4 : 2.8; let next = 0.45;
-    return () => { if (this.t >= next) { next += P; this.soundT = 1; this.useSkill(A, sd, tgt, 1); } };
+    return () => { if (this.t >= next) { next += P; this.soundT = 1; this.cast(A, sd, tgt); } };
   }
   // ----- v2.6 死靈技能：每一輪重擺場景再施放一次 -----
   scNecro(sd) {
@@ -314,7 +318,7 @@ G.Sandbox = class {
       let next = 0.9, T0 = 0, mins = [];
       return () => {
         if (this.t >= T0) { T0 += 4.2; next = T0 - 3.3; reset(); mins = ring(4, 0.62, 0, ['leafblower', 'potatoblower', 'stemskewer', 'leafblower']); this.cap = ['身邊的我方小兵', 9]; }
-        if (this.t >= next) { next = 1e9; this.soundT = 1; this.useSkill(A, sd, null, 1); this.cap = ['換成隨機小兵', 17]; }
+        if (this.t >= next) { next = 1e9; this.soundT = 1; this.cast(A, sd, null); this.cap = ['換成隨機小兵', 17]; }
       };
     }
     if (at === 'ctrl') {                                    // 身邊的敵人 → 變成召喚物，回頭打其他敵人
@@ -323,7 +327,7 @@ G.Sandbox = class {
       let T0 = 0, next = 0, foes = [];
       return () => {
         if (this.t >= T0) { T0 += 6; next = T0 - 5.2; reset(); A.hp = A.st.hp; foes = ring(4, 0.6, 1, ['bear', 'bear', 'eagle', 'bear']); this.cap = ['身邊的敵人', 10]; }
-        if (this.t >= next) { next = 1e9; this.soundT = 1; this.useSkill(A, sd, null, 1); this.cap = ['敵人變成召喚物', 10]; }
+        if (this.t >= next) { next = 1e9; this.soundT = 1; this.cast(A, sd, null); this.cap = ['敵人變成召喚物', 10]; }
         for (const f of foes) if (f.charm) { f.face = 1; this.atk(f, far); }
       };
     }
@@ -334,7 +338,7 @@ G.Sandbox = class {
       let T0 = 0, next = 0;
       return () => {
         if (this.t >= T0) { T0 += 5.5; next = T0 - 4.6; reset(); this.cap = ['你的召喚物', 17]; }
-        if (this.t >= next) { next = 1e9; this.soundT = 1; this.useSkill(A, sd, null, 1); this.cap = ['各複製一隻', 18]; }
+        if (this.t >= next) { next = 1e9; this.soundT = 1; this.cast(A, sd, null); this.cap = ['各複製一隻', 18]; }
         for (const u of this.units) if (u.summoner === A) { u.face = 1; if (Math.abs(u.x - D.x) < u.st.range + 30 || u.st.range >= 100) this.atk(u, D); }
       };
     }
@@ -362,14 +366,14 @@ G.Sandbox = class {
       return () => {
         const T = this.t % 7; if (T < 0.05) { cast = false; A.bRed = 0; A.buffT = {}; A.hp = A.st.hp; }
         this.atk(D, A);
-        if (!cast && T > 2.2) { cast = true; this.soundT = 1; this.useSkill(A, sd, null, 1); }
+        if (!cast && T > 2.2) { cast = true; this.soundT = 1; this.cast(A, sd, null); }
         this.cap = cast ? ['護盾中：受到傷害 −' + v.v1 + '%', 12] : ['沒開護盾', 6];
       };
     }
     if (sd.attribute === 'weapon') {                        // 放電：身邊敵人自動被電
       A.x = W * 0.5; [[-40, -10], [42, -6], [-14, 18], [24, 20]].forEach(([dx, dy]) => this.dummy(A.x + dx, gy + dy, 'bear'));
       let next = 0.5;
-      return () => { if (this.t >= next) { next += v.v2 + 1.5; this.soundT = 1; this.useSkill(A, sd, null, 1); } this.cap = A.zap ? ['放電中：自動電擊身邊敵人', 12] : null; };
+      return () => { if (this.t >= next) { next += v.v2 + 1.5; this.soundT = 1; this.cast(A, sd, null); } this.cap = A.zap ? ['放電中：自動電擊身邊敵人', 12] : null; };
     }
     // 狂戰士：同一個敵人，開技能前後的傷害對比
     const D = this.dummy(0, gy), dist = this.gap(A, D); A.x = W / 2 - dist / 2 - 6; D.x = W / 2 + dist / 2 - 6;
@@ -377,7 +381,7 @@ G.Sandbox = class {
     return () => {
       const T = this.t % 7.5; if (T < 0.05) { cast = false; A.bPow = 1; A.bArm = 1; A.bDel = 1; A.buffT = {}; }
       this.atk(A, D);
-      if (!cast && T > 2.2) { cast = true; this.soundT = 1; this.useSkill(A, sd, null, 1); }
+      if (!cast && T > 2.2) { cast = true; this.soundT = 1; this.cast(A, sd, null); }
       this.cap = cast ? [sd.attribute === 'berserker2' ? '狂暴：攻擊 ×2、攻速 +50%' : '狂暴：攻擊 ×2', 10] : ['一般攻擊', 6];
     };
   }
@@ -452,29 +456,36 @@ G.Sandbox = class {
     for (const u of this.units) {
       u.anim += dt; u.lunge = Math.max(0, u.lunge - dt * 7); u.flash -= dt; u.cast = Math.max(0, u.cast - dt); u.knock = Math.max(0, (u.knock || 0) - dt * 20); u.slow -= dt; u.stun = Math.max(0, (u.stun || 0) - dt); u.atkT -= dt;
       this.tickStatus(u, dt);
+      if (u.chg) this.tickCharge(u, dt);
       if (u.windup > 0) { u.windup -= dt; if (u.windup <= 0) this.fire(u, u.wTarget); }
     }
     for (const p of this.projs) this.updateProj(p, dt);
     this.projs = this.projs.filter(p => !p.done);
     if (this.run) this.run(dt);
+    if (this.ultBan) this.ultBan.t += dt;
   }
   drawUnit(b, u) {
     const s = u.spr[u.vis.fly ? ((u.anim * 1.4) | 0) % u.spr.length : u.walk ? ((u.anim * 2) | 0) % u.spr.length : 0];
     const gx = u.x * G.AX, gy = u.y * G.AY, shR = u.vis.shadow * G.AX * (u.vis.fly ? 0.7 : 1);
     G.pxDisc(b, gx, gy, shR, Math.max(1.5, shR * 0.42), 0, 0.55);
+    if (u.chg) G.Render.chgFloor(b, u, gx, gy, shR, this.t);
     let dx = 0, dy = 0;
     if (u.windup > 0) dx = -u.face;
     if (u.lunge > 0) dx = Math.round(Math.sin(u.lunge * Math.PI) * 3) * u.face;
     if (u.knock > 0) dx += Math.round(u.knock * 2) * -u.face;
     if (!u.static && Math.sin(u.anim * 3) > 0.7) dy = -1;
     if (u.cast > 0.12) dy -= 2;
+    if (u.chg) dx += Math.round(Math.sin(u.chg.T * 70) * Math.min(1, u.chg.T / u.chg.dur) * 1.4);
     const z = u.z + (u.vis.fly ? Math.sin(u.anim * 2.5) * 3 : 0);
     const img = u.flash > 0 ? (u.face < 0 ? s.fm : s.f) : G.lookOf(u, u.face < 0 ? s.m : s.n);
     const ax = Math.round(gx - s.w / 2 + dx), ay = Math.round(gy - z * G.AZ - s.h + 1 + dy);
     if (!u.ghost) G.VFX.auraBack(b, u, ax, ay, u.face < 0 ? s.m : s.n, gx, gy, this.t, this);
+    if (u.ultEnd > this.t) G.VFX.ultAura(b, u, ax, ay, u.face < 0 ? s.m : s.n, s, this.t, this);
+    if (u.chg) G.Render.chgBody(b, u, u.face < 0 ? s.m : s.n, ax, ay, this.t);
     if (u.ghost) b.globalAlpha = 0.55;
     if (u.charm || u.clone) { const gl = G.glowOf(G.lookOf(u, u.face < 0 ? s.m : s.n), u.clone ? 25 : 17, 1, 2); b.globalAlpha = 0.7; b.drawImage(gl.c, ax - gl.p, ay - gl.p); b.globalAlpha = u.clone ? 0.7 : 1; }
     b.drawImage(img, ax, ay);
+    if (u.chg && u.chg.T > u.chg.dur - 0.06) { b.globalAlpha = 0.8; b.drawImage(G.glowOf(u.face < 0 ? s.m : s.n, 9, 1, 0).tint, ax, ay); b.globalAlpha = 1; }
     if (!u.ghost) G.VFX.auraFront(b, u, ax, ay, s, gx, gy, this.t, this);
     b.globalAlpha = 1;
     if (u === this.A && this.bars) {
@@ -507,7 +518,25 @@ G.Sandbox = class {
     for (const e of this.effects) if (e.layer === 1 && e.draw) e.draw(b, o);
     for (const e of this.effects) if (e.layer === 2 && e.draw) e.draw(b, o);
     b.restore();
+    const A = this.A;                                     // v3.9 大招蓄力：周圍變暗、聚光在英雄身上
+    if (this.ultDim > 0.01) {
+      if (!(A.chg && A.chg.ult)) this.ultDim = Math.max(0, this.ultDim - 0.035);
+      const hx = A.x * G.AX, hy = A.y * G.AY - 12, gr = b.createRadialGradient(hx, hy, Math.min(this.w, this.h) * 0.16, hx, hy, Math.max(this.w, this.h) * 0.75);
+      gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,' + (0.62 * this.ultDim).toFixed(3) + ')'); b.fillStyle = gr; b.fillRect(0, 0, this.w, this.h);
+    }
     if (this.flashScreen > 0) { b.fillStyle = `rgba(255,255,255,${Math.min(0.35, this.flashScreen * 2.5)})`; b.fillRect(0, 0, this.w, this.h); }
+    const B = this.ultBan;                                 // v3.9 大招橫幅（和戰鬥中同款：滑入→停→滑出）
+    if (B && B.n) {
+      const T = B.t, D = 1.5;
+      if (T > D) this.ultBan = null;
+      else {
+        const E = G.ELEM[B.el] || G.ELEM.arcane, w = this.w, h = 13, y = Math.round(this.h * 0.2), inK = Math.min(1, T / 0.16), outK = Math.max(0, (T - (D - 0.25)) / 0.25), off = Math.round((1 - inK) * -w + outK * w);
+        const s = G.cnW('大招・' + B.n) <= w - 12 ? '大招・' + B.n : B.n;
+        b.globalAlpha = 0.78; b.fillStyle = G.PAL[0]; b.fillRect(off, y, w, h); b.globalAlpha = 1;
+        b.fillStyle = G.PAL[E.c]; b.fillRect(off, y, w, 1); b.fillRect(off, y + h - 1, w, 1);
+        G.cn(b, s, Math.round(w / 2) + off, y + 3, E.c, 0.5, 0);
+      }
+    }
     if (this.cap) G.cn(b, this.cap[0], Math.round(this.w / 2), 2, this.cap[1], 0.5, 0);
     return this.c;
   }
