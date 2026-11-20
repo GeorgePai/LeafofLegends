@@ -2,7 +2,7 @@
 
 > 新 session 只要讀這份。排行榜相關再看 `LEADERBOARD.md`。**做任何新設計前，先對照第 8 節「設計守則」**。
 > 各版完成內容在 `CHANGELOG.md`、暫定數值在 `VALUES.md`，需要時用 grep 找到段落再讀，不要整份讀。
-> 最後更新：2026-11-20，版本 **v2.8.6**
+> 最後更新：2026-11-20，版本 **v3.0**
 
 ## 1. 專案是什麼
 - Pai 的 HTML5 瀏覽器遊戲，仿 Gamevil《Plants War》（三路推塔＋英雄操作＋小兵兵線）
@@ -86,10 +86,10 @@
 - v2.8.3：排行畫面 10 秒刷新＋倒數、數據有變自動上傳、前三名獎盃＋光暈、首頁左上「嗨！名字」
 - v2.8.4：排行強制參加＋跳至自己、金銀銅外框固定、帳號管理（改名／登出／刪除）、存檔碼提醒、管理玩家幽靈帳號清除、教學拿掉英雄分類、圖鑑藥水併入分類條＋分頁式分類條＋資訊小按鈕
 - v2.8.6：反饋信箱（玩家↔開發者）、關於（片尾名單＋櫻花）、即時在線人數、商店橫屏不切、柔和選中光、App 圖示
-- v2.8.7：首頁聚光改橢圓、存檔→帳號／玩家名稱、說明文字重點上色、一帳號同時一台（/claim、moved）
-- v3.0：單人五關（場景、難度、特殊規則、9 個新敵人、選關畫面、星等獎勵、8 個成就）
-- v2.9：全部 71 個角色的專屬叫聲（轉盤停下／點中間角色）
 - v2.8.5：版本更新通知（version.json＋首頁右下「點擊更新」＋更新內容卡＋立即更新重新載入）
+- v2.8.7：首頁聚光改橢圓、存檔→帳號／玩家名稱、說明文字重點上色、一帳號同時一台（/claim、moved）
+- v2.9：全部 71 個角色的專屬叫聲（轉盤停下／點中間角色）
+- v3.0：單人五關（場景、難度、特殊規則、9 個新敵人、選關畫面、星等獎勵、8 個成就；成就共 68 個）
 - v2.4：敵塔範圍＋鎖定警示、道路 ×1.5、結算放慢＋鎖值＋音效、新藥水 5 種＋全部藥水特效、DEV 密碼、技能範圍顯示＋指定施放（拖曳／取消）、LOGO 改版、塔射程 190/210
 
 ## 6. 待 Pai 決定
@@ -107,19 +107,21 @@
 - （v2.8.6）排行榜伺服器 11/20 凌晨顯示 0 人（11/19 晚上還有 3 人）；這版只新增資料表沒動玩家資料，請 Pai 確認是不是自己清掉測試帳號
 - （v2.8.6）App 圖示（Leafy＋光芒＋草丘，`assets/icon-*.png`、`tools/icon_make.js`）與主畫面名稱「Leaf Legends」：Pai 可再要求改
 - （v3.0）單人關卡數值全部暫定（VALUES.md 6r）；只用「英雄不動」模擬過，需要 Pai 實際打打看調整難度。另外聖樹、塔、野區營地沒有跟著主題換造型
+- （v2.8.7）一帳號同時一台：被別台登入的裝置會被登出，登出前顯示這台的存檔碼可複製；沒帶工作階段的舊版用戶端不擋。等 Pai 實機兩台測試
+- （v2.9）角色叫聲：Pai 聽過後可指定哪幾隻要改（`04b_cry.js` 的 `V` 表調音高／長度／基底）
 - DEV 密碼只有 Pai 知道（程式內只有雜湊）；要改密碼請 Pai 提供新密碼，重算 `DEV_H`
 
 ## 7. 工作規則
 **每次更新流程**：改 src → build → `bash /home/claude/tools/tc_all.sh`（背景跑，0 筆才可交付）→ 只截有改到的畫面，用 `sheet.py` 拼成一張看 → 發佈 artifact（先 `get_artifact` 取 version，再 `publish_files`，index.html＝dist/index.html）→ 推 GitHub main（遊戲）＋ source（原始碼）→ 備份 Mac（`LeafofLegends.html`、`versions/LeafofLegends_v版本.zip`、有改到的 `source/` 檔案）→ 升版號
-- 版本號在 `src/11_menus.js` 第 2 行 `G.VERSION = 'V2.8.6'`
+- 版本號在 `src/11_menus.js` 第 2 行 `G.VERSION = 'V3.0'`
 - **更新內容（玩家看得到）**：每次發佈前在 `release.json` 的 list 最前面加一筆 `{v, d, n:[…]}`（短句、玩家口吻、不寫技術細節），版本號要和 G.VERSION 一樣
 - 推 main：clone 到 `/home/claude/leafoflegends` → `python3 /home/claude/leafwar/tools/release.py`（複製 index.html＋產生 version.json；保留 `.nojekyll`；音樂有改才更新 `audio/`）→ commit → `git -c push.negotiate=true push origin HEAD:main`，約 1～2 分鐘生效。備援：Pai 在 Mac Terminal 執行 `bash ~/Desktop/Claude/LeafofLegends/deploy_github.sh`
 - 推 source：在 `/home/claude/leafwar` commit（dist/ 已在 .gitignore）→ `git -c push.negotiate=true push origin HEAD:source`
 - **排行榜伺服器**（Pai 要求全自動，不要叫他跑指令）：改 `leaderboard/worker.js` → 本機先測（`cd leaderboard && npm i wrangler@4`，用 `wrangler dev --local` 加假的 database_id 設定檔，curl 測 /board /submit /admin）→ 推 source 即自動部署。新欄位加在 worker.js 的 `SCHEMA`／`UPGRADES`。雲端 shell 連不到 Cloudflare 和 workers.dev：要確認部署就用桌面 App 內建瀏覽器（`mcp__remote-devices__Claude_Browser__*`，已登入 Cloudflare）開 lol-rank → Deployments，或開 /board。**不要用錯的密碼測管理 API**（猜錯 5 次會把 Pai 家的 IP 鎖 1 小時）
 - 長時間指令（文字檢查等）一律用 Bash 的 `run_in_background`，不要用 nohup／`&` 丟著（回合結束會被砍掉），也不要用長 sleep 輪詢；文字檢查（4 支 Chrome 平行）跑的時候不要同時截圖，會逾時
-- 測試：Playwright＋`/usr/bin/google-chrome`；裝置 n（360 寬手機）、m（390 手機）、L（手機橫屏）、d（1280×720）、w/u/t（大視窗／超寬／偏方）。可直接 `G.UI.screen='team'/'book'/'guide'`、`G.UI.start()` 進各畫面；`localStorage.clear()` 模擬新玩家；新增畫面時把場景加進 `tc_scenes.py`
-- 快速驗證：`python3 /home/claude/tools/probe.py "JS"`（在遊戲裡執行並印出結果，比截圖省很多）
-- 測試輔助：`G.Menus.devAsk(true)`、`G.UI.aim={...}`、`G.Menus._guideGo(分類, 頁)`、`G.Menus.menuWheel.go(i)`、`G.Menus._mt(秒)`、`G.Intro.t=秒數`、`G.Dom.el('name'|'code'|'load')`、`G.SaveUI.forceIos=true`
+- 測試：Playwright＋`/usr/bin/google-chrome`；裝置 n（360 寬手機）、m（390 手機）、L（手機橫屏）、d（1280×720）、w/u/t（大視窗／超寬／偏方）。可直接 `G.UI.screen='team'/'book'/'guide'`、`G.UI.start()` 進各畫面；`localStorage.clear()` 模擬新玩家；新增畫面時把場景加進 `tools/tc_scenes.py`（加在最後一行 `json.dump` **之前**，再複製到 /home/claude/tools/），只想重測新場景可把那幾個場景存成小 json 直接跑 `textcheck.py 小.json 裝置`
+- 快速驗證：`python3 /home/claude/tools/probe.py "JS"`（在遊戲裡執行並印出結果，比截圖省很多）。數值平衡可在 probe 裡 `G.UI.start(i)` 後跑 `G.W.update(1/60)` 迴圈模擬幾分鐘（英雄不動）
+- 測試輔助：`G.Team.setDev(true)`（開發者模式，五關全解鎖）、`G.Solo.open()`／`G.Solo._go(卡片序)`、`G.UI.start(關卡 0～5)`、`G.W.hzT=0`（立刻觸發關卡規則）、`G.SaveUI.go('kick')`、`G.Rank.moved=true`、`G.Menus.devAsk(true)`、`G.UI.aim={...}`、`G.Menus._guideGo(分類, 頁)`、`G.Menus.menuWheel.go(i)`、`G.Menus._mt(秒)`、`G.Intro.t=秒數`、`G.Dom.el('name'|'code'|'load')`、`G.SaveUI.forceIos=true`
 - 技能特效總覽：`python3 /home/claude/tools/vfxsheet.py "技能id,...|b=普攻" "時間點,..." out.png [角色名]`
 - 角色介紹與技能說明在 `02b_text.js` 的 `G.TXT.uinfo / sinfo`（JSON，用 Python 讀寫最安全）
 - 修改大檔用精準字串替換；**不要**用空字串當替換目標（曾把檔案炸成 18 萬行）
