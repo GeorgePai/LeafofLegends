@@ -201,6 +201,7 @@ G.SaveUI = (() => {
   S.draw = c => {
     const M = ui(); M.tick(); M.bg(c);
     const y0 = M.header(c, '帳號'), I = R.ins, L = I.l, Rr = R.uw - I.r, B = R.uh - I.b, LD = M.land(), dt = G.Menus.dt || 1 / 60;
+    if (S.gift) { drawGift(c); return; }                                                     // v3.3 建帳號送鑰匙動畫（不畫輸入框，HTML 框自動隱藏）
     copied = Math.max(0, copied - dt); if (msg) msg.t += dt;
     const W = Math.min(Rr - L, LD ? 420 : 300), x = Math.round((L + Rr) / 2 - W / 2), v = G.Team.get();
     let y = y0;
@@ -232,7 +233,7 @@ G.SaveUI = (() => {
       btnRow(c, x, y, W, ['svBack', '返回', () => { step = 'home'; msg = null; }], ['svNext', busy ? '產生中' : '下一步', () => {
         const nm = (e.value || '').trim().slice(0, 8);
         if (!nm) { say('請輸入名字'); G.UI.h.deny('svNext'); return; }
-        v.name = nm; G.Team.save(); e.blur(); if (!busy) makeCode();
+        v.name = nm; G.Team.save(); e.blur(); if (!busy) { grant(); makeCode(); }
       }]);
       y += 24;
     } else if (step === 'code') {
@@ -305,7 +306,7 @@ G.SaveUI = (() => {
   // ---------- 偶爾提醒備份：成就達成或拿到新角色累積 3 次、且距離上次提醒超過 20 分鐘 → 首頁下方出現一張小卡 ----------
   S.bump = () => { if (G.Team.dev) return; const v = G.Team.get(); v.bk = v.bk || { n: 0, t: 0 }; v.bk.n++; G.Team.save(); };
   S.drawBackupTip = (c, menuT) => {
-    const v = G.Team.get(), bk = v.bk; if (!bk || G.Team.dev || bk.n < 3 || Date.now() - bk.t < 20 * 60 * 1000 || menuT < 2.5 || S.welcome || S.greet) return;
+    const v = G.Team.get(), bk = v.bk; if (!bk || G.Team.dev || S.needAcct() || bk.n < 3 || Date.now() - bk.t < 20 * 60 * 1000 || menuT < 2.5 || S.welcome || S.greet) return;
     if (G.Menus.pillPos && G.Update && G.Update.has()) return;   // v2.8.6 橫屏有新版本時，右下角讓給「點擊更新」（更新完再提醒備份）
     const M = ui();
     if (G.Menus.pillPos) {                              // 橫屏：小膠囊「要備份嗎？」＋關閉
@@ -369,6 +370,94 @@ G.SaveUI = (() => {
     c.drawImage(G.SPR.leaf_pt.n, x + 6, by + 6);
     ls.forEach((l, i) => G.cn(c, l, x + 16, by + 3 + i * 13, 9));
     c.globalAlpha = 1;
+  };
+
+  // ---------- v3.3 建立帳號送 8 把鑰匙 ----------
+  // 規則：新玩家開局 0 把；第一次建立帳號（取名＋產生存檔碼）送 8 把，播領取動畫。旗標 p.gift 跟著存檔碼走；已有名字的舊帳號視為領過
+  const GIFT = 8, now = () => performance.now() / 1000;
+  let darkKey = null; const dKey = () => darkKey || (darkKey = G.sprite(G.ART_SMALL.i_key.map(r => r.replace(/[1-9a-h]/g, '0'))));
+  S.needAcct = () => !G.Team.dev && !G.Ach.P().gift;
+  S.makeAcct = () => { const M = ui(); G.Trans.start(() => { M.go('save'); step = 'name'; msg = null; const e = G.Dom.get('name', 'input'); e.value = G.Team.get().name || ''; }); };
+  function grant() { if (!S.needAcct()) return; G.Ach.P().gift = 1; G.Team.addKeys(GIFT); S.gift = { t: 0, k: 0, ps: [], pop: 0 }; }
+  const easeBack = k => { const s = 1.7; k -= 1; return 1 + k * k * ((s + 1) * k + s); };
+  // 八把鑰匙圍成一圈（i：第幾把，rx/ry：半徑，rot：旋轉）
+  const ringPos = (i, cx, cy, rx, ry, rot = 0) => { const a = -Math.PI / 2 + i * Math.PI * 2 / GIFT + rot; return [cx + Math.cos(a) * rx, cy + Math.sin(a) * ry]; };
+  function drawGift(c) {
+    const g = S.gift, dt = G.Menus.dt || 1 / 60, uw = R.uw, uh = R.uh, LD = ui().land(); g.t += dt;
+    const T0 = 0.45, STEP = 0.15, ALL = T0 + GIFT * STEP + 0.25;
+    const out = g.out != null ? Math.min(1, (g.t - g.out) / 0.5) : 0; if (out >= 1) { S.gift = null; return; }
+    U().btns = [];
+    H().btn('gfBg', 0, 0, uw, uh, null, () => { if (g.t > ALL + 0.3 && g.out == null) { g.out = g.t; G.Audio.play('click'); } else if (g.t > 0.5 && g.t < ALL) g.t = ALL; });   // 播放中點一下＝跳到最後
+    H().dim(c, 0.86);
+    const cx = Math.round(uw / 2), cy = Math.round(uh * (LD ? 0.5 : 0.46)), rx = 48, ry = LD ? 26 : 30, rot = g.t > ALL ? (g.t - ALL) * 0.45 : 0;
+    const k0 = Math.min(1, g.t / 0.35), fade = 1 - out;
+    c.globalAlpha = fade;
+    const ts = G.cnW('帳號建立完成') * 2 <= uw - 20 ? 2 : 1;
+    cnBig(c, '帳號建立完成', cx, cy - ry - (LD ? 32 : 42) - Math.round((1 - k0) * 10), 13, ts);
+    const rk = Math.min(1, Math.max(0, (g.t - 0.2) / 0.6));
+    G.glow(c, cx, cy, 18 + rk * 34, 13, 0.32 * rk * fade);
+    // 鑰匙一把一把飛出來
+    const ki = G.scaled(G.SPR.i_key.n, 2);
+    for (let i = 0; i < GIFT; i++) {
+      const ti = g.t - (T0 + i * STEP); if (ti < 0) continue;
+      if (g.k <= i) { g.k = i + 1; g.pop = 1; G.Audio.play('coin');
+        const [px, py] = ringPos(i, cx, cy, rx, ry); for (let q = 0; q < 6; q++) { const a = Math.random() * 6.28, s = G.rr(20, 55); g.ps.push({ x: px, y: py, vx: Math.cos(a) * s, vy: Math.sin(a) * s, c: G.pick([13, 9, 14]), l: G.rr(0.3, 0.6) }); } }
+      const e = easeBack(Math.min(1, ti / 0.35)), [px, py] = ringPos(i, cx, cy, rx * e, ry * e, rot), bob = 0;
+      const ox = px + (uw - 24 - px) * out * out, oy = py + (10 - py) * out * out;    // 收下：飛向右上角
+      G.glow(c, ox, oy + bob, 9, 13, 0.25 * fade);
+      c.drawImage(ki, Math.round(ox - ki.width / 2), Math.round(oy - ki.height / 2) + bob);
+    }
+    for (const p of g.ps) { p.l -= dt; if (p.l <= 0) continue; p.vy += 50 * dt; p.x += p.vx * dt; p.y += p.vy * dt; c.fillStyle = P[p.c]; c.fillRect(Math.round(p.x), Math.round(p.y), 1, 1); }
+    g.pop = Math.max(0, g.pop - dt * 5);
+    // 中間的數字：每拿到一把跳一下
+    cnBig(c, '× ' + g.k, cx, cy - 11 - Math.round(g.pop * 3), 13, 2);
+    if (g.t > ALL) {
+      const a = Math.min(1, (g.t - ALL) / 0.3); c.globalAlpha = a * fade;
+      const W = Math.min(uw - 20, 240), ls = G.cnWrap('送你 ' + GIFT + ' 把鑰匙！', W).concat(G.cnWrap('到商店開寶箱，抽新角色', W));
+      ls.forEach((l, i) => G.cn(c, l, cx, cy + ry + 10 + i * 14, i ? 6 : 9, 0.5));
+      if (g.t > ALL + 0.6) { c.globalAlpha = (0.55 + 0.45 * Math.sin(g.t * 4)) * fade; G.cn(c, '點一下繼續', cx, cy + ry + 14 + ls.length * 14, 4, 0.5); }
+    }
+    c.globalAlpha = 1;
+  }
+  // 首頁：還沒建帳號 → 第一次跳出邀請卡；之後首頁下方常駐黃色按鈕
+  S.drawAcctTip = (c, menuT) => {
+    if (!S.needAcct() || S.welcome || S.gift || G.UI.screen !== 'menu' || (G.Update && G.Update.isOpen())) return;
+    const p = G.Ach.P(), M = ui(), uw = R.uw, uh = R.uh, t = now();
+    if (!p.giftAsk) {
+      if (menuT < 1.2) return;
+      const a = Math.min(1, (menuT - 1.2) / 0.3), later = () => { p.giftAsk = 1; G.Team.save(); };
+      U().btns = [];
+      H().btn('gaBg', 0, 0, uw, uh, null, () => {});
+      H().dim(c, 0.75 * a); c.globalAlpha = a;
+      const w = Math.min(uw - 16, 210), ttl = '送你 ' + GIFT + ' 把鑰匙！', tsc = G.cnW(ttl) * 2 <= w - 16 ? 2 : 1, ls = G.cnWrap('建立帳號就能領取，用來開寶箱抽新角色。', w - 20);
+      const h = 60 + 14 * tsc + 6 + ls.length * 13 + 8 + 16 + 8, x = Math.round(uw / 2 - w / 2), y = Math.round(uh / 2 - h / 2) + Math.round((1 - a) * 12);
+      H().box(c, x, y, w, h, 1, 13); H().btn('gaIn', x, y, w, h, null, () => {});
+      const kcx = x + w / 2, kcy = y + 30, ki = G.scaled(G.SPR.i_key.n, 2);
+      G.glow(c, kcx, kcy, 30, 13, 0.24 + 0.08 * Math.sin(t * 2.5));
+      for (let i = 0; i < GIFT; i++) { const [px, py] = ringPos(i, kcx, kcy, 44, 18, t * 0.35), bob = 0; c.drawImage(ki, Math.round(px - ki.width / 2), Math.round(py - ki.height / 2) + bob); }
+      let yy = y + 60; cnBig(c, ttl, kcx, yy, 13, tsc); yy += 14 * tsc + 6;
+      ls.forEach((l, i) => G.cn(c, l, kcx, yy + i * 13, 6, 0.5)); yy += ls.length * 13 + 8;
+      const bw = Math.floor((w - 22) / 2);
+      M.btnSecondary(c, 'gaLater', x + 8, yy, bw, 16, '稍後', () => later());
+      M.btnPrimary(c, 'gaGo', x + 14 + bw, yy, bw, 16, '建立帳號', () => { later(); S.makeAcct(); });
+      c.globalAlpha = 1; return;
+    }
+    const [gcx, gy, gw] = G.Menus.greetPos || [uw / 2, uh - 40, uw - 16];
+    const a = Math.min(1, Math.max(0, (menuT - 0.6) / 0.4)); if (a <= 0) return;
+    c.globalAlpha = a; S.giftBtn(c, 'gaBar', gcx, gy + 18, gw - 8, true); c.globalAlpha = 1;
+  };
+  // 黃色「建立帳號送鑰匙」按鈕（首頁、商店共用）：柔光呼吸＋掃光＋鑰匙跳動。bottom＝按鈕底邊
+  S.giftBtn = (c, id, cx, bottom, maxW, big) => {
+    const M = ui(), t = now(), s = '建立帳號送 ' + GIFT + ' 把鑰匙', w = Math.min(maxW, G.cnW(s) + 30), ls = G.cnWrap(s, w - 26), hh = (big ? 6 : 2) + ls.length * 13;
+    const x = Math.round(cx - w / 2), y = Math.round(bottom - hh), o = M.pr(id) ? 1 : 0;
+    G.glow(c, cx, y + hh / 2, w * 0.55, 13, 0.16 + 0.1 * Math.sin(t * 2.4), (hh + 14) / (w * 1.1));
+    H().key(c, x, y + o, w, hh, o, 14, 13);
+    const sw = (t % 2.8) / 1.2; if (sw < 1) { c.save(); c.beginPath(); c.rect(x + 1, y + o + 1, w - 2, hh - 2); c.clip(); const sx = x - 10 + sw * (w + 20); c.fillStyle = 'rgba(255,255,255,0.45)'; for (let k = 0; k < hh; k++) c.fillRect(Math.round(sx - k * 0.5), y + o + k, 3, 1); c.restore(); }
+    const kb = Math.round(-Math.abs(Math.sin(t * 4)) * 1.5), dk = dKey();
+    c.drawImage(dk.n, x + 6, Math.round(y + o + hh / 2 - dk.h / 2) + kb);
+    ls.forEach((l, i) => G.cn(c, l, x + 19, y + o + (big ? 3 : 1) + i * 13, 0));
+    M.tap(id, x, y, w, hh + 2, () => S.makeAcct());
+    return hh;
   };
   return S;
 })();

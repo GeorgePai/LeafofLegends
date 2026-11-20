@@ -83,9 +83,8 @@ G.FbUI = (() => {
     let ttl = dev ? '回覆 ' + cur.name : '寫給開發者'; while ([...ttl].length > 3 && G.cnW(ttl) > room) ttl = [...ttl].slice(0, -2).join('') + '…';   // 名字太長用「…」
     G.cn(c, ttl, cx, cy, 9); G.cn(c, cnt, cx + cw - 6, cy, n > lim ? 10 : 5, 1);
     H().box(c, cx, cy + 14, cw - 6, th + 2, 0, 13, false);
-    const by = cy + 15 + th + 5, bw = 64, hw = cw - 6 - bw * (dev ? 2 : 1) - 12;
+    const by = cy + 15 + th + 5, bw = 64;
     if (msg && msg.t < 4) G.cnWrap(msg.s, cw - 6).slice(0, 2).forEach((l, i) => G.cn(c, l, cx, by + 20 + i * 13, msg.col));   // 訊息放在按鈕下面（整行寬）
-    if (!dev) G.cnWrap('回覆後會通知你', hw).slice(0, 1).forEach(l => G.cn(c, l, cx, by + 2, 4));
     if (dev) {
       const ask = askDel && Date.now() - askDel < 3000;
       M.btnSecondary(c, 'fbDel', cx + cw - 6 - bw * 2 - 6, by, bw, 16, ask ? '確定刪除' : '刪除', async () => { if (!ask) { askDel = Date.now(); G.Audio.play('tick'); return; } askDel = 0; const j = await Kk.fbAdmAct('fbdel', cur.id); if (j.ok) { sel = null; say('已刪除', 6); G.Audio.play('deny'); } else say('刪除失敗', 10); });

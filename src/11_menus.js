@@ -1,5 +1,5 @@
 'use strict';
-G.VERSION = 'V3.2.6';                                  // 版本號（唯一來源；setup.sh 也從這行讀）
+G.VERSION = 'V3.3';                                  // 版本號（唯一來源；setup.sh 也從這行讀）
 /* =========================================================
    選單：首頁 / 隊伍 / 圖鑑 / 教學
    版面：直屏上下堆疊，橫屏左右分欄
@@ -656,7 +656,7 @@ G.Menus = (() => {
     }
     G.Menus.pillPos = LD ? [bx, uh - I.b - 15, uw - I.r - 26 - bx] : null;   // 橫屏：備份提醒改成選單下方的小膠囊（不蓋到 LOGO）
     G.Menus.greetPos = LD ? [Math.round((I.l + bx - 20) / 2), uh - I.b - 36, bx - 20 - I.l] : [uw / 2, uh - I.b - 38, uw - I.l - I.r];
-    if (G.SaveUI) { G.SaveUI.drawGreet(c); if (!resetAsk && !setOpen && modal <= 0) G.SaveUI.drawBackupTip(c, menuT); G.SaveUI.drawWelcome(c); }
+    if (G.SaveUI) { G.SaveUI.drawGreet(c); if (!resetAsk && !setOpen && !devAsk && modal <= 0) { G.SaveUI.drawBackupTip(c, menuT); G.SaveUI.drawAcctTip(c, menuT); } G.SaveUI.drawWelcome(c); }
     G.Update.card(c);
     if (G.About) G.About.post(c);                                                      // v2.8.6 從「關於」回來的淡入
     if (G.Intro) G.Intro.drawFlash(c);

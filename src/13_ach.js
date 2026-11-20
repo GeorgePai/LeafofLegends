@@ -105,6 +105,7 @@ G.Ach = (() => {
     if (!p.stg || typeof p.stg !== 'object' || Array.isArray(p.stg)) p.stg = {};   // v3.0 關卡紀錄 {關卡: {c 通關次數, s 最佳星數, t 最快秒數}}
     if (!p.best) p.best = {}; for (const k of BEST) if (typeof p.best[k] !== 'number') p.best[k] = 0;
     if (!v.ach) v.ach = {};
+    if (typeof p.gift !== 'number') p.gift = v.name ? 1 : 0;   // v3.3 建帳號送鑰匙：已有名字的舊帳號視為領過
     return p;
   };
   A.off = () => G.Team.dev;

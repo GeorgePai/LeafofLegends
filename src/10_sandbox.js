@@ -167,8 +167,8 @@ G.Team = {
       try { this.v = JSON.parse(localStorage.getItem('leafwar_team')); } catch (e) { }
       if (!this.v || !G.HEROES[this.v.hero] || !Array.isArray(this.v.loadout)) this.v = { hero: 0, loadout: G.STAGES[0].loadout.map((n, i) => ({ n, l: i % 3 })) };
       this.v.loadout = this.v.loadout.map(e => typeof e === 'string' ? { n: e, l: 1 } : e).filter(e => G.ORIG.units[e.n]);
-      // v1.2 起：角色要開寶箱取得；開局只有「普通」稀有度，鑰匙 8 把（v2.7：5→8）
-      if (!this.v.owned) { this.v.owned = { h: G.HEROES.map(h => h.name).filter(n => G.rarityOf(n) === 0), m: G.ROSTER.minions.filter(n => G.rarityOf(n) === 0) }; this.v.keys = 8; this.sanitize(true); }
+      // v1.2 起：角色要開寶箱取得；開局只有「普通」稀有度。鑰匙 v2.7 開局 8 把；v3.3 改成 0 把，建立帳號才送 8 把（G.SaveUI 的 grant）
+      if (!this.v.owned) { this.v.owned = { h: G.HEROES.map(h => h.name).filter(n => G.rarityOf(n) === 0), m: G.ROSTER.minions.filter(n => G.rarityOf(n) === 0) }; this.v.keys = 0; this.sanitize(true); }
       if (this.v.keys == null) this.v.keys = 8;
       try { this.dev = localStorage.getItem('leafwar_dev') === '1'; } catch (e) { }
     }

@@ -159,7 +159,7 @@ G.Store = (() => {
     H().box(c, Rr - kw, I.t, kw, 14, 0, 13); H().icon(c, 'i_key', Rr - kw + 9, I.t + 7); G.cn(c, kt, Rr - 4, I.t + 1, 13, 1);
     if (G.Team.dev) G.text(c, 'DEV', Rr - kw - 4, I.t + 5, 13, 1, 0, 1);
     // 寶箱卡片
-    const n = G.CHESTS.length, gap = 4, foot = 14;
+    const n = G.CHESTS.length, gap = 4, foot = G.SaveUI && G.SaveUI.needAcct() ? 22 : 14;
     G.CHESTS.forEach((ch, i) => {
       let x, y, w, h;
       if (LD) { w = Math.floor((Rr - L - gap * (n - 1)) / n); h = B - y0 - foot; x = L + i * (w + gap); y = y0; }
@@ -189,7 +189,8 @@ G.Store = (() => {
       else if (ok) { const o = pr('co' + i) ? 1 : 0; c.fillStyle = P[(Math.sin(gt * 6) > 0) ? 13 : 14]; c.fillRect(bx - 1, by - 1 + o, bw + 2, 17); H().key(c, bx, by + o, bw, 15, o, 14, 13, G.tint(14, -0.5)); G.cn(c, '開啟', bx + bw / 2, by + 1 + o, 0, 0.5); tap('co' + i, bx, by, bw, 15, () => open(ch)); }
       else { H().box(c, bx, by, bw, 15, 1, 3, false); const lab0 = full ? '已全部擁有' : '鑰匙不足', lab = G.cnW(lab0) <= bw - 4 ? lab0 : (full ? '已擁有' : '不足'); G.cn(c, lab, bx + bw / 2, by + 1, 4, 0.5); }   // 按鈕太窄時改用短字
     });
-    G.cn(c, '※ 不會開到已擁有的角色', uw / 2, B - 12, 5, 0.5);
+    if (G.SaveUI && G.SaveUI.needAcct()) G.SaveUI.giftBtn(c, 'stGift', uw / 2, B - 3, Rr - L, true);   // v3.3 還沒建帳號：提醒建帳號送鑰匙
+    else G.cn(c, '※ 不會開到已擁有的角色', uw / 2, B - 12, 5, 0.5);
     if (info) infoPanel(c);
     if (op) openAnim(c, dt);
   };
