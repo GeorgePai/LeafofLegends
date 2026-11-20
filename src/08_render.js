@@ -392,19 +392,26 @@ G.Render = (() => {
       else if (h0.hp / h0.st.hp < 0.3) { const a = (0.3 - h0.hp / h0.st.hp) * (0.8 + Math.sin(rt * 8) * 0.4); ctx.globalAlpha = G.clamp(a * 2.5, 0, 0.8); ctx.drawImage(vign, 0, 0); ctx.drawImage(vign, 0, 0); ctx.globalAlpha = 1; }
     }
   };
-  // v3.2.1 微縮景深：畫面上下緣逐漸模糊（縮小再放大＝便宜的模糊），中間清楚，像在看一座微縮模型；再加一層暖色頂光
-  let blurC = null;
+  // v3.2.1 微縮景深（參考《歧路旅人》HD-2D）：畫面上下緣逐漸模糊（縮小再放大＝便宜的模糊），中間清楚，像在看一座微縮模型；再加柔光和一層暖色頂光
+  let blurC = null, bloomC = null, tiltC = null;
   function tilt(ctx, buf, bw, bh, sc) {
     const q = 4, w = Math.ceil(bw / q), h = Math.ceil(bh / q);
     if (!blurC || blurC.width !== w || blurC.height !== h) blurC = G.canvas(w, h);
     const bx = blurC.getContext('2d'); bx.imageSmoothingEnabled = true; bx.clearRect(0, 0, w, h); bx.drawImage(buf, 0, 0, bw, bh, 0, 0, w, h);
     ctx.imageSmoothingEnabled = true;
-    const N = 14, SH = R.sh, band = SH * 0.36;
-    for (let k = 0; k < N; k++) {
-      const a = Math.pow(1 - k / N, 1.6) * 0.95, y0 = k * band / N, hh = band / N + 1;
-      ctx.globalAlpha = a;
-      for (const yy of [y0, SH - y0 - hh]) { const sy = (yy + R.fy * sc) / sc / q, sh2 = hh / sc / q; ctx.drawImage(blurC, R.fx / q, sy, R.sw / sc / q, sh2, 0, yy, R.sw, hh); }
-    }
+    // 柔光（HD-2D 的 bloom）：模糊圖用「濾色」疊一層，亮的地方（光暈、水面、法術）會微微發光
+    //   只留亮部：模糊圖自己乘自己兩次（≈ 亮度的 4 次方），暗處幾乎歸零，不會讓整個畫面發灰
+    if (!bloomC || bloomC.width !== w || bloomC.height !== h) bloomC = G.canvas(w, h);
+    const lx = bloomC.getContext('2d'); lx.globalCompositeOperation = 'source-over'; lx.clearRect(0, 0, w, h); lx.drawImage(blurC, 0, 0); lx.globalCompositeOperation = 'multiply'; lx.drawImage(blurC, 0, 0); lx.drawImage(bloomC, 0, 0); lx.globalCompositeOperation = 'source-over';
+    ctx.imageSmoothingEnabled = true; ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = 0.4; ctx.drawImage(bloomC, R.fx / q, R.fy / q, R.sw / sc / q, R.sh / sc / q, 0, 0, R.sw, R.sh); ctx.globalCompositeOperation = 'source-over';
+    // 上下緣模糊：在小畫布上用漸層遮罩一次做好，再整張放大畫上去（只有一次全螢幕繪製，手機也順）
+    if (!tiltC || tiltC.width !== w || tiltC.height !== h) tiltC = G.canvas(w, h);
+    const tx = tiltC.getContext('2d'), sy0 = R.fy / q, sH = R.sh / sc / q;
+    tx.globalCompositeOperation = 'source-over'; tx.clearRect(0, 0, w, h); tx.drawImage(blurC, 0, 0); tx.globalCompositeOperation = 'destination-in';
+    const m = tx.createLinearGradient(0, sy0, 0, sy0 + sH); m.addColorStop(0, 'rgba(0,0,0,0.9)'); m.addColorStop(0.12, 'rgba(0,0,0,0.5)'); m.addColorStop(0.3, 'rgba(0,0,0,0)'); m.addColorStop(0.7, 'rgba(0,0,0,0)'); m.addColorStop(0.88, 'rgba(0,0,0,0.5)'); m.addColorStop(1, 'rgba(0,0,0,0.9)');
+    tx.fillStyle = m; tx.fillRect(0, 0, w, h); tx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1; ctx.drawImage(tiltC, R.fx / q, sy0, R.sw / sc / q, sH, 0, 0, R.sw, R.sh);
+    const SH = R.sh;
     ctx.globalAlpha = 1; ctx.imageSmoothingEnabled = false;
     const g = ctx.createLinearGradient(0, 0, 0, SH); g.addColorStop(0, 'rgba(255,226,170,0.10)'); g.addColorStop(0.45, 'rgba(255,226,170,0)'); g.addColorStop(1, 'rgba(20,10,40,0.16)');
     ctx.fillStyle = g; ctx.fillRect(0, 0, R.sw, SH);
