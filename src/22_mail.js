@@ -108,7 +108,7 @@ G.Mail = (() => {
       c.fillStyle = P[3]; c.fillRect(x + 10, yy + 1, w - 20, 1);
       H().icon(c, 'i_key', x + 16, yy + 12); G.cn(c, '鑰匙 ×' + m.keys, x + 24, yy + 6, 13);
       const bw = 52; if (claimed) G.cn(c, '已領取', x + w - 10, yy + 6, 4, 1);
-      else M.btnPrimary(c, 'mlGet', x + w - 10 - bw, yy + 4, bw, 15, '領取', () => { const T = G.Team.get(); if (!G.Team.dev) T.keys += m.keys; got().push(m.id); G.Team.save(); G.Audio.play('coin'); say(G.Team.dev ? '開發者模式：鑰匙不增減' : '已領取 ' + m.keys + ' 把鑰匙', 11); });
+      else M.btnPrimary(c, 'mlGet', x + w - 10 - bw, yy + 4, bw, 15, '領取', () => { G.Team.addKeys(m.keys); got().push(m.id); G.Team.save(); G.Audio.play('coin'); say(G.Team.dev ? '開發者模式：鑰匙不增減' : '已領取 ' + m.keys + ' 把鑰匙', 11); });
       yy += 22;
     }
     if (msg) { G.cn(c, msg.s, x + w / 2, yy + 2, msg.col, 0.5); yy += 13; }

@@ -54,7 +54,7 @@ G.Store = (() => {
     const k0 = G.Team.keys();
     if (free) G.FreeChest.use(); else G.Team.spend(ch.cost);
     let res;
-    if (!ch.pool) { const n = S._ft != null ? S._ft : roll(ch.keys); res = { keys: n }; G.Team.addKeys(n, free ? n : Math.max(0, n - ch.cost)); }
+    if (!ch.pool) { const n = S._ft != null ? S._ft : roll(ch.keys); res = { keys: n }; G.Team.addKeys(n, free ? null : n - ch.cost); }
     else {
       const e = S.effRates(ch), tier = S._ft != null && e.cnt[S._ft] ? S._ft : roll(e.pct), cand = left(ch).filter(n => G.rarityOf(n) === tier), name = G.pick(cand);
       res = { name, tier }; G.Team.grant(name);

@@ -180,7 +180,14 @@ G.Team = {
   ownedCount(list) { return list.filter(n => this.owns(n)).length; },
   keys() { return this.dev ? Infinity : this.get().keys; },
   spend(k) { if (this.dev) return true; const v = this.get(); if (v.keys < k) return false; v.keys -= k; this.save(); return true; },
-  addKeys(k, net) { if (this.dev) return; this.get().keys += k; if (G.Ach) { const p = G.Ach.P(); p.keysTot = (p.keysTot || 0) + Math.max(0, net == null ? k : net); } this.save(); },   // v2.8 keysTot：累積拿到的鑰匙（排行用；賭徒寶箱只算賺到的）
+  // keysTot：累積取得的鑰匙（排行用）。gb＝賭徒寶箱這次的淨賺（可為負）：只有累計淨賺創新高的部分才算，反覆開不能灌數字（v3.2.6）
+  addKeys(k, gb) {
+    if (this.dev) return; this.get().keys += k;
+    if (G.Ach) { const p = G.Ach.P(); if (gb == null) p.keysTot = (p.keysTot || 0) + k; else { const d = (p.gbD || 0) - gb; p.gbD = Math.max(0, d); if (d < 0) p.keysTot = (p.keysTot || 0) - d; } }   // gbD＝離賭徒淨賺最高點還差幾把（≥0，存檔碼安全）
+    this.save();
+  },
+  // 累積鑰匙下限＝目前持有＋買角色花掉的（角色只能從寶箱來：英雄 5、小兵 3；含開局 8 把）。補舊存檔與 v3.2.6 前漏算的（信箱、開局）
+  keysFloor() { const v = this.get(), r = n => G.rarityOf(n) > 0 ? 1 : 0; return (v.keys | 0) + 5 * v.owned.h.reduce((a, n) => a + r(n), 0) + 3 * v.owned.m.reduce((a, n) => a + r(n), 0); },
   grant(n) { if (this.dev) return; const v = this.get(), arr = G.HEROES.some(h => h.name === n) ? v.owned.h : v.owned.m; if (!arr.includes(n)) { arr.push(n); (v.nw = v.nw || []).push(n); if (G.SaveUI) G.SaveUI.bump(); } this.save(); },
   // v2.6 NEW 標記：寶箱新拿到的角色在隊伍轉盤上標 NEW；在聚光燈下看過、再滾走後消失
   isNew(n) { const v = this.get(); return !!(v.nw && v.nw.includes(n)); },

@@ -46,6 +46,7 @@ G.Rank = (() => {
   // 本機目前的數據（和伺服器欄位對應）
   K.stats = () => {
     const v = G.Team.get(), p = P(), f = x => Math.max(0, Math.floor(+x || 0));
+    if (!G.Team.dev) p.keysTot = Math.max(f(p.keysTot), G.Team.keysFloor());   // v3.2.6 累積不會少於持有＋已花
     return { heroes: v.owned.h.length, minions: v.owned.m.length, games: f(p.games), wins: Math.min(f(p.wins), f(p.games)), kills: f(p.kills), deaths: f(p.deaths), assists: f(p.assists), keys: f(p.keysTot), dmg: f(p.dmg), time: f(p.time), ach: G.Ach.doneCount() };
   };
   K.mine = k => { const s = K.stats(); return k === 'wr' ? (s.games ? Math.round(s.wins / s.games * 1000) / 10 : 0) : k === 'kda' ? Math.round((s.kills + s.assists) / Math.max(1, s.deaths) * 100) / 100 : s[k]; };
