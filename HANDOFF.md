@@ -26,7 +26,8 @@
    - setup.sh 會：複製工具到 `/home/claude/tools/`、建 `/tmp/s`、需要時裝 fonttools/brotli、build、印出版本號、和 main 線上版比對（排除字型那行）
    - 顯示「與線上版一致 ✔」就代表接手完成；**交接時不用跑完整文字檢查**（程式沒變）
 3. 部署用的 main 分支等要發佈時再 clone：`git clone -q --depth 1 https://github.com/GeorgePai/LeafofLegends /home/claude/leafoflegends`
-4. 備援（GitHub 連不上時）：用 device 工具從 Mac 的 `source/` stage 進 `/home/claude/leafwar/`，再 `bash setup.sh`
+4. **Mac 資料夾**：每個新對話一開始都沒連 Mac 資料夾，Claude 自己請求權限可能被自動模式擋下（v3.1 發生過）。所以接手指令第二行請 Pai 先在桌面 App 這個對話的「+」→「加入資料夾」選 `Desktop/Claude/LeafofLegends`；接手時用 `get_device_info` 確認 connectedFolders 有它，沒有就在回報裡提醒一次
+5. 備援（GitHub 連不上時）：用 device 工具從 Mac 的 `source/` stage 進 `/home/claude/leafwar/`，再 `bash setup.sh`
 
 ## 4. 架構重點
 - 單檔 HTML：`build.py` 依**檔名排序**串接 `src/*.js`（排序很重要，例如 `06b_combat.js` 必須在 `07_world.js` 前）
@@ -201,11 +202,12 @@
 接手指令範本：
 ```
 請把這個對話命名為「LeafofLegends (on-going)」。
+（我會先在桌面 App 這個對話的「+」→「加入資料夾」連上 Desktop/Claude/LeafofLegends）
 繼續 Leaf of Legends 專案。照 HANDOFF.md 第 3 節接手：
 add_repo(GeorgePai, LeafofLegends, push) →
 git clone -q -b source --depth 1 https://github.com/GeorgePai/LeafofLegends /home/claude/leafwar && bash /home/claude/leafwar/setup.sh
 讀 /home/claude/leafwar/HANDOFF.md（只讀這份；CHANGELOG.md、VALUES.md 需要時再查）。
 作品：https://claude.ai/artifact/8vvJWeebvgfkNQDrYWXHAB（目前 V○○）；排行榜伺服器：https://lol-rank.leafoflegends.workers.dev；遊戲：https://georgepai.github.io/LeafofLegends/
 設計前對照第 8 節；更新照第 7 節；我說「交接」照第 9 節。
-準備好後用一句話回報版本與狀態，提醒我改名，然後等我的新需求。
+準備好後用一句話回報版本與狀態（含 Mac 資料夾是否已連上），提醒我改名，然後等我的新需求。
 ```
