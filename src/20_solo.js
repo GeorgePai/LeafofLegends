@@ -7,15 +7,25 @@
 // ============================================================
 G.Solo = (() => {
   const S = {}, R = G.Render, P = G.PAL, H = () => G.UI.h, U = () => G.UI, ui = () => G.Menus.ui;
-  const ORDER = [1, 2, 3, 4, 5, 0];                                  // 卡片順序：五個關卡，最後是經典戰場
+  const ORDER = [1, 2, 3, 4, 5];                                     // 卡片順序：五個關卡（v3.4 拿掉經典戰場；G.STAGES[0] 留給首頁背景演示）
   const DIFF = ['', '簡單', '普通', '困難', '極難', '超難'], DCOL = [0, 11, 13, 14, 10, 17];
   let pos = 0, tgt = 0, drag = null, cried = -1, t = 0, wx = [], bgK = 0, bgFrom = null;
   const info = si => si ? G.SOLO[si - 1] : { theme: 'forest', n: '經典戰場', en: 'CLASSIC', d: 0, rule: '沒有特殊規則', rew: 0, roster: [['babybear', 'eagle', 'bear']], boss: 'bigbear' };
   const open = si => G.SoloW.open(si);
+  // ---- v3.4 新關卡解鎖動畫：滑到新關卡 → 鎖頭發光、越抖越快 → 碎掉、白光一閃、卡片亮起來 →「新關卡解鎖！」----
+  let ul = null;                                                     // { si, t, ps, snd }
+  const UL = { shake: 0.45, brk: 1.35, end: 3.2 };
+  const locked = si => !open(si) || (ul && ul.si === si && ul.t < UL.brk);
   // 進入：停在「最新可以挑戰」的那一關
   S.open = () => {
     let k = 0; for (let i = 0; i < 5; i++) if (open(ORDER[i])) k = i;
     for (let i = 0; i < 5; i++) if (open(ORDER[i]) && !G.SoloW.best(ORDER[i]).c) { k = i; break; }
+    ul = null;
+    if (!G.Team.dev) {                                                 // v3.4 有新解鎖的關卡（還沒看過）→ 先停在上一關，再滑過去播解鎖動畫
+      const P = G.Ach.P(), m = G.SoloW.maxOpen();
+      if (P.stgU == null) P.stgU = m;
+      else if (m > P.stgU) { const ni = ORDER.indexOf(m); k = Math.max(0, ni - 1); ul = { si: m, t: -0.45, ps: [], snd: 0 }; P.stgU = m; G.Team.save(); }
+    }
     pos = tgt = k; cried = k; wx = []; G.Menus.ui.go('stages'); G.Audio.play('open');
   };
   S.reset = () => { drag = null; };
@@ -75,15 +85,26 @@ G.Solo = (() => {
       }
     }
     if (G.THEMES[th].grade && !lock) { const [m, col, a] = G.THEMES[th].grade; c.globalCompositeOperation = m; c.globalAlpha = a; c.fillStyle = col; c.fillRect(x, y, w, h); c.globalCompositeOperation = 'source-over'; c.globalAlpha = 1; }
-    if (lock) { c.fillStyle = 'rgba(8,8,8,0.55)'; c.fillRect(x, y, w, h); H().icon(c, 'i_lock', x + w / 2, y + h / 2 - 2); }
+    const u = ul && ul.si === si && big ? ul : null;
+    if (lock && u) {                                                 // 解鎖前：鎖頭放大、發光、越抖越快
+      c.fillStyle = 'rgba(8,8,8,0.55)'; c.fillRect(x, y, w, h);
+      const k = G.clamp((u.t - UL.shake) / (UL.brk - UL.shake), 0, 1), sh = k * k * 2.5, lx = x + w / 2 + Math.round(Math.sin(u.t * 55) * sh), ly = y + h / 2 - 2 + Math.round(Math.cos(u.t * 47) * sh * 0.5);
+      G.glow(c, x + w / 2, y + h / 2 - 2, 10 + k * 22, 13, 0.15 + k * 0.45);
+      const li = G.scaled(G.SPR.i_lock.n, 2); c.drawImage(li, Math.round(lx - li.width / 2), Math.round(ly - li.height / 2));
+    } else if (lock) { c.fillStyle = 'rgba(8,8,8,0.55)'; c.fillRect(x, y, w, h); H().icon(c, 'i_lock', x + w / 2, y + h / 2 - 2); }
+    else if (u) {                                                    // 剛解鎖：暗幕退掉＋白光一閃
+      const k = (u.t - UL.brk) / 0.6; if (k < 1) { c.fillStyle = 'rgba(8,8,8,' + (0.55 * (1 - k)).toFixed(3) + ')'; c.fillRect(x, y, w, h); }
+      const f = 1 - (u.t - UL.brk) / 0.3; if (f > 0) { c.fillStyle = 'rgba(255,255,255,' + (0.85 * f).toFixed(3) + ')'; c.fillRect(x, y, w, h); }
+    }
     c.restore();
   }
   // ---- 卡片 ----
   function card(c, x, y, w, h, si, act, LD) {
-    const I = info(si), lock = !open(si), best = si ? G.SoloW.best(si) : null, col = lock ? 3 : act ? 13 : 6;
+    const I = info(si), lock = locked(si), best = si ? G.SoloW.best(si) : null, col = lock ? 3 : act ? 13 : 6;
     H().box(c, x, y, w, h, 1, col, false);
     const pw = LD ? Math.round(w * 0.42) : w - 8, ph = LD ? h - 8 : Math.round(G.clamp(h * 0.4, 66, 128));
     preview(c, x + 4, y + 4, pw, ph, si, lock, act);
+    if (ul && ul.si === si && act) { ul.px = x + 4; ul.py = y + 4; ul.pw = pw; ul.ph = ph; ul.cx = x; ul.cy = y; ul.cw = w; ul.chh = h; }
     if (!act) { const nm = si ? si + '  ' + I.n : I.n, l = G.cnWrap(nm, w - 8)[0], lw = G.cnW(l); if (x + w / 2 - lw / 2 >= 0 && x + w / 2 + lw / 2 <= R.uw) G.cn(c, l, x + w / 2, LD ? y + h - 16 : y + ph + 8, lock ? 4 : 7, 0.5); return; }   // 旁邊的卡：名字整個在畫面內才畫
     let ix = LD ? x + pw + 10 : x + 6, iy = LD ? y + 5 : y + ph + 8; const iw = LD ? w - pw - 16 : w - 12;
     // 關卡編號＋名稱、英文
@@ -144,7 +165,19 @@ G.Solo = (() => {
     const uw = R.uw, uh = R.uh, I = R.ins, LD = M.land();
     const dg = drag && drag.moved;
     if (!dg) pos += (tgt - pos) * (1 - Math.exp(-dt * 13));
-    if (Math.abs(tgt - pos) < 0.01 && !dg) { pos = tgt; if (cried !== tgt) { cried = tgt; const si = ORDER[tgt]; if (open(si)) G.Audio.cry(info(si).boss); G.Audio.play('snap'); } }
+    if (ul) {
+      const ni = ORDER.indexOf(ul.si), t0 = ul.t; ul.t += dt;
+      if (t0 < 0 && ul.t >= 0) { tgt = ni; G.Audio.play('tick'); }
+      if (ul.t > UL.shake && ul.snd < 1) { ul.snd = 1; G.Audio.play('chestRattle'); }
+      if (t0 < UL.brk && ul.t >= UL.brk) {                             // 碎掉
+        G.Audio.play('shatter'); G.Audio.play('reveal'); cried = ni;
+        const lx = ul.px + ul.pw / 2, ly = ul.py + ul.ph / 2 - 2;
+        for (let i = 0; i < 16; i++) { const a = Math.random() * 6.28, s = G.rr(30, 90); ul.ps.push({ x: lx + G.rr(-4, 4), y: ly + G.rr(-4, 4), vx: Math.cos(a) * s, vy: Math.sin(a) * s - 30, c: G.pick([9, 7, 6, 13]), l: G.rr(0.5, 0.9), z: G.pick([1, 2, 2]) }); }
+      }
+      if (t0 < UL.brk + 0.35 && ul.t >= UL.brk + 0.35) { G.Audio.play('fanfare2'); G.Audio.cry(info(ul.si).boss); }
+      if (ul.t >= UL.end) ul = null;
+    }
+    if (Math.abs(tgt - pos) < 0.01 && !dg) { pos = tgt; if (cried !== tgt) { cried = tgt; const si = ORDER[tgt]; if (!locked(si)) G.Audio.cry(info(si).boss); G.Audio.play('snap'); } }
     bg(c, uw, uh);
     const y0 = M.header(c, '單人關卡');
     const bh = 18, by = uh - I.b - bh - 6, cy = y0 + 2, ch = by - 8 - cy;
@@ -157,6 +190,7 @@ G.Solo = (() => {
       card(c, x, y, w, h, ORDER[i], act, LD);
       if (!act) { c.fillStyle = 'rgba(10,10,10,' + Math.min(0.6, ad * 0.55).toFixed(3) + ')'; c.fillRect(x, y, w + 1, h + 1); }
     }
+    if (ul && ul.px != null && ul.t >= UL.brk) unlockFx(c, dt);
     // 滑動（v3.1 改順）：整排都能拖、卡片跟著手指走；放開時看甩的速度——輕輕一甩或拖超過 12% 就換到下一張，甩得快可以連跳
     const px = sp * 0.92;
     U().btns.push({ id: 'stDrag', x: 0, y: cy, w: uw, h: ch,
@@ -179,9 +213,34 @@ G.Solo = (() => {
     const n = ORDER.length, dx0 = Math.round(uw / 2 - n * 3); for (let k = 0; k < n; k++) { c.fillStyle = P[k === Math.round(pos) ? 13 : 3]; c.fillRect(dx0 + k * 6, by - 5, k === Math.round(pos) ? 4 : 2, 2); }
     // 出發
     const si = ORDER[Math.round(tgt)], bw = Math.min(cw, 140), bx = Math.round(uw / 2 - bw / 2);
-    if (open(si)) M.btnPrimary(c, 'stGo', bx, by, bw, bh, '出發', go);
+    if (!locked(si)) M.btnPrimary(c, 'stGo', bx, by, bw, bh, '出發', go);
     else { H().key(c, bx, by, bw, bh, 0, 3); G.cn(c, '尚未解鎖', bx + bw / 2, by + 3, 4, 0.5); H().btn('stLock', bx, by, bw, bh, null, () => G.UI.h.deny('stLock')); }
+    if (ul) { U().btns = []; H().btn('stUl', 0, 0, uw, uh, null, () => { if (ul.t < 0) return; if (ul.t < UL.brk) ul.t = UL.brk - 0.01; else ul.t = Math.max(ul.t, UL.end - 0.35); }); }   // 動畫中點一下＝跳過
   };
+  // 解鎖瞬間之後：柔光、旋轉光芒、碎片、星芒、「新關卡解鎖！」
+  function unlockFx(c, dt) {
+    const u = ul, e = u.t - UL.brk, cx = u.px + u.pw / 2, cy = u.py + u.ph / 2, out = G.clamp((UL.end - u.t) / 0.35, 0, 1);
+    const gk = Math.max(0, 1 - e / 1.6);
+    G.glow(c, cx, cy, 40 + e * 40, 13, 0.4 * gk);
+    if (e < 1.6) {                                                   // 光芒：細細幾道，慢慢轉、淡出
+      c.save(); c.beginPath(); c.rect(u.cx, u.cy, u.cw, u.chh); c.clip(); c.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4 + e * 0.6, L = 30 + e * 90; c.globalAlpha = 0.16 * gk; c.strokeStyle = P[13]; c.lineWidth = i % 2 ? 1 : 2; c.beginPath(); c.moveTo(cx, cy); c.lineTo(cx + Math.cos(a) * L, cy + Math.sin(a) * L); c.stroke(); }
+      c.restore(); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
+    }
+    for (const p of u.ps) { p.l -= dt; if (p.l <= 0) continue; p.vy += 160 * dt; p.x += p.vx * dt; p.y += p.vy * dt; c.globalAlpha = Math.min(1, p.l * 3); c.fillStyle = P[p.c]; c.fillRect(Math.round(p.x), Math.round(p.y), p.z, p.z); }
+    c.globalAlpha = 1;
+    if (e > 0.2) for (let i = 0; i < 6; i++) {                       // 卡片四周的星芒
+      const ph = (e * 1.3 + i * 0.37) % 1, sx = u.cx + G.hash(i, 5) * u.cw, sy = u.cy + G.hash(i, 8) * u.chh, a = Math.sin(ph * Math.PI) * out;
+      c.globalAlpha = a; c.fillStyle = P[9]; c.fillRect(Math.round(sx), Math.round(sy) - 1, 1, 3); c.fillRect(Math.round(sx) - 1, Math.round(sy), 3, 1); c.globalAlpha = 1;
+    }
+    if (e > 0.25) {                                                  // 標題：從上面掉下來彈一下
+      const k = G.clamp((e - 0.25) / 0.35, 0, 1), eb = 1 + (k - 1) * (k - 1) * (2.7 * (k - 1) + 1.7) , s = '新關卡解鎖！', sc = G.cnW(s) * 2 <= u.pw - 8 ? 2 : 1, h = 14 * sc;
+      const ty = Math.round(cy - h / 2 - (1 - eb) * 18);
+      c.globalAlpha = Math.min(1, k * 2) * out;
+      c.fillStyle = 'rgba(0,0,0,0.55)'; c.fillRect(u.px, ty - 3, u.pw, h + 6);
+      G.cnBig(c, s, cx, ty, 13, sc); c.globalAlpha = 1;
+    }
+  }
   const pr = id => (U().press[id] || 0) > 0;
   return S;
 })();

@@ -331,7 +331,7 @@ G.SaveUI = (() => {
   };
   // ---------- 歡迎回來 ----------
   // 大字（中文像素字放大 2 倍）
-  const cnBig = (c, s, cx, y, col, k = 2) => { const e = G.cnImg(String(s), col, 0); c.drawImage(e.c, Math.round(cx - (e.w * k) / 2) - 2 * k, Math.round(y) - k, e.c.width * k, e.c.height * k); return e.w * k; };
+  const cnBig = G.cnBig = (c, s, cx, y, col, k = 2) => { const e = G.cnImg(String(s), col, 0); c.drawImage(e.c, Math.round(cx - (e.w * k) / 2) - 2 * k, Math.round(y) - k, e.c.width * k, e.c.height * k); return e.w * k; };
   S.drawWelcome = c => {
     const w = S.welcome; if (!w) return;
     const dt = G.Menus.dt || 1 / 60, uw = R.uw, uh = R.uh; w.t += dt;

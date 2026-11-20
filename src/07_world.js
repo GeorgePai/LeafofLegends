@@ -224,7 +224,7 @@ G.World = class {
   }
   spawnWave(s) {
     const n = this.waveN[s]++;
-    if (this.units.filter(u => u.alive && u.side === s && u.kind !== 'holy' && !u.static).length > 40) return;
+    if (this.units.filter(u => u.alive && u.side === s && u.kind !== 'holy' && !u.static).length > (s === 1 ? G.TUNE.foeCap || 40 : 40)) return;   // 場上太多就跳過這波（v3.4 敵方上限 foeCap）
     if (s === 0) {
       let k = 0;
       this.loadout.forEach(({ n: name, l }) => {

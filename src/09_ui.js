@@ -774,13 +774,19 @@ G.UI = (() => {
       const hl = highlights(st); let hx2 = lx + 14 + G.cnW('鑰匙 +' + kg) + 8;
       hl.forEach(([, s2, col]) => { const w2 = G.cnW(s2) + 6; if (hx2 + w2 > lx + colL) return; c.fillStyle = P[0]; c.fillRect(hx2, yl, w2, 13); c.fillStyle = P[col]; c.fillRect(hx2, yl, w2, 1); c.fillRect(hx2, yl + 12, w2, 1); c.fillRect(hx2, yl, 1, 13); c.fillRect(hx2 + w2 - 1, yl, 1, 13); G.cn(c, s2, hx2 + 3, yl, col); hx2 += w2 + 3; });
       yl += 16;
-      const sr = W.soloRes; if (sr && sr.win) {                                // v3.0 關卡星等與獎勵
-        G.Solo.stars(c, lx + 2, yl + 2, sr.stars, 3, 9);
-        const txt = sr.rew ? (sr.first ? '首次通關 ' : '新星等 ') + '+' + sr.rew : G.Team.dev ? '不計獎勵' : '已拿過這個星等', one = G.cnW(txt) + (sr.rew ? 14 : 0) <= colL - 40;
-        const tx = one ? lx + 40 : lx + 2, ty = one ? yl : yl + 14;
+      const sr = W.soloRes; if (sr && sr.win) {                                // v3.0 關卡星等與獎勵（v3.4 橫屏放右欄數據下方，左欄留給成就）
+        const bx0 = LD ? rx : lx, cW = LD ? rw : colL, bTop = uh - I.b - 18 - 4; let by0 = LD ? yr : yl;
+        G.Solo.stars(c, bx0 + 2, by0 + 2, sr.stars, 3, 9);
+        const txt = sr.rew ? (sr.first ? '首次通關 ' : '新星等 ') + '+' + sr.rew : G.Team.dev ? '不計獎勵' : '已拿過這個星等', one = G.cnW(txt) + (sr.rew ? 14 : 0) <= cW - 40;
+        const tx = one ? bx0 + 40 : bx0 + 2, ty = one ? by0 : by0 + 14;
         if (sr.rew) icon(c, 'i_key', tx + 6, ty + 6);
-        const ls = G.cnWrap(txt, colL - (tx - lx) - (sr.rew ? 14 : 0)); ls.forEach((l, i) => G.cn(c, l, tx + (sr.rew ? 14 : 0), ty + i * 13, sr.rew ? 13 : 6));
-        yl = ty + ls.length * 13 + 3;
+        const ls = G.cnWrap(txt, cW - (tx - bx0) - (sr.rew ? 14 : 0)); ls.forEach((l, i) => G.cn(c, l, tx + (sr.rew ? 14 : 0), ty + i * 13, sr.rew ? 13 : 6));
+        by0 = ty + ls.length * 13 + (LD ? 1 : 3);
+        if (sr.unlock && (!LD || by0 + 13 <= bTop)) {                                                     // v3.4 解鎖新關卡
+          const ul = G.cnWrap('解鎖新關卡「' + G.SOLO[sr.unlock - 1].n + '」', cW - 16), bl = ((t * 3) | 0) % 2;
+          icon(c, 'i_play', bx0 + 6, by0 + 6); ul.forEach((l, i) => G.cn(c, l, bx0 + 14, by0 + i * 13, bl ? 13 : 14)); by0 += ul.length * 13 + 3;
+        }
+        if (LD) yr = by0; else yl = by0;
       }
       if (ach.length) {
         icon(c, 'i_trophy', lx + 6, yl + 6); G.cn(c, '成就達成 ×' + ach.length, lx + 14, yl, 13); yl += 14;
@@ -794,12 +800,13 @@ G.UI = (() => {
     // ── 按鈕（文字＋圖示）
     if (t >= TK.btn) {
       const bh = 18, by = LD ? uh - I.b - bh - 2 : Math.min(uh - I.b - bh - 2, Math.max(yl, yr) + 8), bw = Math.floor((PW - 6) / 2);
-      [['i_retry', '再來一局', () => U.start(U.hero), 13], W.stageI ? ['i_play', '選擇關卡', () => { U.goTitle(); G.Solo.open(); }, 7] : ['i_tree', '回首頁', () => U.goTitle(), 7]].forEach(([ic, lab, fn, col], i) => {
-        const x = px + i * (bw + 6), id = 'end' + i, o = U.press[id] > 0 ? 1 : 0;
-        if (i === 0) { c.fillStyle = P[Math.sin(t * 6) > 0 ? 13 : 14]; c.fillRect(x - 1, by - 1 + o, bw + 2, bh + 2); }
-        U.h.key(c, x, by + o, bw, bh, o, i === 0 ? 0 : col, i === 0 ? 13 : 1);
+      const hi = W.soloRes && W.soloRes.unlock ? 1 : 0;                         // v3.4 解鎖新關卡：改成「選擇關卡」閃黃框
+      [['i_retry', '再來一局', () => U.start(U.hero), 7], W.stageI ? ['i_play', '選擇關卡', () => { U.goTitle(); G.Solo.open(); }, 7] : ['i_tree', '回首頁', () => U.goTitle(), 7]].forEach(([ic, lab, fn, col], i) => {
+        const x = px + i * (bw + 6), id = 'end' + i, o = U.press[id] > 0 ? 1 : 0, on = i === hi;
+        if (on) { c.fillStyle = P[Math.sin(t * 6) > 0 ? 13 : 14]; c.fillRect(x - 1, by - 1 + o, bw + 2, bh + 2); }
+        U.h.key(c, x, by + o, bw, bh, o, on ? 0 : col, on ? 13 : 1);
         const lw = G.cnW(lab) + 14, sx = Math.round(x + bw / 2 - lw / 2);
-        icon(c, ic, sx + 5, by + 9 + o, i === 0); G.cn(c, lab, sx + 14, by + 3 + o, i === 0 ? 0 : 9);
+        icon(c, ic, sx + 5, by + 9 + o, on); G.cn(c, lab, sx + 14, by + 3 + o, on ? 0 : 9);
         btn(id, x, by, bw, bh, () => { U.press[id] = 0.12; G.Audio.play('click'); }, fn);
       });
     }

@@ -37,7 +37,7 @@ G.setPatOffset = (ox, oy) => {
 G.pxDisc = (ctx, cx, cy, rx, ry, col, alpha = 1) => {
   if (rx < 0.5 || alpha <= 0) return;
   ctx.fillStyle = alpha >= 1 ? G.PAL[col] : G.pat(ctx, col, alpha);
-  const y0 = Math.ceil(-ry), y1 = Math.floor(ry), icx = Math.round(cx), icy = Math.round(cy);
+  const SQ = G.SSQ || 1, y0 = Math.ceil(-ry), y1 = Math.floor(ry), icx = Math.round(cx * SQ) / SQ, icy = Math.round(cy * SQ) / SQ;   // v3.4 戰場 2 倍細緻時對齊半格
   for (let y = y0; y <= y1; y++) {
     const hw = Math.floor(rx * Math.sqrt(Math.max(0, 1 - (y / ry) * (y / ry))));
     ctx.fillRect(icx - hw, icy + y, hw * 2 + 1, 1);

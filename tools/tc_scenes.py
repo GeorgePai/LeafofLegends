@@ -190,4 +190,13 @@ S.append(['gift-bar',"G.Ach.P().giftAsk=1;G.Menus._mt(3)",500])
 S.append(['gift-store',"G.Menus.ui.go('store')",500])
 S.append(['gift-anim',"G.Menus.ui.go('save');G.SaveUI.gift={t:3,k:0,ps:[],pop:0}",500])
 S.append(['gift-x',"G.SaveUI.gift=null;G.Team.setDev(false);G.UI.goTitle();G.Intro.skip()",300])
+# v3.4 管理玩家：未存檔訪客＋幀數
+S.append(['adm-guest',"localStorage.setItem('leafwar_adm','k');G.Team.setDev(true);G.Menus.ui.go('rank');G.Rank.adm.t=Date.now()+9e9;G.Rank.adm.busy=0;G.Rank.adm.err='';G.Rank.adm.list="+AD+";G.Rank.adm.guests=[{g:1,id:'g1a2b3c4d',name:'訪客 1A2B',pt:Date.now()/1000-15,t0:Date.now()/1000-900,st:JSON.stringify({s:'battle',g:4,b:312,l:11,h:'leafy',k:'12/3/4',f:57,fl:41,q:85,ss:2}),v:G.VERSION,m:1},{g:1,id:'g9f8e7d6c',name:'訪客 9F8E',pt:Date.now()/1000-600,t0:Date.now()/1000-1500,st:JSON.stringify({s:'stages'}),v:'V3.2.5',m:0},{g:1,id:'g00ff00ff',name:'訪客 00FF',pt:Date.now()/1000-40,st:'',v:G.VERSION,m:1}];G.RankUI.adm(true,1);G.Rank.adm.list="+AD,500])
+S.append(['adm-gdet',"G.RankUI._det('g1a2b3c4d')",300]); S.append(['adm-gdet2',"G.RankUI._det('g00ff00ff')",300])
+S.append(['adm-gx',"G.RankUI._det(null);G.RankUI.adm(false);G.Rank.adm.guests=[];localStorage.removeItem('leafwar_adm');G.Team.setDev(false);G.UI.goTitle()",200])
+# v3.4 新關卡解鎖動畫、結算畫面解鎖提示
+UL="localStorage.clear();G.Team.v=null;G.Team.dev=false;G.UI.goTitle();G.Intro.skip();var P=G.Ach.P();P.stg={1:{c:1,s:3},2:{c:1,s:2},3:{c:1,s:1}};P.stgU=3;G.Solo.open();"
+S.append(['ul-shake',UL,1300]); S.append(['ul-title',UL,2300])
+S.append(['ul-end',"localStorage.clear();G.Team.v=null;G.Team.dev=false;G.UI.goTitle();G.Intro.skip();G.UI.start(4);G.W.stats.time=300;G.W.soloRes={win:true,stars:3,rew:40,first:true,si:4,unlock:5};G.Ach.recent=['win1','games1'];G.W.over={win:true,t:3};setTimeout(()=>{G.UI.endT=9},3000)",3800])
+S.append(['ul-x',"G.UI.goTitle()",200])
 json.dump(S,open('/tmp/tc.json','w'))

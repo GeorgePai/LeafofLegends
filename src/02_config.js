@@ -7,6 +7,7 @@
 
 // ---------- 原著未在資料表中的值（標記為暫定） ----------
 G.TUNE = {
+  foeMul: 2, foeGap: 0.3, foeCap: 60,   // v3.4 Pai：敵方每波數量 ×2（小兵點數上限 24 之後敵方太弱）、同一路出兵間隔 0.45→0.3 秒、場上敵兵上限 40→60 — 暫定
   waveInterval: 20,        // 兵線間隔（秒）— 暫定
   firstAllyWave: 2,
   firstEnemyWave: 6,

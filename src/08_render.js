@@ -110,8 +110,11 @@ G.Render = (() => {
     const sc = R.scale = R.base * R.cam.zoom;
     const hd = G.HD && G.HD.active(), [OXf, OYf] = hd ? G.HD.over() : [1, 1]; R.ps = hd ? G.HD.P : 0;   // v3.2.2 HD-2D：透視需要外擴緩衝
     const VW = R.sw / sc, VH = R.sh / sc, bw = Math.ceil(VW * OXf) + 2, bh = Math.ceil(VH * OYf) + 2;
-    if (buf.width !== bw || buf.height !== bh) { buf.width = bw; buf.height = bh; }
-    const b = bctx; b.imageSmoothingEnabled = false;
+    // v3.4 2 倍細緻：緩衝每格美術像素用 2×2 畫，角色可以半格移動（走路不再一格一格跳）；只在 HD 後製下開，掉幀會自動關（08b_hd adapt）
+    const SS = R.SS = hd && !R.ssOff && sc >= 3 ? 2 : 1;
+    if (buf.width !== bw * SS || buf.height !== bh * SS) { buf.width = bw * SS; buf.height = bh * SS; }
+    const b = bctx; b.setTransform(SS, 0, 0, SS, 0, 0); b.imageSmoothingEnabled = false; G.SSQ = SS;
+    const q = v => Math.round(v * SS) / SS;                              // 角色位置對齊到半格
     // 鏡頭 + 震動
     const tr = W.trauma * W.trauma, sh = tr * 7;
     const shx = (G.vnoise(rt * 25, 3.1) - 0.5) * 2 * sh, shy = (G.vnoise(5.7, rt * 25) - 0.5) * 2 * sh;
@@ -234,8 +237,8 @@ G.Render = (() => {
         const gx = x * G.AX - ox, gy = y * G.AY - oy;
         // 影子
         const shR = u.vis.shadow * G.AX * (u.vis.fly ? 0.7 : 1);
-        G.pxDisc(b, gx, gy, shR, Math.max(1.5, shR * 0.42), 0, u.static ? 0.7 : 0.55);
-        if (!u.vis.fly) G.pxDisc(b, gx + 1, gy, shR * 0.55, Math.max(1, shR * 0.22), 0, 0.4);   // v3.2 腳底接觸陰影（環境光遮蔽），角色像真的踩在地上
+        G.pxDisc(b, q(gx), q(gy), shR, Math.max(1.5, shR * 0.42), 0, u.static ? 0.7 : 0.55);
+        if (!u.vis.fly) G.pxDisc(b, q(gx) + 1, q(gy), shR * 0.55, Math.max(1, shR * 0.22), 0, 0.4);   // v3.2 腳底接觸陰影（環境光遮蔽），角色像真的踩在地上
         if (u === h0) G.pxEllipse(b, gx, gy + 1, shR + 3, shR * 0.42 + 2, 9, 5, rt * 12);
         if (u.chg) {                                            // 施法前搖：腳下法陣由小變大、旋轉
           const cp = Math.min(1, u.chg.T / u.chg.dur), E = G.ELEM[u.chg.el] || G.ELEM.arcane, R0 = (shR + (u.chg.big ? 12 : 7)) * (0.35 + 0.65 * Math.sqrt(cp));
@@ -268,11 +271,11 @@ G.Render = (() => {
         const red = u.side === 1 && !u.static;                 // 敵方單位：赤紅配色
         const base = G.lookOf(u, u.face < 0 ? s.m : s.n);             // v2.6 受控＝幽魂紫、複製體＝冰青
         const img = u.flash > 0 ? (u.face < 0 ? s.fm : s.f) : base;
-        const ax = Math.round(gx - s.w / 2 + ddx), ay = Math.round(gy - zz * G.AZ - s.h + 1 + ddy);
+        const ax = q(gx - s.w / 2 + ddx), ay = q(gy - zz * G.AZ - s.h + 1 + ddy);
         // 層次感（v2.3）：光從左上來 → 斜向投影（落在右下方地面）＋左上亮邊＋右下暗邊
         if (!u.vis.fly && u.spawnT <= 0.01) {
-          const sil = G.glowOf(base, 0, 1, 0).tint, fx = Math.round(gx + ddx), fy = Math.round(gy) + 1;
-          b.save(); b.globalAlpha = u.static ? 0.32 : 0.26; b.setTransform(1, 0, -0.55, -0.32, fx - s.w / 2 * 1 + (s.h) * 0, fy); b.drawImage(sil, 0, -s.h); b.restore();
+          const sil = G.glowOf(base, 0, 1, 0).tint, fx = q(gx + ddx), fy = q(gy) + 1;
+          b.save(); b.globalAlpha = u.static ? 0.32 : 0.26; b.setTransform(SS, 0, -0.55 * SS, -0.32 * SS, (fx - s.w / 2) * SS, fy * SS); b.drawImage(sil, 0, -s.h); b.restore();
         }
         const shielded = u.protectors && W.isProtected(u);
         // 稀有度外框（我方英雄與小兵）
@@ -299,7 +302,7 @@ G.Render = (() => {
         const vimg = u.flash > 0 || !(G.VOL & 1) ? img : G.bevelOf(img);   // v3.2.1 光影浮雕
         if (psx !== 1 || psy !== 1 || psk !== 0) {              // 以腳底為支點做擠壓／傾斜
           const fx = ax + s.w / 2, fy = ay + s.h;
-          b.save(); b.setTransform(psx, 0, psk, psy, fx, fy); b.drawImage(vimg, -s.w / 2, -s.h); b.restore();
+          b.save(); b.setTransform(psx * SS, 0, psk * SS, psy * SS, fx * SS, fy * SS); b.drawImage(vimg, -s.w / 2, -s.h); b.restore();
         } else b.drawImage(vimg, ax, ay);
         b.globalAlpha = 1;
         if (u.chg && u.chg.T > u.chg.dur - 0.06) { b.globalAlpha = 0.8; b.drawImage(G.glowOf(base, 9, 1, 0).tint, ax, ay); b.globalAlpha = 1; }   // 放招瞬間白閃
@@ -318,10 +321,10 @@ G.Render = (() => {
         if (u.kind === 'holy' && u.side === 1 && (W.frame % 8) === 0) W.parts.add(u.x + G.rr(-12, 12), u.y, G.rr(50, 70), G.rr(-5, 5), 0, G.rr(10, 20), 1.4, 2, 1, 2, -5, 0.5);
         // 血條
         const full = u.hp >= u.st.hp - 0.5;
-        if (!full || u.kind !== 'creep') bars.push([u, Math.round(gx), ay - 3]);
-        if (u.follow) flags.push([Math.round(gx), ay - (full && u.kind === 'creep' ? 2 : 6)]);
+        if (!full || u.kind !== 'creep') bars.push([u, q(gx), ay - 3]);
+        if (u.follow) flags.push([q(gx), ay - (full && u.kind === 'creep' ? 2 : 6)]);
         const locked = h0 && h0.alive && h0.cmd && h0.cmd.lock && h0.cmd.t === u;
-        if (!locked && tgt) arrows.push([Math.round(gx), ay - 9 - Math.round(Math.abs(Math.sin(rt * 6)) * 2)]);
+        if (!locked && tgt) arrows.push([q(gx), ay - 9 - Math.round(Math.abs(Math.sin(rt * 6)) * 2)]);
       } else if (it.j) {
         const p = it.j, s = sprOf(p.o.vis);
         const gx = p.x * G.AX - ox, gy = p.y * G.AY - oy;
@@ -397,9 +400,9 @@ G.Render = (() => {
     }
     for (const e of W.effects) if (e.layer === 2 && e.draw) e.draw(b, o);
     // 輸出到螢幕
-    ctx.imageSmoothingEnabled = false;
+    G.SSQ = 1; ctx.imageSmoothingEnabled = false;
     if (hd) G.HD.render(ctx, buf, bw, bh, sc, rt, W.themeId || 'forest');   // v3.2.2 HD-2D（透視＋景深＋柔光＋調色＋光束）
-    else { ctx.drawImage(buf, 0, 0, bw, bh, -R.fx * sc, -R.fy * sc, bw * sc, bh * sc); if (G.VOL & 2) tilt(ctx, buf, bw, bh, sc); }   // 不支援 WebGL：退回 v3.2.1 的 2D 景深
+    else { ctx.drawImage(buf, 0, 0, bw * SS, bh * SS, -R.fx * sc, -R.fy * sc, bw * sc, bh * sc); if (G.VOL & 2) tilt(ctx, buf, bw, bh, sc); }   // 不支援 WebGL：退回 v3.2.1 的 2D 景深
     ctx.drawImage(vign, 0, 0);
     if (W.flashScreen > 0) { ctx.fillStyle = `rgba(255,255,255,${W.flashScreen * 2.5})`; ctx.fillRect(0, 0, R.sw, R.sh); }
     if (h0 && !W.attract) {
@@ -412,7 +415,7 @@ G.Render = (() => {
   function tilt(ctx, buf, bw, bh, sc) {
     const q = 4, w = Math.ceil(bw / q), h = Math.ceil(bh / q);
     if (!blurC || blurC.width !== w || blurC.height !== h) blurC = G.canvas(w, h);
-    const bx = blurC.getContext('2d'); bx.imageSmoothingEnabled = true; bx.clearRect(0, 0, w, h); bx.drawImage(buf, 0, 0, bw, bh, 0, 0, w, h);
+    const bx = blurC.getContext('2d'); bx.imageSmoothingEnabled = true; bx.clearRect(0, 0, w, h); bx.drawImage(buf, 0, 0, buf.width, buf.height, 0, 0, w, h);
     ctx.imageSmoothingEnabled = true;
     // 柔光（HD-2D 的 bloom）：模糊圖用「濾色」疊一層，亮的地方（光暈、水面、法術）會微微發光
     //   只留亮部：模糊圖自己乘自己兩次（≈ 亮度的 4 次方），暗處幾乎歸零，不會讓整個畫面發灰

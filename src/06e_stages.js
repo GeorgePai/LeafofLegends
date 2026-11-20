@@ -138,10 +138,10 @@ G.SOLO_HZ = { wind: { every: 50, dur: 8, k: 1.3 }, blizzard: { every: 60, dur: 1
 G.SoloW = {
   // 敵方每一波（自訂名單）
   wave(W, n) {
-    const S = W.stage, D = S.dif, tier = S.roster[n < 6 ? 0 : n < 15 ? 1 : 2], cnt = Math.min(D.cnt[1], D.cnt[0] + Math.floor(n / 6)), lv = 1 + D.lv + Math.floor(n / 3);
+    const S = W.stage, D = S.dif, tier = S.roster[n < 6 ? 0 : n < 15 ? 1 : 2], cnt = Math.min(D.cnt[1], D.cnt[0] + Math.floor(n / 6)) * (G.TUNE.foeMul || 1), lv = 1 + D.lv + Math.floor(n / 3), gap = G.TUNE.foeGap || 0.45;   // v3.4 數量 ×foeMul
     const rng = G.mulberry(n * 977 + S.d * 31);
-    for (let lane = 0; lane < W.nLanes; lane++) for (let i = 0; i < cnt; i++) W.spawnQ.push({ t: i * 0.45, name: tier[(rng() * tier.length) | 0], side: 1, level: lv, lane });
-    if (n % D.boss === D.boss - 1) { W.spawnQ.push({ t: cnt * 0.45 + 0.5, name: S.boss, side: 1, level: lv + 1, kind: 'boss', lane: n % W.nLanes }); W.sfx('warn'); }
+    for (let lane = 0; lane < W.nLanes; lane++) for (let i = 0; i < cnt; i++) W.spawnQ.push({ t: i * gap, name: tier[(rng() * tier.length) | 0], side: 1, level: lv, lane });
+    if (n % D.boss === D.boss - 1) { W.spawnQ.push({ t: cnt * gap + 0.5, name: S.boss, side: 1, level: lv + 1, kind: 'boss', lane: n % W.nLanes }); W.sfx('warn'); }
     W.stageNow = 1 + n + D.lv * 3;
   },
   // 每一幀：特殊規則
@@ -200,6 +200,8 @@ G.SoloW = {
     const res = { win, stars, rew: 0, first: false, newStars: 0, si };
     if (!G.Team.dev && win) {
       const P = G.Ach.P(); P.stg = P.stg || {}; const old = P.stg[si] || { c: 0, s: 0 };
+      if (P.stgU == null) P.stgU = G.SoloW.maxOpen();                   // v3.4 記下打之前已解鎖到哪（之後選關畫面才知道要播解鎖動畫）
+      if (!old.c && si < G.SOLO.length) res.unlock = si + 1;
       if (!old.c) { res.first = true; res.rew += G.SOLO[si - 1].rew; }
       res.newStars = Math.max(0, stars - old.s); res.rew += res.newStars * G.SOLO_STAR;
       P.stg[si] = { c: (old.c || 0) + 1, s: Math.max(old.s, stars), t: Math.min(old.t || 1e9, Math.round(W.stats.time)) };
@@ -209,5 +211,6 @@ G.SoloW = {
     W.soloRes = res; return res;
   },
   best: si => { const P = G.Ach.P(); return (P.stg && P.stg[si]) || { c: 0, s: 0 }; },
-  open: si => G.Team.dev || si <= 1 || G.SoloW.best(si - 1).c > 0
+  open: si => G.Team.dev || si <= 1 || G.SoloW.best(si - 1).c > 0,
+  maxOpen: () => { let m = 1; for (let i = 1; i <= G.SOLO.length; i++) if (G.SoloW.open(i)) m = i; return m; }
 };

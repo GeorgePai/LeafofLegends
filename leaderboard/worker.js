@@ -10,6 +10,7 @@
 //      管理：POST /admin/ann {key,title,body,keys,days,live}、/admin/anndel {key,id}
 // v3.2 玩家動態：/ping 多帶 st（目前畫面／戰鬥狀態，短字串）、v（版本）、m（1＝手機）；同一台 50 秒內只寫一次，狀態變了最快 10 秒寫一次
 //      /admin/list 每位玩家附上最近一次的 pres（t、st、v、m、t0＝這次上線開始時間）
+// v3.4 /admin/list?g=1 → { list, guests }：guests＝最近 30 分鐘有連線、沒綁帳號的裝置（gid＝sid 雜湊前 8 碼）
 // v2.8.2：管理權限＝遊戲的開發者密碼（key 傳 8 位數密碼，和遊戲用同一個雜湊檢查）；猜錯會被擋：同一個 IP 每小時 5 次、全部合計每小時 30 次
 const CATS = ['heroes', 'minions', 'games', 'wr', 'kda', 'keys', 'dmg', 'time', 'ach'];
 const QUAL = { wr: 'games >= 10', kda: 'games >= 10' };          // 勝率、KDA 至少 10 場才上榜
@@ -169,7 +170,12 @@ async function admin(req, env, url) {
   if (url.pathname === '/admin/list') {
     const [r, q] = await env.DB.batch([env.DB.prepare('SELECT id, name, hidden, heroes, minions, games, wins, kills, deaths, assists, keys, dmg, time, ach, wr, kda, created, updated FROM players ORDER BY updated DESC LIMIT 500'),
       env.DB.prepare('SELECT pid, MAX(t) AS t, st, v, m, t0 FROM pres WHERE pid IS NOT NULL GROUP BY pid')]);   // v3.2 每位玩家最近一次的動態
-    const pm = new Map(q.results.map(x => [x.pid, x])); return J(r.results.map(p => { const x = pm.get(p.id); return x ? Object.assign(p, { pt: x.t, st: x.st, v: x.v, m: x.m, t0: x.t0 }) : p; }));
+    const pm = new Map(q.results.map(x => [x.pid, x])), list = r.results.map(p => { const x = pm.get(p.id); return x ? Object.assign(p, { pt: x.t, st: x.st, v: x.v, m: x.m, t0: x.t0 }) : p; });
+    if (url.searchParams.get('g') !== '1') return J(list);
+    // v3.4 未存檔玩家（從沒綁過帳號的裝置）：最近 30 分鐘有連線的，最多 100 台；sid 只給前 8 碼的雜湊當代號
+    const g = await env.DB.prepare('SELECT sid, t, st, v, m, t0 FROM pres WHERE pid IS NULL AND t > ? ORDER BY t DESC LIMIT 100').bind(Math.floor(Date.now() / 1000) - 1800).all();
+    const guests = await Promise.all(g.results.map(async x => ({ gid: (await sha(x.sid + '|g')).slice(0, 8), t: x.t, st: x.st, v: x.v, m: x.m, t0: x.t0 })));
+    return J({ list, guests });
   }
   if (url.pathname === '/admin/ann' && isPost) {                                       // v3.2 發布系統公告
     const title = cleanBody(b.title, 20), body = cleanBody(b.body, 300); if (!title || !body) return J({ err: 'len' }, 422);

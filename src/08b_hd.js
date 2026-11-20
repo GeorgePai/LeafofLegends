@@ -13,7 +13,7 @@ G.HD = (() => {
   //   輸出像素有預算（手機 100 萬、電腦 220 萬），掉幀時自動降解析度 H.q（0.55～1），順了再慢慢升回來
   const H = { on: true, P: 0.16, ok: null, q: 1, slow: 0, fast: 0, dof: 0 };   // v3.2.4 Pai：拿掉上下緣景深模糊（dof 0；要找回來設 1）
   const RAY = { forest: [1.0, 0.88, 0.62, 0.11], autumn: [1.0, 0.72, 0.42, 0.12], snow: [0.82, 0.92, 1.0, 0.1], lava: [1.0, 0.55, 0.3, 0.1], abyss: [0.66, 0.56, 1.0, 0.08] };
-  const TOUCH = matchMedia('(pointer: coarse)').matches, BUDGET = TOUCH ? 1.0e6 : 2.2e6;
+  const TOUCH = matchMedia('(pointer: coarse)').matches, BUDGET = TOUCH ? 3.2e6 : 4.2e6;   // v3.4 原生解析度（手機 1170×2532≈300 萬也放得下）；掉幀才降
   let gl = null, cv = null, prog = null, lowP = null, tex = null, L = {}, LL = {}, motes = [], dot = null;
   const low = [null, null];   // [模糊色, 亮部]：{ t 貼圖, f 畫框 }
   let lw = 0, lh = 0;
@@ -31,7 +31,7 @@ uniform sampler2D uTex; uniform vec2 uBuf; uniform float uMode;
 vec3 t(vec2 b) { vec3 c = texture2D(uTex, b / uBuf).rgb; return uMode > 0.5 ? max(c - vec3(0.7), vec3(0.0)) : c; }
 void main() { vec2 b = gl_FragCoord.xy * 2.0; gl_FragColor = vec4((t(b + vec2(-1.0, -1.0)) + t(b + vec2(1.0, -1.0)) + t(b + vec2(-1.0, 1.0)) + t(b + vec2(1.0, 1.0))) * 0.25, 1.0); }`;
   const FS = PRE + `
-uniform sampler2D uTex; uniform sampler2D uLC; uniform sampler2D uLB; uniform vec2 uScr; uniform float uSc; uniform float uP; uniform vec2 uCB; uniform vec2 uBuf; uniform vec2 uLow; uniform float uLin; uniform float uT; uniform vec4 uRay; uniform vec3 uFx;
+uniform sampler2D uTex; uniform sampler2D uLC; uniform sampler2D uLB; uniform vec2 uScr; uniform float uSc; uniform float uP; uniform vec2 uCB; uniform vec2 uBuf; uniform vec2 uLow; uniform float uSS; uniform float uOut; uniform float uT; uniform vec4 uRay; uniform vec3 uFx;
 varying vec2 vUV;
 vec2 src(vec2 sp) {
   float s = 1.0 + uP * (2.0 * sp.y / uScr.y - 1.0);
@@ -42,7 +42,11 @@ vec3 lb(vec2 b) { return texture2D(uLB, b / uLow).rgb; }
 void main() {
   vec2 sp = vec2(vUV.x * uScr.x, (1.0 - vUV.y) * uScr.y);
   vec2 b = src(sp);
-  vec3 c = texture2D(uTex, (uLin > 0.5 ? b : floor(b) + 0.5) / uBuf).rgb;
+  // v3.4 銳利雙線性：像素中間是純色、只有交界那半個輸出像素做混合 → 每顆像素一樣大、移動時邊緣不閃（貼圖要用線性取樣）
+  float s = 1.0 + uP * (2.0 * sp.y / uScr.y - 1.0);
+  vec2 tp = b * uSS; float dd = uSS / (uSc * s * uOut);
+  vec2 seam = floor(tp + 0.5); tp = seam + clamp((tp - seam) / dd, -0.5, 0.5);
+  vec3 c = texture2D(uTex, tp / (uBuf * uSS)).rgb;
   float v = sp.y / uScr.y;
   float r = uFx.x * (3.2 * smoothstep(0.36, 0.0, v) + 2.4 * smoothstep(0.72, 1.0, v));
   if (r > 0.02) {
@@ -75,7 +79,7 @@ void main() {
       gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
       tex = mkTex(gl.NEAREST);
       for (let i = 0; i < 2; i++) { const t = mkTex(gl.LINEAR), f = gl.createFramebuffer(); low[i] = { t, f }; }
-      for (const k of ['uTex', 'uLC', 'uLB', 'uScr', 'uSc', 'uP', 'uCB', 'uBuf', 'uLow', 'uLin', 'uT', 'uRay', 'uFx']) L[k] = gl.getUniformLocation(prog, k);
+      for (const k of ['uTex', 'uLC', 'uLB', 'uScr', 'uSc', 'uP', 'uCB', 'uBuf', 'uLow', 'uSS', 'uOut', 'uT', 'uRay', 'uFx']) L[k] = gl.getUniformLocation(prog, k);
       for (const k of ['uTex', 'uBuf', 'uMode']) LL[k] = gl.getUniformLocation(lowP, k);
       gl.useProgram(prog); gl.uniform1i(L.uTex, 0); gl.uniform1i(L.uLC, 1); gl.uniform1i(L.uLB, 2);
       gl.useProgram(lowP); gl.uniform1i(LL.uTex, 0);
@@ -99,7 +103,7 @@ void main() {
     const dt = G.Render.dtF || 0.016;
     if (dt > 0.1) return;
     if (dt > 1 / 48) { H.slow += dt; H.fast = 0; } else if (dt < 1 / 57) { H.fast += dt; H.slow = Math.max(0, H.slow - dt * 0.5); }
-    if (H.slow > 1.5) { H.q = Math.max(0.55, H.q * 0.85); H.slow = 0; }
+    if (H.slow > 1.5) { const R = G.Render; if (H.q > 0.75 || R.ssOff) H.q = Math.max(0.55, H.q * 0.85); else { R.ssOff = true; H.q = 0.85; } H.slow = 0; }   // v3.4 先降解析度，再關掉 2 倍細緻（關了就不再開，避免來回切）
     if (H.fast > 5) { H.q = Math.min(1, H.q * 1.08); H.fast = 0; }
   }
   H.active = () => { if (!H.on) return false; if (H.ok == null) H.ok = init(); return H.ok; };
@@ -109,11 +113,10 @@ void main() {
   H.render = (ctx, buf, bw, bh, sc, rt, themeId) => {
     const R = G.Render, SW = R.sw, SH = R.sh, VW = SW / sc, VH = SH / sc;
     adapt();
-    let gw = Math.min(SW, Math.ceil(VW * 3)), gh = Math.min(SH, Math.ceil(VH * 3));
-    const k = Math.min(1, Math.sqrt(BUDGET * H.q * H.q / (gw * gh)));
+    let gw = SW, gh = SH;
+    const k = Math.min(1, H.q, Math.sqrt(BUDGET * H.q * H.q / (gw * gh)));
     gw = Math.max(64, Math.round(gw * k)); gh = Math.max(64, Math.round(gh * k));
     if (cv.width !== gw || cv.height !== gh) { cv.width = gw; cv.height = gh; }
-    const lin = gw < VW * 1.5;   // 輸出解析度接近原始像素時改線性取樣，避免縮小視角時像素閃爍
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, buf);
     // 1. 半解析預先模糊（模糊色＋亮部）
@@ -122,17 +125,16 @@ void main() {
     for (let i = H.dof ? 0 : 1; i < 2; i++) { gl.bindFramebuffer(gl.FRAMEBUFFER, low[i].f); gl.uniform1f(LL.uMode, i); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4); }
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     // 2. 主畫面：透視＋景深＋柔光＋調色＋光束
-    if (!lin) filt(gl.NEAREST);
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, low[0].t);
     gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, low[1].t);
     gl.activeTexture(gl.TEXTURE0);
     gl.useProgram(prog); gl.viewport(0, 0, gw, gh);
     const ry = RAY[themeId] || RAY.forest;
     gl.uniform2f(L.uScr, SW, SH); gl.uniform1f(L.uSc, sc); gl.uniform1f(L.uP, R.ps); gl.uniform2f(L.uCB, R.cbx, R.cby); gl.uniform2f(L.uBuf, bw, bh);
-    gl.uniform2f(L.uLow, lw * 2, lh * 2); gl.uniform1f(L.uLin, lin ? 1 : 0);
+    gl.uniform2f(L.uLow, lw * 2, lh * 2); gl.uniform1f(L.uSS, R.SS || 1); gl.uniform1f(L.uOut, gw / SW);
     gl.uniform1f(L.uT, rt); gl.uniform4f(L.uRay, ry[0], ry[1], ry[2], ry[3]); gl.uniform3f(L.uFx, H.dof, 1, 1);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-    ctx.imageSmoothingEnabled = gw < SW * 0.6; ctx.drawImage(cv, 0, 0, gw, gh, 0, 0, SW, SH); ctx.imageSmoothingEnabled = false;
+    ctx.imageSmoothingEnabled = gw !== SW; ctx.drawImage(cv, 0, 0, gw, gh, 0, 0, SW, SH); ctx.imageSmoothingEnabled = false;   // 原生解析度 1:1；降解析度時平滑放大（內容已經是銳利雙線性）
     drawMotes(ctx, SW, SH, rt, ry);
   };
   // 漂浮的光塵：慢慢往上飄、忽明忽暗（畫在螢幕上，不跟著世界移動）

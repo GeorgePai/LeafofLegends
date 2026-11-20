@@ -22,7 +22,9 @@ G.boot = function () {
   function frame(now) {
     let dt = (now - last) / 1000; last = now;
     if (dt > 0.1) dt = 0.1; if (dt < 0) dt = 0;
-    fpsT += dt; fpsN++; if (fpsT >= 0.5) { G.UI.fps = fpsN / fpsT; fpsT = 0; fpsN = 0; }
+    fpsT += dt; fpsN++;
+    if (fpsT >= 0.5) { const U = G.UI, f = fpsN / fpsT; U.fps = f; fpsT = 0; fpsN = 0;
+      if (U.screen === 'battle' && !U.paused && !document.hidden) { U.fpsA = U.fpsA ? U.fpsA * 0.9 + f * 0.1 : f; U.fpsLo = Math.min(f, (U.fpsLo || f) + 0.5); } }   // v3.4 戰鬥幀數（約 5 秒平均、最低值慢慢回升）→ 管理玩家監測
     const W = G.W, U = G.UI;
     if (!U.paused && !(G.Menus && G.Menus.covers(U.screen)) && !(G.StageGo && G.StageGo.hold())) {
       W.keyDir = U.screen === 'battle' ? U.keyDir() : null;

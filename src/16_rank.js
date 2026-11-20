@@ -137,7 +137,9 @@ G.Rank = (() => {
   //   s 畫面；戰鬥中再加 g 關卡、b 秒數、l 英雄等級、h 英雄、k K/D/A、w 結果（1 勝 2 敗）
   K.state = () => {
     const U = G.UI, sc = document.hidden ? 'bg' : U.screen === 'battle' && U.paused ? 'pause' : U.screen, o = { s: sc };
-    if (U.screen === 'battle' && G.W && !G.W.attract) { const W = G.W, h = W.hero, S = W.stats || {}; o.g = W.stageI || 0; o.b = Math.round(W.time || 0); if (h) { o.l = h.level; o.h = h.name; } o.k = (S.kills || 0) + '/' + (S.deaths || 0) + '/' + (S.assists || 0); if (W.over) o.w = W.over.win ? 1 : 2; }
+    if (U.screen === 'battle' && G.W && !G.W.attract) { const W = G.W, h = W.hero, S = W.stats || {}; o.g = W.stageI || 0; o.b = Math.round(W.time || 0); if (h) { o.l = h.level; o.h = h.name; } o.k = (S.kills || 0) + '/' + (S.deaths || 0) + '/' + (S.assists || 0); if (W.over) o.w = W.over.win ? 1 : 2;
+      if (U.fpsA) { o.f = Math.round(U.fpsA); o.fl = Math.round(U.fpsLo || U.fpsA); }   // v3.4 幀數（平均／最低）、畫質（HD 解析度 %、超取樣倍數）
+      if (G.HD && G.HD.ok) o.q = Math.round(G.HD.q * 100); o.ss = G.Render.SS || 1; }
     if (U.screen === 'battle' && U.shop) o.s = 'shop_b';
     return JSON.stringify(o);
   };
@@ -190,8 +192,9 @@ G.Rank = (() => {
   K.admLoad = async key => {
     const k = key || K.admKey(); if (!k || K.adm.busy) return false;
     K.adm.busy = 1; K.adm.err = '';
-    let j; try { const r = await fetch(G.RANK_URL + '/admin/list?key=' + encodeURIComponent(k)); j = await r.json(); } catch (e) { j = { err: 'net' }; }
+    let j; try { const r = await fetch(G.RANK_URL + '/admin/list?g=1&key=' + encodeURIComponent(k)); j = await r.json(); } catch (e) { j = { err: 'net' }; }
     K.adm.busy = 0;
+    if (j && Array.isArray(j.list)) { K.adm.guests = (j.guests || []).map(x => Object.assign(x, { g: 1, id: 'g' + x.gid, name: '訪客 ' + x.gid.slice(0, 4).toUpperCase(), pt: x.t })); j = j.list; }   // v3.4 未存檔玩家（訪客）
     if (Array.isArray(j)) { K.adm.list = j; K.adm.t = Date.now(); if (key) try { localStorage.setItem('leafwar_adm', key); } catch (e) { } return true; }
     K.adm.err = j.err === 'auth' ? '密碼不對' : j.err === 'locked' ? '猜錯太多次，1 小時後再試' : '連不上伺服器';
     return false;
@@ -384,7 +387,7 @@ G.RankUI = (() => {
   const ago = s => s < 60 ? '剛剛' : s < 3600 ? Math.floor(s / 60) + ' 分鐘前' : s < 86400 ? Math.floor(s / 3600) + ' 小時前' : Math.floor(s / 86400) + ' 天前';
   const mmss = s => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
   function doing(p, now) {
-    const o = st(p), sc = SCN[o.s] || o.s || '';
+    const o = st(p), sc = SCN[o.s] || o.s || (p.g && !p.st ? '開發者模式' : '');
     if (!p.pt) return '最後上傳 ' + ago(now - (p.updated || p.created || now));
     let t = sc;
     if (o.g != null) { t += '・' + (o.g ? '第 ' + o.g + ' 關' : '經典') + ' ' + mmss(o.b || 0); if (o.l) t += '・Lv' + o.l; if (o.w) t += o.w === 1 ? '・勝利' : '・落敗'; }
@@ -397,6 +400,8 @@ G.RankUI = (() => {
     if (on && p.t0) r.push(['上線', Math.max(1, Math.round((now - p.t0) / 60)) + ' 分鐘']);
     if (p.m != null) r.push(['裝置', p.m ? '手機／平板' : '電腦']);
     if (p.v) r.push(['版本', p.v + (p.v !== G.VERSION ? '（舊版）' : ''), p.v !== G.VERSION ? 10 : 9]);
+    if (o.f) r.push(['幀數', '平均 ' + o.f + '・最低 ' + (o.fl || o.f) + ' FPS' + (o.q != null ? '・解析度 ' + o.q + '%' : '') + (o.ss > 1 ? '・' + o.ss + ' 倍細緻' : ''), (o.fl || o.f) < 40 ? 10 : (o.fl || o.f) < 55 ? 13 : 9]);   // v3.4
+    if (p.g) return r;                                                      // 訪客沒有帳號資料
     r.push(['戰績', (p.games || 0) + ' 場・' + (p.wins || 0) + ' 勝・勝率 ' + (p.games ? Math.round((p.wins || 0) / p.games * 100) : 0) + '%']);
     r.push(['擊殺', (p.kills || 0) + '/' + (p.deaths || 0) + '/' + (p.assists || 0) + '（KDA ' + (p.kda != null ? Number(p.kda).toFixed(1) : '-') + '）']);
     r.push(['收集', '英雄 ' + (p.heroes || 0) + '・小兵 ' + (p.minions || 0) + '・成就 ' + (p.ach || 0)]);
@@ -417,26 +422,26 @@ G.RankUI = (() => {
     if (!A.list) { G.cn(c, A.busy ? '讀取中…' : A.err || '讀取中…', x + W / 2, y + 16, A.err ? 10 : 6, 0.5); if (!A.busy && !A.err) Kk.admLoad(); return; }
     if (!A.busy && A.t && !A.err && Date.now() - A.t > 15000) Kk.admLoad();               // 只有上次成功才自動更新（失敗不重試，避免密碼錯誤次數累積）                          // v3.2 停在這頁時每 15 秒更新動態
     const now = Date.now() / 1000, last = p => Math.max(p.pt || 0, p.updated || 0, p.created || 0), days = p => Math.max(0, Math.floor((now - (last(p) || now)) / 86400)), GH = G.RANK_GHOST;
-    const on = p => p.pt && now - p.pt < 120, L = A.list.slice().sort((a, b) => (on(b) - on(a)) || last(b) - last(a));
-    const hid = L.filter(p => p.hidden).length, gh = L.filter(p => days(p) >= GH).length, onN = L.filter(on).length, fight = L.filter(p => on(p) && /^(battle|pause|shop_b)$/.test(st(p).s)).length, pbw = 52;
+    const on = p => p.pt && now - p.pt < 120, L = A.list.concat(A.guests || []).sort((a, b) => (on(b) - on(a)) || last(b) - last(a)), acc = L.filter(p => !p.g);   // v3.4 訪客（未存檔）一起列，在線的排前面
+    const hid = acc.filter(p => p.hidden).length, gh = acc.filter(p => days(p) >= GH).length, onN = L.filter(on).length, gN = L.filter(p => p.g && on(p)).length, fight = L.filter(p => on(p) && /^(battle|pause|shop_b)$/.test(st(p).s)).length, pbw = 52;
     // 上方摘要：總數、在線（戰鬥中）、隱藏、幽靈；幽靈帳號（GH 天以上沒上線）右邊一鍵清除（要按兩下）
-    const hl = G.cnWrap(A.err || '共 ' + L.length + ' 人・在線 ' + onN + (fight ? '（戰鬥 ' + fight + '）' : '') + (hid ? '・隱藏 ' + hid : '') + (gh ? '・幽靈 ' + gh : ''), W - (gh ? pbw + 8 : 0));
+    const hl = G.cnWrap(A.err || '共 ' + acc.length + ' 人・在線 ' + onN + (fight ? '（戰鬥 ' + fight + '）' : '') + (gN ? '・未存檔 ' + gN : '') + (hid ? '・隱藏 ' + hid : '') + (gh ? '・幽靈 ' + gh : ''), W - (gh ? pbw + 8 : 0));
     hl.forEach((l, i) => G.cn(c, l, x, y + i * 13, A.err ? 10 : 13));
     if (gh && !A.err) { const ask = askPurge && Date.now() - askPurge < 3000;
       (ask ? M.btnPrimary : M.btnSecondary)(c, 'rkPurge', x + W - pbw - 6, y, pbw, 13, ask ? '確定清除' : '清除幽靈', () => { if (ask) { askPurge = 0; Kk.admPurge(GH); } else { askPurge = Date.now(); G.Audio.play('tick'); } }); }
     const ly = y + Math.max(1, hl.length) * 13 + 2, listH = B - bh - 3 - ly;
-    const gl = G.cnWrap('綠點在線・紅字 ' + GH + ' 天沒上線・點一列看詳細', W); gl.forEach((l, i) => G.cn(c, l, x, ly - 1 + i * 13, 4)); const ly2 = ly + gl.length * 13, listH2 = listH - gl.length * 13;
+    const gl = G.cnWrap('綠點在線・灰名是未存檔訪客・紅字 ' + GH + ' 天沒上線・點一列看詳細', W); gl.forEach((l, i) => G.cn(c, l, x, ly - 1 + i * 13, 4)); const ly2 = ly + gl.length * 13, listH2 = listH - gl.length * 13;
     M.scrollDetail(c, x, ly2, W - 6, listH2, 'rkadm', yy => {                                   // v3.2 每人三行：名字、現在在做什麼、場數／裝置／版本；按鈕在右邊
       L.forEach(p => {
         const RH = 41;
         if (yy + RH <= ly2 || yy >= ly2 + listH2) { yy += RH + 2; return; }
-        const d = days(p), w = W - 6, o = on(p), tx = w - 8;
+        const d = p.g ? 0 : days(p), w = W - 6, o = on(p), tx = w - 8;
         H().box(c, x, yy, w, RH, 1, p.hidden ? 2 : o ? 16 : 3, false);
         if (o) { c.fillStyle = P[11]; c.globalAlpha = 0.6 + 0.4 * Math.sin(Date.now() / 300); c.fillRect(x + 4, yy + 5, 4, 4); c.globalAlpha = 1; } else { c.fillStyle = P[4]; c.fillRect(x + 4, yy + 5, 4, 4); }
-        G.cn(c, ell(p.name, tx - 8), x + 11, yy + 1, p.hidden ? 4 : 9);
+        G.cn(c, ell(p.name, tx - 8), x + 11, yy + 1, p.hidden ? 4 : p.g ? 6 : 9);
         G.cn(c, ell(doing(p, now), tx), x + 4, yy + 14, o ? 11 : d >= GH ? 10 : 5);
         const wr = p.games ? Math.round((p.wins || 0) / p.games * 100) + '%' : '-', dev = p.m == null ? '' : p.m ? '・手機' : '・電腦', old = p.v && p.v !== G.VERSION;
-        const l3 = (p.games || 0) + ' 場' + dev; G.cn(c, ell(l3, tx - (p.v ? G.cnW(p.v) + 6 : 0)), x + 4, yy + 27, 6);
+        const l3 = (p.g ? '未存檔' : (p.games || 0) + ' 場') + dev; G.cn(c, ell(l3, tx - (p.v ? G.cnW(p.v) + 6 : 0)), x + 4, yy + 27, 6);
         if (p.v) G.cn(c, p.v, x + 4 + tx, yy + 27, old ? 10 : 5, 1);
         M.tap('aq' + p.id, x, yy, w, RH, () => { det = p.id; askDel = null; G.Audio.play('tick'); });   // 隱藏／刪除改到詳細資料裡，清單留給動態
         yy += RH + 2;
@@ -453,6 +458,7 @@ G.RankUI = (() => {
       G.cn(c, ell(p.name, pw - 16), px + 8, py + 6, 9);
       let yy = py + 24; rows.forEach((r, i) => { G.cn(c, r[0], px + 8, yy, 5); lines[i].forEach((l, k) => G.cn(c, l, px + 8 + lw2, yy + k * 13, r[2] || 9)); yy += lines[i].length * 13; });
       const bw = Math.floor((pw - 16 - 8) / 3), by = py + ph - 22, del = askDel && askDel.id === p.id && Date.now() - askDel.t < 3000;
+      if (p.g) { M.btnSecondary(c, 'adOk', Math.round(px + pw / 2 - bw / 2), by, bw, 16, '關閉', () => { det = null; }); return; }   // 訪客只能看
       M.btnSecondary(c, 'ah' + p.id, px + 8, by, bw, 16, p.hidden ? '復原' : '隱藏', () => Kk.admAct('hide', p.id, p.hidden ? 0 : 1));
       (del ? M.btnPrimary : M.btnSecondary)(c, 'ad' + p.id, px + 12 + bw, by, bw, 16, del ? '確定刪除' : '刪除', () => { if (del) { askDel = null; det = null; Kk.admAct('del', p.id); } else { askDel = { id: p.id, t: Date.now() }; G.Audio.play('tick'); } });
       M.btnSecondary(c, 'adOk', px + 16 + bw * 2, by, bw, 16, '關閉', () => { det = null; });
