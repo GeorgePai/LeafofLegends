@@ -1,5 +1,5 @@
 'use strict';
-G.VERSION = 'V3.5';                                  // 版本號（唯一來源；setup.sh 也從這行讀）
+G.VERSION = 'V3.6';                                  // 版本號（唯一來源；setup.sh 也從這行讀）
 /* =========================================================
    選單：首頁 / 隊伍 / 圖鑑 / 教學
    版面：直屏上下堆疊，橫屏左右分欄
@@ -1734,6 +1734,7 @@ G.Menus = (() => {
   let cat = 0;
   const pagesOf = (ci) => CATS[ci].pages.filter(p => !p.only || (p.only === 'd') === desk);
   M._gt = v => { gt = v; };
+  M.guideKeys = () => CATS.flatMap(c => c.pages.map(p => c.name + '/' + p.t));   // v3.6 存檔碼 LW2 用（教學頁的鍵）
   M._guideGo = (ci, pi) => { cat = ci; page = pi; gt = 0; };   // 測試用
   M._guideList = () => CATS.map((k, i) => pagesOf(i).map(p => p.t));
   M.guideTurn = d => {

@@ -12,11 +12,17 @@ G.RANK_URL = 'https://lol-rank.leafoflegends.workers.dev';                    //
 G.RANK_GAP = 30;                      // 上傳間隔＆一般刷新間隔（秒）
 G.RANK_GHOST = 30;                    // v2.8.4 幾天沒上線算「幽靈帳號」（管理玩家用）
 G.RANK_FAST = 10;                     // v2.8.3 開著排行榜畫面時的刷新間隔（秒）
-G.RANK_CATS = [                       // [欄位, 短名（分類格）, 全名, 單位]
-  ['heroes', '英雄', '英雄收集', '位'], ['minions', '小兵', '小兵收集', '隻'], ['games', '場數', '戰鬥場數', '場'],
-  ['wr', '勝率', '勝率', ''], ['kda', 'KDA', 'KDA', ''], ['keys', '鑰匙', '累積鑰匙', '把'],
-  ['dmg', '傷害', '總傷害', ''], ['time', '時長', '遊玩時長', ''], ['ach', '成就', '成就數', '個']
+G.RANK_CATS = [                       // [欄位, 短名（分類格）, 全名, 單位]（v3.6 新增星數／速通／本週／擊殺／連勝／獵人；拿掉場數、時長）
+  ['stars', '星數', '關卡星數', '顆'], ['spd', '速通', '深淵速通', ''], ['wk', '本週', '本週勝場', '場'],
+  ['bk', '擊殺', '單場最高擊殺', '隻'], ['wst', '連勝', '最長連勝', '場'], ['hunt', '獵人', '首領獵人', '隻'],
+  ['kda', 'KDA', 'KDA', ''], ['wr', '勝率', '勝率', ''], ['heroes', '英雄', '英雄收集', '位'], ['minions', '小兵', '小兵收集', '隻'],
+  ['keys', '鑰匙', '累積鑰匙', '把'], ['dmg', '傷害', '總傷害', ''], ['ach', '成就', '成就數', '個']
 ];
+// 還沒上榜時的提示（底部第二行）、清單是空的時候
+G.RANK_HOW = { spd: '通關深淵就能上榜', wk: '本週贏一場就上榜', bk: '打完一場就能上榜', wst: '贏一場就能上榜', stars: '拿到星星就能上榜', hunt: '擊倒首領或獵手就上榜' };
+G.RANK_NONE = { spd: '還沒有人通關深淵，快來搶第一！', wk: '這週還沒有人獲勝，快來搶第一！（每週一重置）' };
+// 週次：台灣時間每週一 0 點換週（和伺服器同一個公式）
+G.weekId = (t = Date.now()) => Math.floor((Math.floor((t / 1000 + 8 * 3600) / 86400) + 3) / 7);
 G.RANK_MIN = { wr: 10, kda: 3 };       // v3.5 上榜最少場數（KDA 10→3 場；勝率維持 10 場）
 G.Rank = (() => {
   const K = {}, CN = Object.fromEntries(G.RANK_CATS.map(c => [c[0], c[2]]));
@@ -40,6 +46,7 @@ G.Rank = (() => {
     v = +v || 0;
     if (k === 'wr') return v.toFixed(1) + '%';
     if (k === 'kda') return v.toFixed(2);
+    if (k === 'spd') return v ? Math.floor(v / 60) + ':' + String(v % 60).padStart(2, '0') : '-';   // v3.6 速通：分:秒
     if (k === 'time') { const m = Math.floor(v / 60); return m >= 60 ? Math.floor(m / 60) + '時' + (m % 60) + '分' : m + '分'; }
     if (k === 'dmg') return v >= 1e4 ? (v / 1e4).toFixed(v >= 1e6 ? 0 : 1) + '萬' : String(Math.round(v));
     const u = (G.RANK_CATS.find(c => c[0] === k) || [])[3] || ''; return v + (u ? ' ' + u : '');
@@ -48,7 +55,10 @@ G.Rank = (() => {
   K.stats = () => {
     const v = G.Team.get(), p = P(), f = x => Math.max(0, Math.floor(+x || 0));
     if (!G.Team.dev) p.keysTot = Math.max(f(p.keysTot), G.Team.keysFloor());   // v3.2.6 累積不會少於持有＋已花
-    return { heroes: v.owned.h.length, minions: v.owned.m.length, games: f(p.games), wins: Math.min(f(p.wins), f(p.games)), kills: f(p.kills), deaths: f(p.deaths), assists: f(p.assists), keys: f(p.keysTot), dmg: f(p.dmg), time: f(p.time), ach: G.Ach.doneCount() };
+    const stg = p.stg || {}, ab = stg[G.SOLO.length], wk = G.weekId();
+    return { heroes: v.owned.h.length, minions: v.owned.m.length, games: f(p.games), wins: Math.min(f(p.wins), f(p.games)), kills: f(p.kills), deaths: f(p.deaths), assists: f(p.assists), keys: f(p.keysTot), dmg: f(p.dmg), time: f(p.time), ach: G.Ach.doneCount(),
+      stars: Object.values(stg).reduce((a, o) => a + f(o && o.s), 0), spd: ab && ab.c && ab.t ? f(ab.t) : 0, bk: f(p.best && p.best.kills), wst: f(p.wstB), hunt: f(p.bosses) + f(p.hunters),   // v3.6
+      wk: p.wk && p.wk.id === wk ? f(p.wk.n) : 0, wkid: wk };
   };
   K.mine = k => { const s = K.stats(); return k === 'wr' ? (s.games ? Math.round(s.wins / s.games * 1000) / 10 : 0) : k === 'kda' ? Math.round((s.kills + s.assists) / Math.max(1, s.deaths) * 100) / 100 : s[k]; };
   const req = async (path, body) => {
@@ -210,7 +220,7 @@ G.Rank = (() => {
   };
   K._mock = () => {                                                              // 測試用：假資料（20 人、含長名字）
     const nm = ['葉子王', '小派', '阿明', '超級無敵大豌豆', 'Leafy99', '風之子', 'ABCDEFGH', '豆豆', '阿珠', '小樹苗', '火焰射手', '冰霜', '雷神', '阿傑', 'Mia', 'Ken', '老王', '小美', '長名字測試八', '路人'];
-    const base = { heroes: [11, 0.5], minions: [18, 0.5], games: [300, 7], wr: [92.5, 2.3], kda: [9.87, 0.3], keys: [500, 13], dmg: [9876543, 400000], time: [360000, 9000], ach: [60, 2] }, cats = {};
+    const base = { heroes: [11, 0.5], minions: [18, 0.5], games: [300, 7], wr: [92.5, 2.3], kda: [9.87, 0.3], keys: [500, 13], dmg: [9876543, 400000], time: [360000, 9000], ach: [60, 2], stars: [15, 0.6], spd: [620, -25], wk: [42, 2], bk: [88, 4], wst: [23, 1], hunt: [345, 15] }, cats = {};
     for (const [k] of G.RANK_CATS) cats[k] = nm.map((n, i) => [n === '小派' ? 'me00000000000000' : 'id' + String(i).padStart(14, '0'), n, Math.max(1, Math.round((base[k][0] - i * base[k][1]) * 100) / 100)]);
     G.RANK_URL = G.RANK_URL || 'https://x.invalid'; G.Team.get().name = '小派'; G.Ach.P().rk = { id: 'me00000000000000', tok: '0'.repeat(32) };
     K._set({ t: 0, n: 57, news: [], cats }, 'ok', Object.fromEntries(G.RANK_CATS.map(([k], i) => [k, i % 3 ? 2 : 5])));
@@ -340,6 +350,7 @@ G.RankUI = (() => {
     else {
       col = 13; const r = Kk.ranks()[k] || 0, my = Kk.mine(k), g = Kk.stats().games;
       if (G.RANK_MIN[k] && g < G.RANK_MIN[k]) lines = ['你：還沒上榜', '還差 ' + (G.RANK_MIN[k] - g) + ' 場才上榜'];
+      else if (!r && !my && G.RANK_HOW[k]) lines = ['你：還沒上榜', G.RANK_HOW[k]];
       else if (!r) lines = ['你：還沒上榜', '目前 ' + Kk.fmt(k, my)];
       else { const rt = '你：' + (r > 20 ? '20 名以外' : '第 ' + r + ' 名'), vt = Kk.fmt(k, my); lines = G.cnW(rt + '　' + vt) <= W - 70 ? [rt + '　' + vt] : [rt, '目前 ' + vt]; }
       btn = ['rkMe', '跳至自己', () => { jmp = { st: 'ask' }; G.Audio.play('click'); }, 0, myI < 0];   // 不在前 20 名：按鈕變灰
@@ -347,7 +358,7 @@ G.RankUI = (() => {
     const bh = bar(c, x, B, W, lines, col, btn), listH = B - bh - 3 - y;
     // ---- 清單（每列固定 15 高；名字放不下用「…」）----
     if (!b || !rows.length) {
-      const msg = !Kk.on() ? '排行榜準備中，敬請期待' : st === 'quota' ? '今天的排行額度用完了，早上 8 點恢復' : st === 'err' ? '暫時連不上排行榜，稍後會自動再試' : !b ? '讀取中…' : G.RANK_MIN[k] ? '還沒有人打滿 ' + G.RANK_MIN[k] + ' 場，快來搶第一！' : '還沒有人上榜';
+      const msg = !Kk.on() ? '排行榜準備中，敬請期待' : st === 'quota' ? '今天的排行額度用完了，早上 8 點恢復' : st === 'err' ? '暫時連不上排行榜，稍後會自動再試' : !b ? '讀取中…' : G.RANK_NONE[k] ? G.RANK_NONE[k] : G.RANK_MIN[k] ? '還沒有人打滿 ' + G.RANK_MIN[k] + ' 場，快來搶第一！' : '還沒有人上榜';
       G.cnWrap(msg, lw - 12).forEach((l, i) => G.cn(c, l, lx + lw / 2 - 3, y + 16 + i * 13, 6, 0.5));
       return;
     }
@@ -407,6 +418,7 @@ G.RankUI = (() => {
     r.push(['擊殺', (p.kills || 0) + '/' + (p.deaths || 0) + '/' + (p.assists || 0) + '（KDA ' + (p.kda != null ? Number(p.kda).toFixed(1) : '-') + '）']);
     r.push(['收集', '英雄 ' + (p.heroes || 0) + '・小兵 ' + (p.minions || 0) + '・成就 ' + (p.ach || 0)]);
     r.push(['鑰匙', '累積 ' + (p.keys || 0)]);
+    if (p.stars != null) r.push(['紀錄', (p.stars || 0) + ' 星・深淵 ' + K().fmt('spd', p.spd || 0) + '・單場擊殺 ' + (p.bk || 0) + '・連勝 ' + (p.wst || 0) + '・本週 ' + (p.wkid === G.weekId() ? p.wk || 0 : 0) + ' 勝']);   // v3.6
     r.push(['時長', Math.round((p.time || 0) / 3600 * 10) / 10 + ' 小時']);
     r.push(['傷害', String(p.dmg || 0)]);
     if (p.created) r.push(['建立', d(p.created)]);

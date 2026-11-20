@@ -92,7 +92,7 @@ G.ACH_BY = Object.fromEntries(G.ACH.map(a => [a.id, a]));
 G.Ach = (() => {
   const A = {};
   const ADD = ['kills', 'deaths', 'assists', 'camps', 'towers', 'gold', 'time', 'bosses', 'hunters', 'wboss', 'potions', 'dmg', 'tps'];
-  const BEST = ['streak', 'towers', 'gold', 'assists', 'level', 'wboss', 'follow', 'potions', 'bag', 'camps', 'allmax', 'spent'];
+  const BEST = ['streak', 'towers', 'gold', 'assists', 'level', 'wboss', 'follow', 'potions', 'bag', 'camps', 'allmax', 'spent', 'kills'];   // v3.6 kills＝單場最高擊殺（排行）
   A.recent = [];                                     // 本場新達成（結算畫面用）
   A.banner = null;                                   // 選單畫面的成就通知
   // 檔案：缺的欄位自動補上（舊存檔相容）
@@ -100,7 +100,7 @@ G.Ach = (() => {
     const v = G.Team.get();
     if (!v.p) v.p = {};
     const p = v.p;
-    for (const k of [...ADD, 'games', 'wins', 'chests', 'gamble5', 'codes', 'night', 'morning', 'maps']) if (typeof p[k] !== 'number') p[k] = 0;
+    for (const k of [...ADD, 'games', 'wins', 'chests', 'gamble5', 'codes', 'night', 'morning', 'maps', 'wst', 'wstB']) if (typeof p[k] !== 'number') p[k] = 0;   // v3.6 wst 目前連勝、wstB 最長連勝
     for (const k of ['guide', 'book', 'demo']) if (!Array.isArray(p[k])) p[k] = [];
     if (!p.stg || typeof p.stg !== 'object' || Array.isArray(p.stg)) p.stg = {};   // v3.0 關卡紀錄 {關卡: {c 通關次數, s 最佳星數, t 最快秒數}}
     if (!p.best) p.best = {}; for (const k of BEST) if (typeof p.best[k] !== 'number') p.best[k] = 0;
@@ -153,7 +153,7 @@ G.Ach = (() => {
     if (A.off() || !W || W.attract || !W._cm) return;
     const P = A.P(), st = W.stats;
     for (const k of ADD) { const d = (st[k] || 0) - W._cm[k]; if (d) { P[k] += d; W._cm[k] = st[k] || 0; } }
-    const live = { streak: st.streak, towers: st.towers, gold: st.gold, assists: st.assists, level: W.hero ? W.hero.level : 0, wboss: st.wboss, follow: st.maxFollow, potions: st.potions, bag: W.bag.length, camps: st.camps, spent: st.spent || 0,
+    const live = { streak: st.streak, towers: st.towers, gold: st.gold, assists: st.assists, level: W.hero ? W.hero.level : 0, wboss: st.wboss, follow: st.maxFollow, potions: st.potions, bag: W.bag.length, camps: st.camps, spent: st.spent || 0, kills: st.kills,
       allmax: W.hero && [...W.hero.skills, ...W.hero.pskills].every(q => q.lv >= G.SKILL_MAX) ? 1 : 0 };
     for (const k of BEST) P.best[k] = Math.max(P.best[k], live[k] || 0);
     G.Team.save();
@@ -170,6 +170,8 @@ G.Ach = (() => {
     if (A.off()) return;
     A.commit(W);
     const P = A.P(), win = !!W.over.win; P.games++; if (win) P.wins++;
+    P.wst = win ? P.wst + 1 : 0; P.wstB = Math.max(P.wstB, P.wst);                        // v3.6 連勝
+    if (win) { const wk = G.weekId(); if (!P.wk || P.wk.id !== wk) P.wk = { id: wk, n: 0 }; P.wk.n++; }   // v3.6 本週勝場（每週一換週）
     const hr = new Date().getHours(); if (hr < 5) P.night++; if (hr >= 5 && hr < 8) P.morning++;
     G.Team.save();
     A.check({ win, st: W.stats, pts: W.loadPts, stage: W.stageI || 0 }, W);

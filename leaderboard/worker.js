@@ -12,7 +12,14 @@
 //      /admin/list 每位玩家附上最近一次的 pres（t、st、v、m、t0＝這次上線開始時間）
 // v3.4 /admin/list?g=1 → { list, guests }：guests＝最近 30 分鐘有連線、沒綁帳號的裝置（gid＝sid 雜湊前 8 碼）
 // v2.8.2：管理權限＝遊戲的開發者密碼（key 傳 8 位數密碼，和遊戲用同一個雜湊檢查）；猜錯會被擋：同一個 IP 每小時 5 次、全部合計每小時 30 次
-const CATS = ['heroes', 'minions', 'games', 'wr', 'kda', 'keys', 'dmg', 'time', 'ach'];
+const CATS = ['stars', 'spd', 'wk', 'bk', 'wst', 'hunt', 'kda', 'wr', 'heroes', 'minions', 'keys', 'dmg', 'ach'];   // v3.6 新增 6 類、拿掉場數與時長（欄位還在）
+// v3.6 新欄位：stars 關卡星數、spd 深淵速通秒數（越小越好，0＝沒通關）、wk/wkid 本週勝場與週次、bk 單場最高擊殺、wst 最長連勝、hunt 首領＋獵手
+const EX = ['stars', 'spd', 'bk', 'wst', 'hunt', 'wk', 'wkid'], EXMAX = { stars: 60, spd: 86400, bk: 1e5, wst: 1e6, hunt: 1e7, wk: 1e5, wkid: 1e6 };
+const weekId = () => Math.floor((Math.floor((Date.now() / 1000 + 8 * 3600) / 86400) + 3) / 7);   // 台灣時間每週一 0 點換週
+const ASC = { spd: 1 };
+// 每一類：上榜條件、排序（created 早的同分在前）
+const cond = k => k === 'wk' ? 'wkid = ' + weekId() + ' AND wk > 0' : QUAL[k] || k + ' > 0';
+const better = k => ASC[k] ? `${k} < ?1` : `${k} > ?1`;
 const MING = { wr: 10, kda: 3 }, QUAL = Object.fromEntries(Object.entries(MING).map(([k, n]) => [k, 'games >= ' + n]));   // 勝率至少 10 場、KDA 至少 3 場才上榜（v3.5）
 const FIELDS = ['heroes', 'minions', 'games', 'wins', 'kills', 'deaths', 'assists', 'keys', 'dmg', 'time', 'ach'];
 const MAX = { heroes: 40, minions: 80, ach: 200, games: 1e6, wins: 1e6, kills: 1e8, deaths: 1e8, assists: 1e8, keys: 1e7, dmg: 1e12, time: 1e9 };
@@ -35,7 +42,7 @@ const isQuota = e => /limit|exceed|quota/i.test(String((e && e.message) || e));
 
 async function board(env) {
   if (cache && Date.now() - cacheT < CACHE_MS) return cache;
-  const qs = CATS.map(k => env.DB.prepare(`SELECT id, name, ${k} AS v FROM players WHERE hidden = 0 AND ${QUAL[k] || k + ' > 0'} ORDER BY ${k} DESC, created ASC LIMIT ${TOP}`));
+  const qs = CATS.map(k => env.DB.prepare(`SELECT id, name, ${k} AS v FROM players WHERE hidden = 0 AND ${cond(k)} ORDER BY ${k} ${ASC[k] ? 'ASC' : 'DESC'}, created ASC LIMIT ${TOP}`));
   qs.push(env.DB.prepare('SELECT id, t, pid, name, cat FROM news ORDER BY id DESC LIMIT 20'));
   qs.push(env.DB.prepare('SELECT COUNT(*) AS n FROM players WHERE hidden = 0'));
   const rs = await env.DB.batch(qs), cats = {};
@@ -44,8 +51,8 @@ async function board(env) {
   return cache;
 }
 async function ranks(env, p) {
-  const qs = CATS.map(k => (p.hidden || (QUAL[k] ? p.games < MING[k] : !(p[k] > 0))) ? null
-    : env.DB.prepare(`SELECT COUNT(*) AS n FROM players WHERE hidden = 0 AND ${QUAL[k] ? QUAL[k] + ' AND ' : ''}(${k} > ?1 OR (${k} = ?1 AND created < ?2))`).bind(p[k], p.created));
+  const qs = CATS.map(k => (p.hidden || (QUAL[k] ? p.games < MING[k] : !(p[k] > 0)) || (k === 'wk' && p.wkid !== weekId())) ? null
+    : env.DB.prepare(`SELECT COUNT(*) AS n FROM players WHERE hidden = 0 AND ${cond(k)} AND (${better(k)} OR (${k} = ?1 AND created < ?2))`).bind(p[k], p.created));
   const live = qs.filter(Boolean), rs = live.length ? await env.DB.batch(live) : [], out = {}; let j = 0;
   CATS.forEach((k, i) => { out[k] = qs[i] ? rs[j++].results[0].n + 1 : 0; });
   return out;
@@ -74,21 +81,27 @@ async function submit(req, env) {
   for (const f of FIELDS) { const x = Number(s[f]); if (!isInt(x, MAX[f])) return J({ err: 'value', f }, 422); v[f] = x; }
   if (v.wins > v.games) return J({ err: 'value', f: 'wins' }, 422);
   if (v.dmg > (v.time + 60) * DMG_PS) return J({ err: 'value', f: 'dmg' }, 422);
+  const ex = {}; for (const f of EX) { const x = Number(s[f]); ex[f] = isInt(x, EXMAX[f]) ? x : 0; }   // v3.6 新欄位：舊版沒送就是 0（不擋）
+  if (ex.wk > v.wins) ex.wk = 0; if (ex.wst > v.wins) ex.wst = 0; if (Math.abs(ex.wkid - weekId()) > 1) { ex.wk = 0; ex.wkid = 0; }
   const [old, bad] = await auth(env, id, tok, String(b.ss || '')); if (bad) return bad;
   const ih = (await sha((req.headers.get('cf-connecting-ip') || '') + '|lol')).slice(0, 16);
   if (old) {
     if (now - old.updated < GAP_S) return J({ err: 'wait', wait: GAP_S - (now - old.updated) }, 429);
     if (v.time > old.time && v.time - old.time > now - old.updated + 120) return J({ err: 'value', f: 'time' }, 422);   // 不可能比真實經過的時間玩得更久
     for (const f of FIELDS) v[f] = Math.max(v[f], old[f]);                                                             // 累積數值只增不減
+    for (const f of ['stars', 'bk', 'wst', 'hunt']) ex[f] = Math.max(ex[f], old[f] || 0);
+    ex.spd = ex.spd && old.spd ? Math.min(ex.spd, old.spd) : ex.spd || old.spd || 0;                                 // 速通取最快
+    if ((old.wkid || 0) > ex.wkid) { ex.wk = old.wk; ex.wkid = old.wkid; } else if (old.wkid === ex.wkid) ex.wk = Math.max(ex.wk, old.wk || 0);
   } else {
     const c = await env.DB.prepare('SELECT COUNT(*) AS n FROM players WHERE ip = ? AND created > ?').bind(ih, now - 3600).first();
     if (c.n >= NEW_PER_IP_H) return J({ err: 'busy' }, 429);
   }
-  const p = { ...v, wr: v.games ? Math.round(v.wins / v.games * 1000) / 10 : 0, kda: Math.round((v.kills + v.assists) / Math.max(1, v.deaths) * 100) / 100, created: old ? old.created : now, hidden: old ? old.hidden : 0 };
+  const p = { ...v, ...ex, wr: v.games ? Math.round(v.wins / v.games * 1000) / 10 : 0, kda: Math.round((v.kills + v.assists) / Math.max(1, v.deaths) * 100) / 100, created: old ? old.created : now, hidden: old ? old.hidden : 0 };
   const before = await board(env);
-  await env.DB.prepare(`INSERT INTO players (id, tok, name, ip, ${FIELDS.join(', ')}, wr, kda, created, updated, sess) VALUES (?1, ?2, ?3, ?4, ${FIELDS.map((_, i) => '?' + (i + 5)).join(', ')}, ?16, ?17, ?18, ?19, ?20)
-    ON CONFLICT(id) DO UPDATE SET sess = COALESCE(players.sess, excluded.sess), name = excluded.name, ${FIELDS.map(f => f + ' = excluded.' + f).join(', ')}, wr = excluded.wr, kda = excluded.kda, updated = excluded.updated`)
-    .bind(id, await sha(tok + id), name, ih, ...FIELDS.map(f => p[f]), p.wr, p.kda, p.created, now, okSS(b.ss) ? b.ss : null).run();
+  const AF = FIELDS.concat(EX), N0 = 5 + AF.length;                                                                   // v3.6 欄位清單（新欄位接在後面）
+  await env.DB.prepare(`INSERT INTO players (id, tok, name, ip, ${AF.join(', ')}, wr, kda, created, updated, sess) VALUES (?1, ?2, ?3, ?4, ${AF.map((_, i) => '?' + (i + 5)).join(', ')}, ?${N0}, ?${N0 + 1}, ?${N0 + 2}, ?${N0 + 3}, ?${N0 + 4})
+    ON CONFLICT(id) DO UPDATE SET sess = COALESCE(players.sess, excluded.sess), name = excluded.name, ${AF.map(f => f + ' = excluded.' + f).join(', ')}, wr = excluded.wr, kda = excluded.kda, updated = excluded.updated`)
+    .bind(id, await sha(tok + id), name, ih, ...AF.map(f => p[f]), p.wr, p.kda, p.created, now, okSS(b.ss) ? b.ss : null).run();
   const rk = await ranks(env, p), news = CATS.filter(k => rk[k] === 1 && !(before.cats[k][0] && before.cats[k][0][0] === id));
   if (news.length) {
     await env.DB.batch(news.map(k => env.DB.prepare('INSERT INTO news (t, pid, name, cat) VALUES (?, ?, ?, ?)').bind(now, id, name, k))
@@ -168,7 +181,7 @@ async function admin(req, env, url) {
   const k = String(key || ''), ok = (env.ADMIN_KEY && k === env.ADMIN_KEY) || (/^[0-9]{8}$/.test(k) && devHash(k) === DEV_H);
   if (!ok) { await env.DB.batch([env.DB.prepare('INSERT INTO fails (ip, t) VALUES (?, ?)').bind(ih, hr + 3600), env.DB.prepare('DELETE FROM fails WHERE t < ?').bind(hr)]); return J({ err: 'auth' }, 403); }
   if (url.pathname === '/admin/list') {
-    const [r, q] = await env.DB.batch([env.DB.prepare('SELECT id, name, hidden, heroes, minions, games, wins, kills, deaths, assists, keys, dmg, time, ach, wr, kda, created, updated FROM players ORDER BY updated DESC LIMIT 500'),
+    const [r, q] = await env.DB.batch([env.DB.prepare('SELECT id, name, hidden, heroes, minions, games, wins, kills, deaths, assists, keys, dmg, time, ach, wr, kda, stars, spd, bk, wst, hunt, wk, wkid, created, updated FROM players ORDER BY updated DESC LIMIT 500'),
       env.DB.prepare('SELECT pid, MAX(t) AS t, st, v, m, t0 FROM pres WHERE pid IS NOT NULL GROUP BY pid')]);   // v3.2 每位玩家最近一次的動態
     const pm = new Map(q.results.map(x => [x.pid, x])), list = r.results.map(p => { const x = pm.get(p.id); return x ? Object.assign(p, { pt: x.t, st: x.st, v: x.v, m: x.m, t0: x.t0 }) : p; });
     if (url.searchParams.get('g') !== '1') return J(list);
@@ -211,7 +224,9 @@ const SCHEMA = [
   'CREATE INDEX IF NOT EXISTS i_pres_t ON pres (t)',
   'CREATE TABLE IF NOT EXISTS ann (id INTEGER PRIMARY KEY AUTOINCREMENT, t INTEGER, title TEXT, body TEXT, keys INTEGER DEFAULT 0, live INTEGER DEFAULT 1, exp INTEGER)'
 ];
-const UPGRADES = ['ALTER TABLE players ADD COLUMN hidden INTEGER DEFAULT 0', 'ALTER TABLE players ADD COLUMN sess TEXT', 'ALTER TABLE pres ADD COLUMN pid TEXT', 'ALTER TABLE pres ADD COLUMN st TEXT', 'ALTER TABLE pres ADD COLUMN v TEXT', 'ALTER TABLE pres ADD COLUMN m INTEGER', 'ALTER TABLE pres ADD COLUMN t0 INTEGER', 'CREATE INDEX IF NOT EXISTS i_pres_pid ON pres (pid, t)'];   // 已經有這欄就會報錯，略過即可
+const UPGRADES = [...['stars', 'spd', 'bk', 'wst', 'hunt', 'wk', 'wkid'].map(k => `ALTER TABLE players ADD COLUMN ${k} INTEGER DEFAULT 0`),   // v3.6
+  ...['stars', 'bk', 'wst', 'hunt'].map(k => `CREATE INDEX IF NOT EXISTS i_${k} ON players (${k} DESC, created)`), 'CREATE INDEX IF NOT EXISTS i_spd ON players (spd, created)', 'CREATE INDEX IF NOT EXISTS i_wk ON players (wkid, wk DESC, created)',
+  'ALTER TABLE players ADD COLUMN hidden INTEGER DEFAULT 0', 'ALTER TABLE players ADD COLUMN sess TEXT', 'ALTER TABLE pres ADD COLUMN pid TEXT', 'ALTER TABLE pres ADD COLUMN st TEXT', 'ALTER TABLE pres ADD COLUMN v TEXT', 'ALTER TABLE pres ADD COLUMN m INTEGER', 'ALTER TABLE pres ADD COLUMN t0 INTEGER', 'CREATE INDEX IF NOT EXISTS i_pres_pid ON pres (pid, t)'];   // 已經有這欄就會報錯，略過即可
 async function migrate(env) {
   if (migrated) return;
   await env.DB.batch(SCHEMA.map(q => env.DB.prepare(q)));

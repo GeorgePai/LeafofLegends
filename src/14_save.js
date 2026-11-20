@@ -2,6 +2,11 @@
 /* =========================================================
    存檔碼：把所有進度（角色、鑰匙、隊伍、成就、累計數據、名稱）打包成一串文字
    格式：LW1Z-<base64url(deflate(JSON))>-<4 碼檢查碼>（瀏覽器不支援壓縮時用 LW1P，不壓縮）
+   v3.6 LW2Z／LW2P：精簡二進位（同樣壓縮＋base64url），長度約剩 1/4～1/5：
+     - 角色、成就用「固定清單的位元」（清單只能往後加；不在清單裡的新項目用 3 位元組雜湊另外記）
+     - 看過的教學頁／圖鑑／技能展示：每筆 3 位元組雜湊（讀檔時用遊戲裡現有的名稱反查；查不到的原字串放進 JSON 備援區，不會遺失）
+     - 數據用變長整數（小數無條件捨去）；不認得的欄位整包放進 JSON 備援區
+     - 產生後立刻解回來比對，不一致就改用 LW1（保證不掉資料）；舊的 LW1 永遠讀得到
    ========================================================= */
 G.SaveCode = (() => {
   const S = {};
@@ -9,9 +14,94 @@ G.SaveCode = (() => {
   const unb64u = str => { str = str.replace(/-/g, '+').replace(/_/g, '/'); while (str.length % 4) str += '='; const s = atob(str), b = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i); return b; };
   const sum = str => { let h = 0x811c9dc5; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return (h % 1679616).toString(36).toUpperCase().padStart(4, '0'); };
   const pipe = async (bytes, Stream, fmt) => { const s = new Blob([bytes]).stream().pipeThrough(new Stream(fmt)); return new Uint8Array(await new Response(s).arrayBuffer()); };
+  // ---------- v3.6 LW2 精簡格式 ----------
+  // 固定清單（v3.6 當下的順序）——以後只能往後加，不可以刪、不可以改順序
+  const FH = ['leafy', 'quickleafy', 'spearleafy', 'splashleafy', 'muscleleafy', 'eliteleafy', 'elitequickleafy', 'elitespearleafy', 'cannonleafy', 'berserkerleafy', 'necroleafy'];
+  const FM = ['leafblower', 'potatoblower', 'seedshooter', 'treeprotector', 'stemskewer', 'twinflower', 'peasniper', 'leafmuscle', 'fruitpult', 'flame', 'sunshooter', 'iceshooter', 'poisonshooter', 'flametree', 'vampireflower', 'elitepeasniper', 'leaftanker', 'treestun'];
+  const FA = ['games1', 'games20', 'games50', 'wins10', 'time30', 'time180', 'time600', 'kill100', 'kill1000', 'boss10', 'boss50', 'tower20', 'tower100', 'gold', 'wins50', 'camp100', 'dmg', 'tp50', 'win1', 'flawless', 'speed', 'comeback', 'phoenix', 'few', 'streak', 'demolish', 'rich', 'assist', 'lv10', 'tame', 'tame2', 'hunter', 'army', 'potion', 'fullbag', 'pacifist', 'marathon', 'tank', 'jungle12', 'allmax', 'spend', 'streak10', 'chest1', 'gamble5', 'hero5', 'heroAll', 'minion10', 'minionAll', 'ach15', 'chest30', 'legend3', 'mythic', 'guide', 'book', 'demo', 'save', 'night', 'early', 'demoAll', 'scout', 'stg1', 'stg2', 'stg3', 'stg4', 'stg5', 'star3', 'starAll', 'huntKill'];
+  const FN = ['kills', 'deaths', 'assists', 'camps', 'towers', 'gold', 'time', 'bosses', 'hunters', 'wboss', 'potions', 'dmg', 'tps', 'games', 'wins', 'chests', 'gamble5', 'codes', 'night', 'morning', 'maps', 'gift', 'giftAsk', 'keysTot', 'gbD', 'stgU', 'wst', 'wstB'];
+  const FB = ['streak', 'towers', 'gold', 'assists', 'level', 'wboss', 'follow', 'potions', 'bag', 'camps', 'allmax', 'spent', 'kills'];
+  const FG = ['操作/移動', '操作/鍵盤移動', '操作/移動視角', '操作/縮放畫面', '操作/回到英雄', '操作/傳送', '操作/大地圖', '戰鬥/自動攻擊', '戰鬥/攻擊順序', '戰鬥/鎖定目標', '戰鬥/召集小兵', '戰鬥/施放技能', '戰鬥/魔力 MP', '戰鬥/金幣與商店', '戰鬥/使用道具', '戰鬥/鑰匙掉落', '戰鬥/技能升級', '戰鬥/技能說明', '戰鬥/施法前搖', '戰鬥/技能瞄準', '戰鬥/取消施放', '戰鬥/塔的警戒', '戰鬥/特殊藥水', '戰鬥/戰鬥數據', '戰鬥/升級', '戰鬥/英雄資訊', '地圖/兵線', '地圖/防禦塔', '地圖/推塔順序', '地圖/摧毀聖所', '地圖/河道與野區', '地圖/視野與迷霧', '地圖/野怪增益', '地圖/野生首領', '地圖/敵方獵手', '地圖/首領', '地圖/聖樹回復', '隊伍/解鎖角色', '隊伍/寶箱', '隊伍/免費寶箱', '隊伍/稀有度', '隊伍/植物點數', '隊伍/加入小兵', '隊伍/移出小兵', '系統/關卡星等', '系統/成就', '系統/存檔碼', '系統/讀取存檔', '系統/排行榜', '系統/反饋', '系統/版本更新'];   // 教學頁（v3.6）
+  const FK = ['leafy', 'quickleafy', 'spearleafy', 'splashleafy', 'muscleleafy', 'eliteleafy', 'elitequickleafy', 'elitespearleafy', 'cannonleafy', 'berserkerleafy', 'leafblower', 'potatoblower', 'seedshooter', 'treeprotector', 'stemskewer', 'twinflower', 'peasniper', 'leafmuscle', 'fruitpult', 'flame', 'sunshooter', 'iceshooter', 'poisonshooter', 'flametree', 'vampireflower', 'babybear', 'bear', 'mouse', 'eagle', 'bat', 'boar', 'chipmunk', 'vampirebat', 'blackvulture', 'dog', 'whitemouse', 'gnomebaby', 'gorilla', 'hippo', 'raven', 'bigbear', 'tiger', 'penguin', 'polarbear', 'turtle', 'gnome', 'buffalo', 'cat', 'lion', 'crocodile', 'kangaroo', 'madwolf', 'monkey', 'smartmonkey', 'spearbear', 'bigboar', 'firebear', 'firegnome', 'madbuffalo', 'splashbuffalo', 'elitepeasniper', 'leaftanker', 'treestun', 'necroleafy', 'shroom', 'hedgehog', 'stagking', 'snowhare', 'yeti', 'salamander', 'magmagolem', 'wraith', 'cerberus', 'hunter'];   // 圖鑑（v3.6）
+  const h24 = s => { let h = 0x811c9dc5; s = String(s); for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return h & 0xffffff; };
+  const nat = x => typeof x === 'number' && isFinite(x) && x >= 0;
+  function enc2(v) {
+    const W = [], p = v.p || {}, rest = {}, te = new TextEncoder();
+    const vu = n => { n = nat(n) ? Math.floor(n) : 0; while (n >= 128) { W.push((n % 128) | 128); n = Math.floor(n / 128); } W.push(n); };
+    const str = s => { const b = te.encode(String(s)); vu(b.length); for (const x of b) W.push(x); };
+    const hs = x => { const h = h24(x); W.push(h & 255, (h >> 8) & 255, h >> 16); };
+    const bits = (list, on) => { for (let i = 0; i < list.length; i += 8) { let b = 0; for (let j = 0; j < 8 && i + j < list.length; j++) if (on(list[i + j])) b |= 1 << j; W.push(b); } };
+    const set = (list, have) => { bits(list, n => have.includes(n)); const ex = have.filter(n => !list.includes(n)); vu(ex.length); ex.forEach(hs); };
+    W.push(2); str(v.name || ''); vu(v.hero); vu(v.keys);
+    set(FH, v.owned.h); set(FM, v.owned.m);
+    vu(v.loadout.length); for (const e of v.loadout) { const i = FM.indexOf(e.n); if (i >= 0) vu(i + 1); else { vu(0); hs(e.n); } W.push(e.l | 0); }
+    for (let i = 0; i < FA.length; i += 4) { let b = 0; for (let j = 0; j < 4 && i + j < FA.length; j++) b |= ((v.ach[FA[i + j]] | 0) & 3) << (j * 2); W.push(b); }
+    const exA = Object.keys(v.ach).filter(k => !FA.includes(k)); vu(exA.length); exA.forEach(k => { hs(k); W.push(v.ach[k] | 0); });
+    bits(FN, k => nat(p[k])); FN.forEach(k => { if (nat(p[k])) vu(p[k]); });
+    const bst = p.best && typeof p.best === 'object' ? p.best : null; W.push(bst ? 1 : 0);
+    if (bst) { bits(FB, k => nat(bst[k])); FB.forEach(k => { if (nat(bst[k])) vu(bst[k]); }); const bx = Object.keys(bst).filter(k => !FB.includes(k) || !nat(bst[k])); if (bx.length) rest.best = Object.fromEntries(bx.map(k => [k, bst[k]])); }
+    const stg = p.stg && typeof p.stg === 'object' ? p.stg : {}, sk = Object.keys(stg).filter(k => /^\d+$/.test(k) && stg[k] && nat(stg[k].c) && nat(stg[k].s) && (stg[k].t == null || nat(stg[k].t)));
+    vu(sk.length); sk.forEach(k => { const o = stg[k]; vu(+k); vu(o.c); vu(o.s); vu(o.t == null ? 0 : o.t + 1); });
+    if (sk.length !== Object.keys(stg).length) rest.stgX = Object.fromEntries(Object.keys(stg).filter(k => !sk.includes(k)).map(k => [k, stg[k]]));
+    // 看過的清單：字串 → 3 位元組雜湊；技能展示是數字 → 變長整數；反查不到的放備援區
+    const known = lists();
+    for (const [key, cand] of [['guide', known.guide], ['book', known.book]]) {
+      const a = (Array.isArray(p[key]) ? p[key] : []).map(String), F = key === 'guide' ? FG : FK, inF = a.filter(x => F.includes(x)), ok = a.filter(x => !F.includes(x) && cand.has(x)), bad = a.filter(x => !F.includes(x) && !cand.has(x));
+      bits(F, x => inF.includes(x)); vu(ok.length); ok.forEach(hs); if (bad.length || new Set(inF).size !== inF.length) rest[key + 'X'] = bad.concat(inF.filter((x, i) => inF.indexOf(x) !== i));   // 固定清單用位元，新的用雜湊
+    }
+    { const a = Array.isArray(p.demo) ? p.demo : [], ok = a.filter(x => /^\d{1,9}$/.test(String(x))), bad = a.filter(x => !/^\d{1,9}$/.test(String(x))); vu(ok.length); ok.forEach(x => vu(+x)); if (bad.length) rest.demoX = bad; }
+    const rk = p.rk, rkOk = rk && /^[0-9a-f]{16}$/.test(rk.id) && /^[0-9a-f]{32}$/.test(rk.tok) && Object.keys(rk).length === 2;
+    W.push(rkOk ? 1 : 0); if (rkOk) for (const hx of [rk.id, rk.tok]) for (let i = 0; i < hx.length; i += 2) W.push(parseInt(hx.substr(i, 2), 16));
+    const wk = p.wk, wkOk = wk && nat(wk.id) && nat(wk.n) && Object.keys(wk).length === 2; W.push(wkOk ? 1 : 0); if (wkOk) { vu(wk.id); vu(wk.n); }
+    // 其他不認得的欄位（以後新增的東西）→ JSON 備援
+    const done = new Set([...FN, 'best', 'stg', 'guide', 'book', 'demo', 'rk', 'wk']);
+    for (const k in p) { if (!done.has(k)) rest[k] = p[k]; else if (FN.includes(k) && !nat(p[k])) rest[k] = p[k]; }
+    if (rk && !rkOk) rest.rk = rk; if (wk && !wkOk) rest.wk = wk;
+    str(Object.keys(rest).length ? JSON.stringify(rest) : '');
+    return new Uint8Array(W);
+  }
+  function dec2(b) {
+    let i = 0; const td = new TextDecoder(), known = lists();
+    const u8 = () => { if (i >= b.length) throw new Error('eof'); return b[i++]; };
+    const vu = () => { let n = 0, m = 1, x; do { x = u8(); n += (x & 127) * m; m *= 128; } while (x & 128); return n; };
+    const str = () => { const n = vu(); if (i + n > b.length) throw new Error('eof'); const s = td.decode(b.subarray(i, i + n)); i += n; return s; };
+    const hs = () => u8() | (u8() << 8) | (u8() << 16);
+    const rev = arr => { const m = new Map(); for (const x of arr) m.set(h24(x), x); return m; };
+    const bits = (list) => { const out = []; for (let k = 0; k < list.length; k += 8) { const x = u8(); for (let j = 0; j < 8 && k + j < list.length; j++) if (x & (1 << j)) out.push(list[k + j]); } return out; };
+    const set = (list, all) => { const out = bits(list), m = rev(all); for (let n = vu(); n > 0; n--) { const x = m.get(hs()); if (x != null) out.push(x); } return out; };
+    if (u8() !== 2) throw new Error('ver');
+    const v = { name: str(), hero: vu(), keys: vu(), owned: {}, loadout: [], ach: {}, p: {} };
+    v.owned.h = set(FH, G.HEROES.map(h => h.name)); v.owned.m = set(FM, G.ROSTER.minions);
+    const mRev = rev(G.ROSTER.minions);
+    for (let n = vu(); n > 0; n--) { const k = vu(), nm = k ? FM[k - 1] : mRev.get(hs()), l = u8(); if (nm) v.loadout.push({ n: nm, l }); }
+    for (let k = 0; k < FA.length; k += 4) { const x = u8(); for (let j = 0; j < 4 && k + j < FA.length; j++) { const s = (x >> (j * 2)) & 3; if (s) v.ach[FA[k + j]] = s; } }
+    { const m = rev(G.ACH.map(a => a.id)); for (let n = vu(); n > 0; n--) { const id = m.get(hs()), s = u8(); if (id && s) v.ach[id] = s; } }
+    const p = v.p; bits(FN).forEach(k => { p[k] = vu(); });
+    if (u8()) { p.best = {}; bits(FB).forEach(k => { p.best[k] = vu(); }); }
+    p.stg = {}; for (let n = vu(); n > 0; n--) { const k = vu(), c = vu(), s = vu(), t = vu(); p.stg[k] = t ? { c, s, t: t - 1 } : { c, s }; }
+    for (const key of ['guide', 'book']) { const m = rev([...known[key]]); p[key] = bits(key === 'guide' ? FG : FK); for (let n = vu(); n > 0; n--) { const x = m.get(hs()); if (x != null) p[key].push(x); } }
+    p.demo = []; for (let n = vu(); n > 0; n--) p.demo.push(String(vu()));
+    if (u8()) { const hx = n => { let s = ''; for (let k = 0; k < n; k++) s += u8().toString(16).padStart(2, '0'); return s; }; p.rk = { id: hx(8), tok: hx(16) }; }
+    if (u8()) p.wk = { id: vu(), n: vu() };
+    const js = str(); if (js) { const r = JSON.parse(js);
+      for (const k in r) { if (k === 'best') p.best = Object.assign(p.best || {}, r.best); else if (k === 'stgX') Object.assign(p.stg, r.stgX); else if (/^(guide|book|demo)X$/.test(k)) p[k.slice(0, -1)] = p[k.slice(0, -1)].concat(r[k]); else p[k] = r[k]; } }
+    return v;
+  }
+  // 讀檔反查用：目前遊戲裡所有教學頁鍵、圖鑑名稱
+  const lists = () => ({ guide: new Set(G.Menus && G.Menus.guideKeys ? G.Menus.guideKeys() : []), book: new Set(Object.keys(G.ORIG.units).concat(G.HEROES.map(h => h.name))) });
+  // 比對用：把資料整理成可比較的樣子（陣列排序、數字捨去小數）
+  const norm = x => Array.isArray(x) ? x.map(norm).sort((a, b) => JSON.stringify(a) < JSON.stringify(b) ? -1 : 1) : x && typeof x === 'object' ? Object.fromEntries(Object.keys(x).sort().map(k => [k, norm(x[k])])) : typeof x === 'number' && x >= 0 ? Math.floor(x) : x;
+  const pack = async (raw) => { let mode = 'P'; try { if (window.CompressionStream) { raw = await pipe(raw, CompressionStream, 'deflate-raw'); mode = 'Z'; } } catch (e) { mode = 'P'; } return [mode, b64u(raw)]; };
   S.make = async () => {
     const v = G.Team.get(); G.Ach.P();
-    const json = JSON.stringify({ s: 1, v: { name: v.name || '', hero: v.hero, loadout: v.loadout, owned: v.owned, keys: v.keys, p: v.p, ach: v.ach } });
+    const src = { name: v.name || '', hero: v.hero, loadout: v.loadout, owned: v.owned, keys: v.keys, p: v.p, ach: v.ach };
+    try {                                                                   // v3.6 先試 LW2；解回來和原本一模一樣才用
+      const bin = enc2(S.clean(JSON.parse(JSON.stringify(src)))), [mode, body] = await pack(bin), code = 'LW2' + mode + '-' + body + '-' + sum(body);
+      const back = await S.read(code);
+      if (back.ok && JSON.stringify(norm(back.v)) === JSON.stringify(norm(S.clean(JSON.parse(JSON.stringify(src)))))) return code;
+      console.warn('LW2 roundtrip mismatch → LW1');
+    } catch (e) { console.warn('LW2 fail → LW1', e); }
+    const json = JSON.stringify({ s: 1, v: src });
     let raw = new TextEncoder().encode(json), mode = 'P';
     try { if (window.CompressionStream) { raw = await pipe(raw, CompressionStream, 'deflate-raw'); mode = 'Z'; } } catch (e) { mode = 'P'; raw = new TextEncoder().encode(json); }
     const body = b64u(raw);
@@ -21,13 +111,13 @@ G.SaveCode = (() => {
   S.read = async code => {
     const s = String(code || '').replace(/\s+/g, '');
     if (!s) return { ok: false, err: '請先貼上存檔碼' };
-    const m = /^LW1([ZP])-([A-Za-z0-9_-]+)-([0-9A-Z]{4})$/.exec(s);
+    const m = /^LW([12])([ZP])-([A-Za-z0-9_-]+)-([0-9A-Z]{4})$/.exec(s);
     if (!m) return { ok: false, err: '這不是 Leaf of Legends 的存檔碼' };
-    if (sum(m[2]) !== m[3]) return { ok: false, err: '存檔碼不完整，請確認有完整複製' };
+    if (sum(m[3]) !== m[4]) return { ok: false, err: '存檔碼不完整，請確認有完整複製' };
     try {
-      let bytes = unb64u(m[2]);
-      if (m[1] === 'Z') { if (!window.DecompressionStream) return { ok: false, err: '這個瀏覽器無法讀取壓縮存檔' }; bytes = await pipe(bytes, DecompressionStream, 'deflate-raw'); }
-      const d = JSON.parse(new TextDecoder().decode(bytes));
+      let bytes = unb64u(m[3]);
+      if (m[2] === 'Z') { if (!window.DecompressionStream) return { ok: false, err: '這個瀏覽器無法讀取壓縮存檔' }; bytes = await pipe(bytes, DecompressionStream, 'deflate-raw'); }
+      const d = m[1] === '2' ? { v: dec2(bytes) } : JSON.parse(new TextDecoder().decode(bytes));
       const v = S.clean(d && d.v); if (!v) return { ok: false, err: '存檔內容有誤' };
       return { ok: true, v };
     } catch (e) { return { ok: false, err: '存檔碼損毀，無法讀取' }; }
@@ -373,8 +463,8 @@ G.SaveUI = (() => {
   };
 
   // ---------- v3.3 建立帳號送 8 把鑰匙 ----------
-  // 規則：新玩家開局 0 把；第一次建立帳號（取名＋產生存檔碼）送 8 把，播領取動畫。旗標 p.gift 跟著存檔碼走；已有名字的舊帳號視為領過
-  const GIFT = 8, now = () => performance.now() / 1000;
+  // 規則：新玩家開局 0 把；第一次建立帳號（取名＋產生存檔碼）送 GIFT 把（v3.6 8→10），播領取動畫。旗標 p.gift 跟著存檔碼走；已有名字的舊帳號視為領過
+  const GIFT = 10, now = () => performance.now() / 1000;
   let darkKey = null; const dKey = () => darkKey || (darkKey = G.sprite(G.ART_SMALL.i_key.map(r => r.replace(/[1-9a-h]/g, '0'))));
   S.needAcct = () => !G.Team.dev && !G.Ach.P().gift;
   S.makeAcct = () => { const M = ui(); G.Trans.start(() => { M.go('save'); step = 'name'; msg = null; const e = G.Dom.get('name', 'input'); e.value = G.Team.get().name || ''; }); };
@@ -430,12 +520,12 @@ G.SaveUI = (() => {
       H().btn('gaBg', 0, 0, uw, uh, null, () => {});
       H().dim(c, 0.75 * a); c.globalAlpha = a;
       const w = Math.min(uw - 16, 210), ttl = '送你 ' + GIFT + ' 把鑰匙！', tsc = G.cnW(ttl) * 2 <= w - 16 ? 2 : 1, ls = G.cnWrap('建立帳號就能領取，用來開寶箱抽新角色。', w - 20);
-      const h = 60 + 14 * tsc + 6 + ls.length * 13 + 8 + 16 + 8, x = Math.round(uw / 2 - w / 2), y = Math.round(uh / 2 - h / 2) + Math.round((1 - a) * 12);
+      const h = 64 + 14 * tsc + 6 + ls.length * 13 + 8 + 16 + 8, x = Math.round(uw / 2 - w / 2), y = Math.round(uh / 2 - h / 2) + Math.round((1 - a) * 12);
       H().box(c, x, y, w, h, 1, 13); H().btn('gaIn', x, y, w, h, null, () => {});
-      const kcx = x + w / 2, kcy = y + 30, ki = G.scaled(G.SPR.i_key.n, 2);
+      const kcx = x + w / 2, kcy = y + 32, ki = G.scaled(G.SPR.i_key.n, 2);
       G.glow(c, kcx, kcy, 30, 13, 0.24 + 0.08 * Math.sin(t * 2.5));
-      for (let i = 0; i < GIFT; i++) { const [px, py] = ringPos(i, kcx, kcy, 44, 18, t * 0.35), bob = 0; c.drawImage(ki, Math.round(px - ki.width / 2), Math.round(py - ki.height / 2) + bob); }
-      let yy = y + 60; cnBig(c, ttl, kcx, yy, 13, tsc); yy += 14 * tsc + 6;
+      for (let i = 0; i < GIFT; i++) { const [px, py] = ringPos(i, kcx, kcy, Math.min(54, w / 2 - 14), 20, t * 0.35), bob = 0; c.drawImage(ki, Math.round(px - ki.width / 2), Math.round(py - ki.height / 2) + bob); }
+      let yy = y + 64; cnBig(c, ttl, kcx, yy, 13, tsc); yy += 14 * tsc + 6;
       ls.forEach((l, i) => G.cn(c, l, kcx, yy + i * 13, 6, 0.5)); yy += ls.length * 13 + 8;
       const bw = Math.floor((w - 22) / 2);
       M.btnSecondary(c, 'gaLater', x + 8, yy, bw, 16, '稍後', () => later());
