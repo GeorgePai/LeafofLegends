@@ -860,7 +860,7 @@ G.UI = (() => {
   const evXY = e => [(e.clientX - (R.cssX || 0)) * R.dpr, (e.clientY - (R.cssY || 0)) * R.dpr];
   // 點選單位：ally=false 找敵人（含中立）；ally=true 找可跟隨的友軍（小兵／我方首領）
   function pickUnit(sx, sy, ally, padX) {
-    const ax = R.fx + sx / R.scale, ay = R.fy + sy / R.scale;      // 與 unitBox 同為緩衝區座標
+    const [ax, ay] = R.scrToBuf(sx, sy);                             // 與 unitBox 同為緩衝區座標（v3.2.2 含透視）
     let best = null, bd = 1e9;
     for (const u of W.units) {
       if (!u.alive || !W.seen(0, u)) continue;

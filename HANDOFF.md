@@ -2,7 +2,7 @@
 
 > 新 session 只要讀這份。排行榜相關再看 `LEADERBOARD.md`。**做任何新設計前，先對照第 8 節「設計守則」**。
 > 各版完成內容在 `CHANGELOG.md`、暫定數值在 `VALUES.md`，需要時用 grep 找到段落再讀，不要整份讀。
-> 最後更新：2026-11-20，版本 **v3.2.1**
+> 最後更新：2026-11-20，版本 **v3.2.2**
 
 ## 1. 專案是什麼
 - Pai 的 HTML5 瀏覽器遊戲，仿 Gamevil《Plants War》（三路推塔＋英雄操作＋小兵兵線）
@@ -56,6 +56,7 @@
 | 06e_stages | **單人關卡（v3.0）**：`G.THEMES` 場景、`G.withTheme`／`G.themeImg`、9 個新敵人、`G.SOLO` 五關設定、`G.SOLO_HZ` 規則數值、`G.SoloW`（wave/tick/erupt/died/weather/finish/best/open） |
 | 07_world | 單位、AI、兵線、英雄指令、經驗升級、召集跟隨 `toggleFollow/followAI`、獵手 AI 分派 |
 | 07b_systems | 技能升級、金幣/商店/背包、計時增益、野區、技能數值表 `G.skillRows`、**敵方獵手 `hunter`（`spawnHunter/junglerAI/hunterReward`）、塔傳送 `startTeleport/updateTeleport`** |
+| 08b_hd | **HD-2D 鏡頭後製（v3.2.2）**：`G.HD`（WebGL 著色器：透視、景深、柔光、調色、光束；光塵），`on/P/active/over/render` |
 | 08_render | `R.resize`（固定比例＋整數倍）、`R.zoomMin`（可縮到全圖）、`R.hiQ/blitUI`、世界繪製（護盾光殼、稀有度外框、血條、準心、迷霧） |
 | 09_ui | 戰鬥 HUD：HP/MP/XP 三條等粗、鑰匙＋K/D/A 列、小地圖 `mapDraw`＋展開大地圖 `bigMap`、戰鬥數據 `statPanel`、廣播 `drawNotices`、技能水平列＋置中鈕（大招上方）、長按技能卡（動畫，`cardC`）、增益卡、商店、左側道具欄（效果短標）、暫停選單（有名稱）；所有輸入（`evXY` 已扣黑邊）|
 | 10_sandbox | 中文字工具 `G.cn/cnWrap`、標籤 `tagOf`、**技能展示沙盒 `G.Sandbox`（依技能類型的情境：`scBasic/scActive/scBuff/scPassive`，被動用對照演出）** |
@@ -93,7 +94,8 @@
 - v2.8.7：首頁聚光改橢圓、存檔→帳號／玩家名稱、說明文字重點上色、一帳號同時一台（/claim、moved）
 - v2.9：全部 71 個角色的專屬叫聲（轉盤停下／點中間角色）
 - v3.0：單人五關（場景、難度、特殊規則、9 個新敵人、選關畫面、星等獎勵、8 個成就；成就共 68 個）
-- v3.2.1：拿掉側面厚度，改成 HD-2D 微縮景深＋柔光（`G.VOL`）
+- v3.2.2：WebGL HD-2D 鏡頭後製（透視傾斜＋景深＋柔光＋調色＋光束＋光塵，`08b_hd.js`）、光暈改平滑微透、復活藥水倒地 2 秒
+- v3.2.1：拿掉側面厚度，改成 HD-2D 微縮景深＋柔光（`G.VOL`，現在只當不支援 WebGL 時的退路）
 - v3.2：等級數字改白字細黑邊、復活無敵 2 秒、2.5D 立體感（側面厚度，v3.2.1 已拿掉）、系統公告＋信箱、管理玩家動態
 - v3.1：出發過場動畫＋進關卡卡頓修正（地面色名快取）、等級徽章、敵人改回暗黑色調（場景生物各有色調＋細紅邊）、選關滑動重做、教學 72→51 頁全面改寫、爐石式文字守則
 - v2.4：敵塔範圍＋鎖定警示、道路 ×1.5、結算放慢＋鎖值＋音效、新藥水 5 種＋全部藥水特效、DEV 密碼、技能範圍顯示＋指定施放（拖曳／取消）、LOGO 改版、塔射程 190/210
@@ -101,7 +103,7 @@
 ## 6. 待 Pai 決定
 - 畫質再提升：A＝高解析文字（像素角色＋平滑字體），B＝提高像素解析度（480×270，整套美術重畫）。尚未選擇
 - 圖鑑動畫重畫：Pai 說「有些動畫可以描繪得更好」，等他指定哪幾隻
-- 暫定數值全部在 `VALUES.md`（最新：6u v3.2.1 段）
+- 暫定數值全部在 `VALUES.md`（最新：6v v3.2.2 段）
 - （v2.7）成就鑰匙過剩：全收集只要 90 把，成就給 138 把；「群英薈萃／森羅萬象」較晚完成的那個獎勵用不到。Pai 決定先保留，等鑰匙有新用途再說
 - （v2.4）首頁 RESET 要不要也加密碼鎖？隕石等範圍技仍可在塔射程外打到塔（目前視為合理技能消耗），要不要禁止？
 - （v2.5）重生時間、塔成長／升溫、野怪脫戰規則等暫定數值待確認（VALUES.md 6h）
@@ -116,13 +118,13 @@
 - （v2.8.7）一帳號同時一台：被別台登入的裝置會被登出，登出前顯示這台的存檔碼可複製；沒帶工作階段的舊版用戶端不擋。等 Pai 實機兩台測試
 - （v2.9）角色叫聲：Pai 聽過後可指定哪幾隻要改（`04b_cry.js` 的 `V` 表調音高／長度／基底）
 - （v3.1）出發過場長度、選關甩動手感、敵人暗色調與細紅邊、等級徽章配色（VALUES.md 6s）待 Pai 實機確認
-- （v3.2.1）HD-2D 景深強度待 Pai 在手機上確認（太糊或太亮就調 VALUES 6u）；如果手機會卡，可以加「畫面效果」開關
+- （v3.2.2）HD-2D 強度（透視、景深、柔光、光束）待 Pai 在手機上確認（VALUES 6v）；手機會卡的話加「畫面效果」開關（`G.HD.on`）
 - （v3.2）公告與動態數值（VALUES.md 6t）待 Pai 實機確認；公告／動態的伺服器功能要等 Cloudflare 自動部署完才會生效
 - DEV 密碼只有 Pai 知道（程式內只有雜湊）；要改密碼請 Pai 提供新密碼，重算 `DEV_H`
 
 ## 7. 工作規則
 **每次更新流程**：改 src → build → `bash /home/claude/tools/tc_all.sh`（背景跑，0 筆才可交付）→ 只截有改到的畫面，用 `sheet.py` 拼成一張看 → 發佈 artifact（先 `get_artifact` 取 version，再 `publish_files`，index.html＝dist/index.html）→ 推 GitHub main（遊戲）＋ source（原始碼）→ 備份 Mac（`LeafofLegends.html`、`versions/LeafofLegends_v版本.zip`、有改到的 `source/` 檔案）→ 升版號
-- 版本號在 `src/11_menus.js` 第 2 行 `G.VERSION = 'V3.2.1'`
+- 版本號在 `src/11_menus.js` 第 2 行 `G.VERSION = 'V3.2.2'`
 - **更新內容（玩家看得到）**：每次發佈前在 `release.json` 的 list 最前面加一筆 `{v, d, n:[…]}`（短句、玩家口吻、不寫技術細節），版本號要和 G.VERSION 一樣
 - 推 main：clone 到 `/home/claude/leafoflegends` → `python3 /home/claude/leafwar/tools/release.py`（複製 index.html＋產生 version.json；保留 `.nojekyll`；音樂有改才更新 `audio/`）→ commit → `git -c push.negotiate=true push origin HEAD:main`，約 1～2 分鐘生效。備援：Pai 在 Mac Terminal 執行 `bash ~/Desktop/Claude/LeafofLegends/deploy_github.sh`
 - 推 source：在 `/home/claude/leafwar` commit（dist/ 已在 .gitignore）→ `git -c push.negotiate=true push origin HEAD:source`

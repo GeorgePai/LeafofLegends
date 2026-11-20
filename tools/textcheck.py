@@ -35,7 +35,7 @@ async def main():
             c=await b.new_context(**devs[dv]); pg=await c.new_page(); errs=[]
             pg.on('pageerror',lambda e:errs.append(str(e)))
             await pg.goto('file:///home/claude/leafwar/dist/index.html'); await pg.wait_for_timeout(700)
-            await pg.evaluate(INJ)
+            await pg.evaluate(INJ); await pg.evaluate('G.HD&&(G.HD.on=false)')   # v3.2.2 文字檢查不需要 HD-2D 後製（軟體繪圖很慢）
             for name,js,wait in SC:
                 for part in js.split('||WAIT||'):
                     try: await pg.evaluate(part)

@@ -7,7 +7,7 @@ G.About = (() => {
   const S = {}, R = G.Render, H = () => G.UI.h, ui = () => G.Menus.ui;
   const SPD = 19, HOLD = 4.5, FADE = 1.4, BACK = 1.1;          // 捲動速度（每秒幾格）、結尾停留、淡出、回首頁淡入（秒）
   const PINK = '#f7a8c0', CREAM = '#f3e6c8', SOFT = '#bfb3c9', GOLD = '#f7d23c';
-  let t = 0, off = 0, fast = false, end = -1, out = -1, petals = [], back = 0;
+  let t = 0, off = 0, fast = false, end = -1, out = -1, petals = [], back = 0, clr = -1;
   const tc = new Map();                                          // 任意顏色的中文字（白字＋上色，快取）
   function tint(s, hex) {
     const k = s + '|' + hex; let e = tc.get(k); if (e) return e;
@@ -48,7 +48,7 @@ G.About = (() => {
     L.forEach(it => { if (it.k === 'logo') { it.top = 24; it.h = ui().logoSize(lw).h + 24 + 30; } if (it.k === 'end') endY = y; it.y = y; y += it.h; });   // logo：上面留 Leafy、下面留光暈
     return (LAY = { uw, cw, lw, L, endY, blockH: y - endY });
   }
-  S.reset = () => { t = 0; off = 0; fast = false; end = -1; out = -1; petals = []; };
+  S.reset = () => { t = 0; off = 0; fast = false; end = -1; out = -1; petals = []; clr = -1; };
   S._skip = (sec, f) => { for (let i = 0; i < sec * 30; i++) step(1 / 30, R.uw, R.uh, f); };   // 測試用：快轉 sec 秒
   S._end = () => { for (let i = 0; i < 20000 && end < 0; i++) step(1 / 30, R.uw, R.uh, true); };   // 測試用：直接到結尾（停在中間那一刻）
   function step(dt, uw, uh, f) {
@@ -75,9 +75,14 @@ G.About = (() => {
     drawP(true);
     // ---- 名單 ----
     const Y = layout(uw);
+    // v3.2.2 底部提示「點一下畫面可以快轉」：等 LOGO 捲過提示那一行才出現；提示在的時候，剛好壓到那一行的字先不畫（那裡本來就在淡出區）
+    const hY = uh - I.b - 14, logoB = uh - off + (Y.L[1] ? Y.L[1].y : 0);
+    if (clr < 0 && logoB < hY - 3) clr = t;
+    const hint = clr >= 0 && (t - clr < 5 || fast);
     Y.L.forEach(it => {
       const y = uh - off + it.y;
       if (y + it.h < -30 || y > uh + 30) return;
+      if (hint && it.k !== 'logo' && y < hY + 14 && y + Math.max(13, it.h) > hY - 2) return;
       if (it.k === 'logo') ui().bigTitle(c, cx, y + it.top, Y.lw, 99);
       else if (it.k === 'lab') { const w = tint(it.s, PINK).w; txt(c, it.s, cx, y, PINK); c.fillStyle = PINK; c.globalAlpha = 0.5; c.fillRect(Math.round(cx - w / 2 - 22), y + 6, 14, 1); c.fillRect(Math.round(cx + w / 2 + 8), y + 6, 14, 1); c.globalAlpha = 1; }
       else if (it.k === 't') txt(c, it.s, cx, y, it.col, it.sc);
@@ -90,7 +95,7 @@ G.About = (() => {
     // 返回鍵＋提示
     M.header(c, '');
     H().btn('abTap', 0, I.t + 18, uw, uh - I.t - 18, null, () => { fast = !fast; G.Audio.play('click'); });
-    if (t < 5 || fast) { c.globalAlpha = fast ? 0.8 : Math.min(1, (5 - t) / 1.5) * 0.7; G.cn(c, fast ? '快轉中・點一下恢復' : '點一下畫面可以快轉', cx, uh - I.b - 14, 7, 0.5); c.globalAlpha = 1; }
+    if (hint) { c.globalAlpha = fast ? 0.8 : Math.min(1, (5 - (t - clr)) / 1.5, (t - clr) / 0.4) * 0.7; G.cn(c, fast ? '快轉中・點一下恢復' : '點一下畫面可以快轉', cx, hY, 7, 0.5); c.globalAlpha = 1; }
     // 結束：柔和淡出 → 回首頁（首頁再淡入）
     if (out >= 0) { const k = Math.min(1, (t - out) / FADE); c.fillStyle = 'rgba(0,0,0,' + (k * k * (3 - 2 * k)).toFixed(3) + ')'; c.fillRect(0, 0, uw, uh); if (k >= 1) { back = BACK; S.reset(); G.UI.goMenu(); } }
   };

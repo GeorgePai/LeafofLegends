@@ -77,11 +77,20 @@ G.Render = (() => {
     b.globalAlpha = a; b.fillStyle = G.PAL[col]; b.beginPath(); P2.forEach(([x, y], i) => i ? b.lineTo(x, y) : b.moveTo(x, y)); b.closePath(); b.fill(); b.globalAlpha = 1;
     b.fillStyle = G.PAL[col]; for (let i = 0; i < 4; i++) G.pxLine(b, P2[i][0], P2[i][1], P2[(i + 1) % 4][0], P2[(i + 1) % 4][1], 1);
   };
-  R.screenToWorld = (sx, sy) => {
-    const ax = R.ox + R.fx + sx / R.scale, ay = R.oy + R.fy + sy / R.scale;
-    return [ax / G.AX, ay / G.AY];
+  // v3.2.2 螢幕（實體像素）⇄ 緩衝座標：有透視時用和著色器一樣的公式
+  R.scrToBuf = (X, Y) => {
+    const sc = R.scale, P = R.ps;
+    if (!P) return [R.cbx + (X - R.sw / 2) / sc, R.cby + (Y - R.sh / 2) / sc];
+    const s = 1 + P * (2 * Y / R.sh - 1); return [R.cbx + (X - R.sw / 2) / (sc * s), R.cby + R.sh / (2 * P * sc) * Math.log(s)];
   };
-  R.worldToScreen = (x, y, z = 0) => [((x * G.AX - R.ox - R.fx) * R.scale), ((y * G.AY - z * G.AZ - R.oy - R.fy) * R.scale)];
+  R.bufToScr = (bx, by) => {
+    const sc = R.scale, P = R.ps;
+    if (!P) return [R.sw / 2 + (bx - R.cbx) * sc, R.sh / 2 + (by - R.cby) * sc];
+    const s = Math.exp((by - R.cby) * 2 * P * sc / R.sh); return [R.sw / 2 + (bx - R.cbx) * sc * s, R.sh / 2 * (1 + (s - 1) / P)];
+  };
+  R.depthAt = Y => 1 + (R.ps || 0) * (2 * Y / R.sh - 1);          // 這一列的遠近縮放（頭上 UI 可以跟著縮）
+  R.screenToWorld = (sx, sy) => { const [bx, by] = R.scrToBuf(sx, sy); return [(R.ox + bx) / G.AX, (R.oy + by) / G.AY]; };
+  R.worldToScreen = (x, y, z = 0) => R.bufToScr(x * G.AX - R.ox, y * G.AY - z * G.AZ - R.oy);
 
   // 單位在美術座標的外框（點選用）
   R.unitBox = (u) => {
@@ -94,15 +103,16 @@ G.Render = (() => {
   R.draw = function (W, alpha, rt) {
     R.dtF = Math.min(0.1, Math.max(0, rt - (R._lrt || rt))); R._lrt = rt;
     const sc = R.scale = R.base * R.cam.zoom;
-    const bw = Math.ceil(R.sw / sc) + 2, bh = Math.ceil(R.sh / sc) + 2;
+    const hd = G.HD && G.HD.active(), [OXf, OYf] = hd ? G.HD.over() : [1, 1]; R.ps = hd ? G.HD.P : 0;   // v3.2.2 HD-2D：透視需要外擴緩衝
+    const VW = R.sw / sc, VH = R.sh / sc, bw = Math.ceil(VW * OXf) + 2, bh = Math.ceil(VH * OYf) + 2;
     if (buf.width !== bw || buf.height !== bh) { buf.width = bw; buf.height = bh; }
     const b = bctx; b.imageSmoothingEnabled = false;
     // 鏡頭 + 震動
     const tr = W.trauma * W.trauma, sh = tr * 7;
     const shx = (G.vnoise(rt * 25, 3.1) - 0.5) * 2 * sh, shy = (G.vnoise(5.7, rt * 25) - 0.5) * 2 * sh;
-    const left = R.cam.x * G.AX - R.sw / sc / 2 + shx, top = R.cam.y * G.AY - R.sh / sc / 2 + shy;
+    const left = R.cam.x * G.AX - VW * OXf / 2 + shx, top = R.cam.y * G.AY - VH * OYf / 2 + shy;
     const ox = Math.floor(left), oy = Math.floor(top);
-    R.ox = ox; R.oy = oy; R.fx = left - ox; R.fy = top - oy;
+    R.ox = ox; R.oy = oy; R.fx = left - ox; R.fy = top - oy; R.cbx = R.fx + VW * OXf / 2; R.cby = R.fy + VH * OYf / 2;   // 鏡頭中心在緩衝裡的位置
     const o = { x: ox, y: oy };
     G.setPatOffset(ox, oy);
     // 背景 + 地面
@@ -383,8 +393,8 @@ G.Render = (() => {
     for (const e of W.effects) if (e.layer === 2 && e.draw) e.draw(b, o);
     // 輸出到螢幕
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(buf, 0, 0, bw, bh, -R.fx * sc, -R.fy * sc, bw * sc, bh * sc);
-    if (G.VOL & 2) tilt(ctx, buf, bw, bh, sc);                       // v3.2.1 微縮景深（tilt-shift）
+    if (hd) G.HD.render(ctx, buf, bw, bh, sc, rt, W.themeId || 'forest');   // v3.2.2 HD-2D（透視＋景深＋柔光＋調色＋光束）
+    else { ctx.drawImage(buf, 0, 0, bw, bh, -R.fx * sc, -R.fy * sc, bw * sc, bh * sc); if (G.VOL & 2) tilt(ctx, buf, bw, bh, sc); }   // 不支援 WebGL：退回 v3.2.1 的 2D 景深
     ctx.drawImage(vign, 0, 0);
     if (W.flashScreen > 0) { ctx.fillStyle = `rgba(255,255,255,${W.flashScreen * 2.5})`; ctx.fillRect(0, 0, R.sw, R.sh); }
     if (h0 && !W.attract) {

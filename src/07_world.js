@@ -187,7 +187,8 @@ G.World = class {
     const h = this.hero;
     if (h && !h.alive && !this.over) {
       h.dead -= dt;
-      if (h.dead <= 0) { const [x, y] = this.spawnPt[0]; h.x = h.px = x; h.y = h.py = y; h.alive = true; h.hp = h.st.hp; h.mp = h.st.mp; h.cmd = null; h.target = null; h.pending = null; G.FX.respawn(this, h); this.sfx('shield'); }   // 重生特效（不是升級）
+      if (h.dead <= 0 && h.revPend) { h.revPend = false; if (this.tryRevive(h)) this.stats.deaths = Math.max(0, this.stats.deaths - 1); else h.dead = 0.01; }   // 藥水復活不算陣亡（星等、成就照舊）   // 原地復活（藥水已在倒地期間被用掉時，改回聖樹重生）
+      else if (h.dead <= 0) { const [x, y] = this.spawnPt[0]; h.x = h.px = x; h.y = h.py = y; h.alive = true; h.hp = h.st.hp; h.mp = h.st.mp; h.cmd = null; h.target = null; h.pending = null; G.FX.respawn(this, h); this.sfx('shield'); }   // 重生特效（不是升級）
     }
     if (this.over) { this.over.t += dt / Math.max(0.1, this.timeScale); if (this.over.t > 1.4) this.timeScale = 1; }
     // BGM 強度
@@ -594,7 +595,6 @@ G.World = class {
   }
   say(n) { if (this.attract) return; n.age = 0; n.t = Math.max(2.2, n.t || 2.4); this.notices.push(n); }
   kill(t, src) {
-    if (t === this.hero && this.tryRevive(t)) return;
     t.alive = false; t.hp = 0;
     G.FX.shatter(this, t);
     if (t.static) {
@@ -617,7 +617,9 @@ G.World = class {
     if (this.stageI) G.SoloW.died(this, t);
     if (t.side === 1) this.killGold(t, src);
     if (t.side === 2) { if (h && h.alive && src && src.side === 0) this.gainExp(h, t.st.exp); this.wildReward(t, src); }
-    if (t === h) { h.dead = Math.min(G.TUNE.heroRespawnMax, G.TUNE.heroRespawnBase + G.TUNE.heroRespawnPer * h.level + G.TUNE.heroRespawnMin * Math.max(0, this.time / 60 - 5)); h.cmd = null; h.pending = null; this.shake(0.5); this.clearFollow(); }
+    if (t === h) { h.dead = Math.min(G.TUNE.heroRespawnMax, G.TUNE.heroRespawnBase + G.TUNE.heroRespawnPer * h.level + G.TUNE.heroRespawnMin * Math.max(0, this.time / 60 - 5)); h.cmd = null; h.pending = null; this.shake(0.5); this.clearFollow();
+      if (this.bag && this.bag.some(b => b.id === 'rev') && !this.over && !this.attract) { h.dead = 2; h.revPend = true; }   // v3.2.2 有復活藥水：先倒地，2 秒後原地站起來
+    }
     if (t.kind === 'holy' && !this.over) {
       this.over = { win: t.side === 1, t: 0 }; this.timeScale = 0.3; this.shake(1);
       this.overSt = Object.assign({}, this.stats, { lv: this.hero ? this.hero.level : 1, keys: this.keysGot || 0 });   // v2.4 結算數值在這一刻鎖住（背景戰鬥還會繼續）

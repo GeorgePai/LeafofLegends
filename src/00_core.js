@@ -192,24 +192,19 @@ G.glowOf = function (src, col, ring = 1, halo = 3) {
   const sd = src.getContext('2d').getImageData(0, 0, w, h).data;
   const inside = new Uint8Array(W * H);
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (sd[(y * w + x) * 4 + 3] > 40) inside[(y + p) * W + x + p] = 1;
-  // 距離（BFS，八方向）
-  const dist = new Uint8Array(W * H).fill(255), q = [];
-  for (let i = 0; i < W * H; i++) if (inside[i]) { dist[i] = 0; q.push(i); }
-  for (let qi = 0; qi < q.length; qi++) {
-    const i = q[qi], x = i % W, y = (i / W) | 0, d = dist[i] + 1; if (d > p) continue;
-    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-      const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
-      const j = ny * W + nx; if (dist[j] > d) { dist[j] = d; q.push(j); }
-    }
-  }
+  // v3.2.2 光暈改成「歐式距離＋平滑淡出」：不再用點陣網點（顆粒感重、像一塊背板），改成微透、往外漸淡的柔光
+  //   halo＝0 的純外框（輪廓線、剪影）維持實心
+  const dist = new Float32Array(W * H).fill(99), R2 = p + 0.5;
+  const ins = []; for (let i = 0; i < W * H; i++) if (inside[i]) ins.push(i);
+  for (const i of ins) { const x0 = i % W, y0 = (i / W) | 0;
+    for (let dy = -p; dy <= p; dy++) for (let dx = -p; dx <= p; dx++) { const nx = x0 + dx, ny = y0 + dy; if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue; const j = ny * W + nx; if (inside[j]) continue; const d = Math.hypot(dx, dy); if (d < dist[j]) dist[j] = d; } }
   const c = G.canvas(W, H), x = c.getContext('2d'), id = x.createImageData(W, H), [r, g, b] = G.PAL_RGB[col];
-  const BY = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
-  for (let y = 0; y < H; y++) for (let xx = 0; xx < W; xx++) {
-    const i = y * W + xx, d = dist[i]; if (d === 0 || d === 255) continue;
-    let a = 0;
-    if (d <= ring) a = 255;
-    else { const k = 1 - (d - ring) / (halo + 0.5); if (BY[(y & 3) * 4 + (xx & 3)] / 16 < k * 0.75) a = Math.round(120 + 100 * k); }
-    if (!a) continue; const o = i * 4; id.data[o] = r; id.data[o + 1] = g; id.data[o + 2] = b; id.data[o + 3] = a;
+  for (let i = 0; i < W * H; i++) {
+    const d = dist[i]; if (inside[i] || d > R2) continue;
+    let a;
+    if (!halo) a = d <= ring + 0.5 ? 255 : 0;                                            // 純外框
+    else { const k = 1 - (d - 0.6) / (R2 - 0.6); a = Math.round(235 * Math.pow(G.clamp(k, 0, 1), 1.7)); }   // 柔光：貼著身體最亮，往外平滑淡出
+    if (a < 6) continue; const o = i * 4; id.data[o] = r; id.data[o + 1] = g; id.data[o + 2] = b; id.data[o + 3] = a;
   }
   x.putImageData(id, 0, 0);
   const t = G.canvas(w, h), tx = t.getContext('2d'); tx.drawImage(src, 0, 0); tx.globalCompositeOperation = 'source-in'; tx.fillStyle = G.PAL[col]; tx.fillRect(0, 0, w, h);
