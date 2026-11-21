@@ -558,7 +558,7 @@ G.UI = (() => {
   // 點卡片 → 說明＋確認（技能：動畫＋數值；藥水：效果＋各級數值）→「升級」；長按＝快速看說明
   // 打開／關閉時，從右上「升級」鈕放大跳出、縮回去（讓玩家知道這些都在那顆鈕裡）
   U.openLv = auto => {
-    if (!W || W.over || U.lvUp) return;
+    W = G.W; if (!W || W.over || U.lvUp || !W.hero) return;
     if (U.aim) U.aim = null; U.hold = null; if (G.Ctl) G.Ctl.joyEnd(); U.bigMap = false;
     U.lvUp = { t: 0, auto: !!auto, fl: {}, sp: [], tab: 0, sel: null, cl: -1 }; G.Audio.play(auto ? 'level' : 'open');
   };
