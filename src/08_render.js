@@ -123,7 +123,9 @@ G.Render = (() => {
       const cp = Math.min(1, u.chg.T / u.chg.dur), E = G.ELEM[u.chg.el] || G.ELEM.arcane, gl = G.glowOf(base, E.c, 1, 2);
       b.globalAlpha = 0.25 + 0.6 * cp * (0.75 + 0.25 * Math.sin(rt * 30)); b.drawImage(gl.c, ax - gl.p, ay - gl.p); b.globalAlpha = 1;
   };
-  R.uScale = u => u.kind === 'hero' ? G.TUNE.heroScale || 1 : 1;   // v3.8 英雄本體放大（以腳底為中心）
+  R.uScale = u => u.kind === 'hero' ? G.TUNE.heroScale || 1 : 1;
+  // v3.13 倒下動畫的位置：被打飛（先快後慢）＋拋物線彈起；p＝0~1
+  G.corpsePos = (c, p) => { const e = 1 - (1 - p) * (1 - p) * (1 - p), big = c.u.kind === 'boss'; return { x: c.x + c.dir * (big ? 14 : 26) * e, y: c.y, z: Math.sin(Math.min(1, p / 0.8) * Math.PI) * (big ? 6 : 12) }; };   // v3.8 英雄本體放大（以腳底為中心）
 
   const sprOf = (k) => { const s = G.SPR[k]; return Array.isArray(s) ? s[0] : s; };
 
@@ -237,6 +239,7 @@ G.Render = (() => {
     for (const p of W.M.props) if (inView(p.x, p.y)) list.push({ y: p.y, p });
     for (const u of W.units) if (u.alive && inView(u.x, u.y) && W.seen(0, u)) list.push({ y: G.lerp(u.py, u.y, alpha), u });   // 迷霧中的敵人不畫
     for (const p of W.projs) if (p.side === 0 || W.seenXY(0, p.x, p.y)) list.push({ y: p.y, j: p });
+    for (const c of W.corpses || []) if (inView(c.x, c.y) && (c.u.side === 0 || W.seenXY(0, c.x, c.y))) list.push({ y: c.y, c });
     list.sort((a, c) => a.y - c.y);
     const bars = [], arrows = [], reticles = [];
     for (const it of list) {
@@ -282,8 +285,31 @@ G.Render = (() => {
         if (u.recoil > 0) { ddx = -u.face * Math.round(u.recoil * 2); psy = 1 + 0.06 * u.recoil; psx = 1 - 0.04 * u.recoil; }
         if (u.chg) { const cp = Math.min(1, u.chg.T / u.chg.dur); psy = 1 - 0.09 * cp; psx = 1 + 0.07 * cp; ddx = Math.round(Math.sin(u.chg.T * 70) * cp * (u.chg.big ? 1.4 : 0.8)); }
         if (u.cast > 0.12) { psy = 1.08; psx = 0.95; }
-        if (moving && fi === 1) ddy = -1;
-        if (!moving && !u.static && Math.sin(u.anim * 3 + u.id) > 0.7) ddy = -1;
+        // v3.13 生命感：待機呼吸、走路彈跳＋前傾、轉身、受擊、落地（全部以腳底為支點，不改剪影）
+        let hop = 0;
+        if (!u.static) {
+          const Lf = u.life || (u.life = { face: u.face, flip: 0, land: 0, sp: u.spawnT > 0, step: 0 }), dtF = R.dtF || 0;
+          const busy = u.windup > 0 || u.lunge > 0 || u.recoil > 0 || u.chg || u.cast > 0.12;
+          if (!busy && !u.vis.fly) {
+            if (moving) {
+              const ph = u.anim * 0.7 * Math.PI, sn = Math.abs(Math.sin(ph)), big = u.kind === 'boss';
+              hop = sn * (big ? 1 : u.kind === 'hero' ? 2 : 1.5);
+              psy = 1 + (sn - 0.45) * (big ? 0.05 : 0.09); psx = 1 - (sn - 0.45) * (big ? 0.035 : 0.06);   // 腳落地時壓扁、騰空時拉長
+              psk = -u.face * (big ? 0.05 : 0.09);                                                         // 往前傾
+              const st = Math.floor(ph / Math.PI);
+              if (st !== Lf.step) { Lf.step = st; if (W.parts && !W.attract && (u.kind !== 'creep' || (u.id + st) % 3 === 0)) for (let k = 0; k < (big ? 3 : 2); k++) W.parts.add(u.x - u.face * G.rr(2, 8), u.y + G.rr(-3, 3), 1, -u.face * G.rr(8, 24), G.rr(-6, 6), G.rr(6, 16), G.rr(0.25, 0.4), 6, 5, 1, 30, 3); }   // 腳步揚塵
+            } else {
+              const br = Math.sin(rt * (u.kind === 'boss' ? 2.1 : 3.2) + u.id * 1.7);
+              psy = 1 + 0.035 * br; psx = 1 - 0.025 * br;                                                  // 呼吸
+            }
+          }
+          if (u.face !== Lf.face) { Lf.face = u.face; Lf.flip = 1; }
+          if (Lf.flip > 0) { psx *= 0.45 + 0.55 * Math.abs(1 - 2 * Lf.flip); Lf.flip = Math.max(0, Lf.flip - dtF / 0.11); }   // 轉身：先壓窄再展開
+          if (Lf.sp && u.spawnT <= 0) { Lf.sp = false; Lf.land = 1; if (W.parts && !W.attract) for (let k = 0; k < 6; k++) { const a = k * 1.047; W.parts.add(u.x, u.y, 1, Math.cos(a) * 40, Math.sin(a) * 22, G.rr(8, 18), 0.35, 6, 5, 1, 30, 3); } }
+          if (Lf.land > 0) { psy *= 1 - 0.2 * Lf.land; psx *= 1 + 0.16 * Lf.land; Lf.land = Math.max(0, Lf.land - dtF / 0.2); }   // 落地壓扁
+          if (u.hurt > 0) { const k = u.hurt; ddx += u.hurtDir * Math.round(k * 3); psx *= 1 + 0.14 * k; psy *= 1 - 0.12 * k; psk += u.hurtDir * 0.12 * k; }   // 受擊：往後縮＋後仰
+        }
+        ddy -= hop;
         if (u.cast > 0.12) ddy -= 2;
         const zz = u.z + u.spawnT * 70 + (u.vis.fly ? Math.sin(u.anim * 2.5) * 3 : 0);
         const red = u.side === 1 && !u.static;                 // 敵方單位：赤紅配色
@@ -297,6 +323,9 @@ G.Render = (() => {
           const sil = G.glowOf(base, 0, 1, 0).tint, fx = q(gx + ddx), fy = q(gy) + 1;
           b.save(); b.globalAlpha = u.static ? 0.32 : 0.26; b.translate(fx - s.w / 2, fy); b.transform(1, 0, -0.55, -0.32, 0, 0); b.drawImage(sil, 0, -s.h); b.restore();
         }
+        // v3.13 姿勢變形（擠壓／傾斜）套在整組：外框、光暈、本體一起變形，不會錯位
+        const PT = psx !== 1 || psy !== 1 || psk !== 0;
+        if (PT) { const fx = ax + s.w / 2, fy = ay + s.h; b.save(); b.translate(fx, fy); b.transform(psx, 0, psk, psy, 0, 0); b.translate(-fx, -fy); }
         const shielded = u.protectors && W.isProtected(u);
         // 稀有度外框（我方英雄與小兵）
         if (u.charm || u.clone) { const gl = G.glowOf(base, u.clone ? 25 : 17, 1, 2); b.globalAlpha = 0.6 + Math.sin(rt * 5 + u.id) * 0.25; b.drawImage(gl.c, ax - gl.p, ay - gl.p); b.globalAlpha = 1; }   // 召喚物外框
@@ -318,10 +347,7 @@ G.Render = (() => {
         if (u.chg) R.chgBody(b, u, base, ax, ay, rt);        // 施法前搖：身體發光（越來越亮）
         if (u.clone) b.globalAlpha = 0.68 + Math.sin(rt * 9 + u.id) * 0.1;      // 複製體：半透明、微微閃爍
         const vimg = u.flash > 0 || !(G.VOL & 1) ? img : G.bevelOf(img);   // v3.2.1 光影浮雕
-        if (psx !== 1 || psy !== 1 || psk !== 0) {              // 以腳底為支點做擠壓／傾斜
-          const fx = ax + s.w / 2, fy = ay + s.h;
-          b.save(); b.translate(fx, fy); b.transform(psx, 0, psk, psy, 0, 0); b.drawImage(vimg, -s.w / 2, -s.h); b.restore();
-        } else b.drawImage(vimg, ax, ay);
+        b.drawImage(vimg, ax, ay);
         b.globalAlpha = 1;
         if (u.chg && u.chg.T > u.chg.dur - 0.06) { b.globalAlpha = 0.8; b.drawImage(G.glowOf(base, 9, 1, 0).tint, ax, ay); b.globalAlpha = 1; }   // 放招瞬間白閃
         if (u.lunge > 0.25 && !u.static) G.FX.swingArc(b, u, ax, ay, s, 1 - u.lunge);
@@ -334,15 +360,26 @@ G.Render = (() => {
           if (sy > 0 && sy < s.h) { b.save(); b.beginPath(); b.rect(ax - 2, ay + s.h - sy - 2, s.w + 4, 3); b.clip(); b.globalAlpha = 0.5; b.drawImage(gl.tint, ax, ay); b.globalAlpha = 1; b.restore(); }
           if ((W.frame % 10) === 0) W.parts.add(u.x + G.rr(-s.w, s.w) / G.AX * 0.5, u.y + G.rr(-4, 4), G.rr(4, s.h / G.AZ), 0, 0, G.rr(8, 18), 0.9, 12, 9, 1, 0, 0.4);
         }
+        if (PT) b.restore();
         if (UK !== 1) b.restore();
         // 聖所/塔的待機特效
         if (u.kind === 'holy' && u.side === 0 && (W.frame % 6) === 0) W.parts.add(u.x + G.rr(-24, 24), u.y + G.rr(-6, 6), G.rr(20, 60), 0, 0, G.rr(10, 25), 1.2, 9, 7, 1, 0, 0.5);
         if (u.kind === 'holy' && u.side === 1 && (W.frame % 8) === 0) W.parts.add(u.x + G.rr(-12, 12), u.y, G.rr(50, 70), G.rr(-5, 5), 0, G.rr(10, 20), 1.4, 2, 1, 2, -5, 0.5);
         // 血條
         const full = u.hp >= u.st.hp - 0.5;
-        if (!full || u.kind !== 'creep') bars.push([u, q(gx), ayT - 3]);
+        if (!full || u.kind !== 'creep') bars.push([u, q(gx), ayT - 3 + Math.round(hop)]);   // 血條不跟著走路彈跳
         const locked = h0 && h0.alive && h0.cmd && h0.cmd.lock && h0.cmd.t === u;
         if (!locked && tgt) arrows.push([q(gx), ayT - 9 - Math.round(Math.abs(Math.sin(rt * 6)) * 2)]);
+      } else if (it.c) {                                   // v3.13 倒下：被打飛、往打擊方向倒、先閃白再淡出（最後由世界碎成粒子）
+        const c = it.c, u = c.u, p = G.clamp((W.time - c.t0) / c.dur, 0, 1), P2 = G.corpsePos(c, p), s = u.spr[0], UK = R.uScale(u);
+        const gx = P2.x * G.AX - ox, gy = P2.y * G.AY - oy, base = G.lookOf(u, c.face < 0 ? s.m : s.n);
+        const shR = u.vis.shadow * G.AX * UK * (1 - P2.z * 0.03); G.pxDisc(b, q(gx), q(gy), shR, Math.max(1.5, shR * 0.42), 0, 0.5 * (1 - p * 0.6));
+        const ang = c.dir * (1 - Math.pow(1 - Math.min(1, p / 0.75), 2)) * 1.35, fy = q(gy - P2.z * G.AZ);
+        b.save(); b.globalAlpha = p < 0.7 ? 1 : 1 - (p - 0.7) / 0.3; b.translate(q(gx), fy); b.rotate(ang); b.scale(UK * (1 + 0.15 * Math.max(0, 0.2 - p) / 0.2), UK * (1 - 0.15 * Math.max(0, 0.2 - p) / 0.2));
+        if (u.side === 1) { const gl = G.glowOf(base, 10, 1, 1); b.drawImage(gl.c, -s.w / 2 - gl.p, -s.h - gl.p); }
+        b.drawImage(base, -s.w / 2, -s.h);
+        const wf = p < 0.16 ? 1 : p < 0.5 && ((p * 30) | 0) % 2 === 0 ? 0.55 : 0; if (wf) { b.globalAlpha *= wf; b.drawImage(G.glowOf(base, 9, 1, 0).tint, -s.w / 2, -s.h); }   // 閃白
+        b.restore();
       } else if (it.j) {
         const p = it.j, s = sprOf(p.o.vis);
         const gx = p.x * G.AX - ox, gy = p.y * G.AY - oy;

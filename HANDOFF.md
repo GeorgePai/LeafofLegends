@@ -2,7 +2,7 @@
 
 > 新 session 只要讀這份。排行榜相關再看 `LEADERBOARD.md`。**做任何新設計前，先對照第 8 節「設計守則」**。
 > 各版完成內容在 `CHANGELOG.md`、暫定數值在 `VALUES.md`，需要時用 grep 找到段落再讀，不要整份讀。
-> 最後更新：2026-11-21，版本 **V3.12**
+> 最後更新：2026-11-21，版本 **V3.13**
 
 ## 1. 專案是什麼
 - Pai 的 HTML5 瀏覽器遊戲，仿 Gamevil《Plants War》（推塔＋英雄操作＋小兵兵線）。**v3.7 起改成單路地圖**（每關一張、每邊內／中／外三座塔＋聖所，v3.10 拿掉主塔）
@@ -18,7 +18,7 @@
 | **原始碼（雲端接手來源）** | 同一個 repo 的 **source** 分支：`src/`、`assets/`、`audio/`、`build.py`、`shell.html`、`tools/`、`setup.sh`、本檔、`CHANGELOG.md`、`VALUES.md`。注意：repo 是公開的（遊戲本身已經包含全部 JS，所以沒有多公開什麼） |
 | Mac 備份 | `/Users/paiju/Desktop/Claude/LeafofLegends/`：`LeafofLegends.html`（可直接玩，旁邊的 `audio/` 是音樂）、`source/`、`versions/LeafofLegends_v*.zip`（舊版 `LeafWar_v*.zip`）、`bgm/`（Pai 給的原始 BGM）、本檔 |
 | **排行榜伺服器** | https://lol-rank.leafoflegends.workers.dev（Cloudflare Worker `lol-rank`＋D1 `lol-rank`，帳號用 Apple ID 登入）。程式在 source 分支的 `leaderboard/`；**推 source 就會由 Cloudflare Workers Builds 自動部署**（根目錄 /leaderboard、`npx wrangler deploy`），資料表由 Worker 自己建立／升級。細節見 `LEADERBOARD.md` |
-| 測試工具 | `tools/`：`tc_all.sh`（平行文字檢查＋摘要）、`textcheck.py`＋`tc_scenes.py`、`shot.py`（截圖）、`sheet.py`（多張截圖拼成一張）、`vfxsheet.py`（技能特效總覽）、`guideshot.py`（教學頁截圖）；v3.10 新增 `ultshot.py`（英雄放大招連拍：`python3 tools/ultshot.py 英雄,... out.png 秒,秒,...`，查殘影）、`mapcheck.py`（五張地圖合法性＋預覽圖 /tmp/s/map_l*.png）、`towersheet.py`（塔精靈總覽）、`sbult.py`（隊伍技能展示大招連拍） |
+| 測試工具 | `tools/`：`tc_all.sh`（平行文字檢查＋摘要）、`textcheck.py`＋`tc_scenes.py`、`shot.py`（截圖）、`sheet.py`（多張截圖拼成一張）、`vfxsheet.py`（技能特效總覽）、`guideshot.py`（教學頁截圖）；v3.10 新增 `ultshot.py`（英雄放大招連拍：`python3 tools/ultshot.py 英雄,... out.png 秒,秒,...`，查殘影）、`mapcheck.py`（五張地圖合法性＋預覽圖 /tmp/s/map_l*.png）、`towersheet.py`（塔精靈總覽）、`sbult.py`（隊伍技能展示大招連拍）；v3.13 `animlab.py html out.gif 秒`（動畫實驗場動圖） |
 
 ## 3. 接手步驟（約 2 分鐘，不需要 Mac）
 1. `add_repo(GeorgePai, LeafofLegends, push)`
@@ -57,7 +57,7 @@
 | 07_world | 單位、AI、兵線、英雄指令、經驗升級、跟隨 `followAI/followSlots`（v3.12 起只給死靈召喚物用，玩家召集已拿掉）、獵手 AI 分派 |
 | 07b_systems | 技能升級、金幣/商店/背包、計時增益、野區、技能數值表 `G.skillRows`、**敵方獵手 `hunter`（`spawnHunter/junglerAI/hunterReward`；v3.12 每 40 秒升級、守首領坑）、塔傳送 `startTeleport/updateTeleport`** |
 | 08b_hd | **HD-2D 鏡頭後製（v3.2.2）**：`G.HD`（WebGL 著色器：透視、景深、柔光、調色、光束；光塵），`on/P/active/over/render` |
-| 08_render | `R.resize`（固定比例＋整數倍）、`R.zoomMin`（可縮到全圖）、`R.hiQ/blitUI`、世界繪製（護盾光殼、稀有度外框、血條、準心、迷霧） |
+| 08_render | v3.13 生命感姿勢層（`u.life`、`PT` 整組變形）、倒下 `W.corpses`＋`G.corpsePos`；`R.resize`（固定比例＋整數倍）、`R.zoomMin`（可縮到全圖）、`R.hiQ/blitUI`、世界繪製（護盾光殼、稀有度外框、血條、準心、迷霧） |
 | 09_ui | 戰鬥 HUD（v3.8 大招橫幅 `ultBanner`；v3.11 暫停離開確認 `leaveAsk`；`leaveBattle` 會 `G.Ach.abandon`）：HP/MP/XP 三條等粗、鑰匙＋K/D/A 列、小地圖 `mapDraw`＋展開大地圖 `bigMap`、戰鬥數據 `statPanel`、廣播 `drawNotices`、技能水平列＋置中鈕（大招上方）、長按技能卡（動畫，`cardC`）、增益卡、商店、左側道具欄（效果短標）、暫停選單（有名稱）；所有輸入（`evXY` 已扣黑邊）|
 | 10_sandbox | 中文字工具 `G.cn/cnWrap`、標籤 `tagOf`、**技能展示沙盒 `G.Sandbox`（依技能類型的情境：`scBasic/scActive/scBuff/scPassive/scNecro`，被動用對照演出；v3.9 大招走 `cast()`→`beginCharge` 播大招儀式，借用 `G.Render.chgFloor/chgBody`）** |
 | 11_menus | 首頁（大標題 5×7 字形 `TITLE_GLYPH`）、隊伍／圖鑑（共用轉盤 `cars.team/book`，橫屏轉盤高度依 `nameplateH`）、技能展示彈窗 `demoPanel`（動畫＋數值表 `lvTable`：每列同一行，放不下就數值欄左右滑動 `TS`）、數值條 `G.statBars/G.statMax`、陣容 `teamBox`（v3.7 拿掉上中下路）、教學（5 類（v2.8.4 拿掉英雄），說明文字用 `{重點}` 上色；`G.Menus.openGuide(fromBattle)`、`M._gt(t)` 測試用跳時間）；捲動狀態 `SM`/`SD` 分開 |
@@ -108,13 +108,14 @@
 - v3.9：立體圓柱塔、隊伍技能展示播大招、大地圖聖所改菱形
 - v3.10：拿掉主塔（三座塔等距重排）、英雄 ×1.25、大招殘影修正（穿透光帶改彗星尾巴、焦痕縮短）
 - v3.11：「不計入排行」改成按重新開始／回首頁才跳確認
+- v3.13：角色生命感動畫（呼吸、走路彈跳前傾揚塵、轉身、受擊、落地、倒下打飛翻倒）、英雄收尾頓格
 - v3.12：拿掉召集／解散、拿掉野區小怪（只剩兩隻野生首領）、獵手改成隨時間升級並守首領坑、塔 ×0.85、成就 65 個
 - v2.4：敵塔範圍＋鎖定警示、道路 ×1.5、結算放慢＋鎖值＋音效、新藥水 5 種＋全部藥水特效、DEV 密碼、技能範圍顯示＋指定施放（拖曳／取消）、LOGO 改版、塔射程 190/210
 
 ## 6. 待 Pai 決定
 - 畫質再提升：A＝高解析文字（像素角色＋平滑字體），B＝提高像素解析度（480×270，整套美術重畫）。尚未選擇
 - 圖鑑動畫重畫：Pai 說「有些動畫可以描繪得更好」，等他指定哪幾隻
-- 暫定數值全部在 `VALUES.md`（最新：6zi v3.12 段；v3.7 以後的 6zd～6zg 都還沒經 Pai 確認）
+- 暫定數值全部在 `VALUES.md`（最新：6zj v3.13 段；v3.7 以後的 6zd～6zg 都還沒經 Pai 確認）
 - （v2.7）成就鑰匙過剩：全收集只要 90 把，成就給 138 把；「群英薈萃／森羅萬象」較晚完成的那個獎勵用不到。Pai 決定先保留，等鑰匙有新用途再說
 - （v2.4）首頁 RESET 要不要也加密碼鎖？隕石等範圍技仍可在塔射程外打到塔（目前視為合理技能消耗），要不要禁止？
 - （v2.5）重生時間、塔成長／升溫、野怪脫戰規則等暫定數值待確認（VALUES.md 6h）
@@ -136,6 +137,7 @@
 - （v3.2）公告與動態數值（VALUES.md 6t）待 Pai 實機確認；公告／動態的伺服器功能要等 Cloudflare 自動部署完才會生效
 - （v3.2.2）「死亡後 2 秒才復活」目前做成：有復活藥水時倒地 2 秒再原地站起來；若 Pai 指的是一般回聖樹重生，要再改 `G.TUNE.heroRespawn*`
 - （v3.2.2）公告／信箱、管理玩家動態已上線但還沒實際用過：請 Pai 開發者模式發一則測試公告確認
+- （v3.13）生命感動畫的幅度（VALUES 6zj）待 Pai 實機看；想再驚艷可加：技能命中頓格、爆擊特寫、英雄專屬待機小動作（要重畫影格）
 - （v3.12）獵手改成每 40 秒升級、守在首領坑旁，Pai 可決定要不要整個拿掉獵手；塔 ×0.85 待實機看；拿掉野區後金幣／經驗來源變少，節奏待 Pai 玩過再調
 - （v3.10）少了主塔，整場可能變短；單路塔血 `towerOne 2` 先沒動，等 Pai 玩過再調。英雄 ×1.25、塔間距（半路 28／53／78%）待 Pai 實機看
 - （v3.9）立體塔造型 Pai 尚未回饋；（v3.8）大招儀式時長／特效強度待確認

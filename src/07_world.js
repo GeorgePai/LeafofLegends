@@ -71,7 +71,7 @@ G.World = class {
     if (!G.mapCache[this.stage.map]) { const M = G.buildMap(md); G.mapCache[this.stage.map] = { M, ground: G.renderGround(M) }; }
     this.M = G.mapCache[this.stage.map].M; this.ground = G.mapCache[this.stage.map].ground;
     if (this.theme && this.theme.nat) { const gk = this.stage.map + '|' + this.themeId; if (!G.mapCache[gk]) G.mapCache[gk] = G.withTheme(this.themeId, () => G.renderGround(this.M)); this.ground = G.mapCache[gk]; }
-    this.units = []; this.projs = []; this.effects = []; this.decals = []; this.parts = new G.Particles(2600);
+    this.units = []; this.projs = []; this.effects = []; this.decals = []; this.corpses = []; this.parts = new G.Particles(2600);
     this.spawnQ = []; this.time = 0; this.trauma = 0; this.flashScreen = 0; this.hitstop = 0; this.timeScale = 1;
     this.notices = []; this.stats = { kills: 0, time: 0, deaths: 0, assists: 0, camps: 0, towers: 0, gold: 0, dmg: 0, taken: 0, tower: 0, bosses: 0, hunters: 0, wboss: 0, potions: 0, tps: 0, streak: 0, minHoly: 1, spent: 0 }; this.killT = [];   // 即時戰鬥數據
     this.over = null; this.attract = !!opt.attract; this.frame = 0;
@@ -181,6 +181,8 @@ G.World = class {
     for (const d of this.decals) d.t += dt;
     if (this.mark) { this.mark.t += dt; const h = this.hero; if (!h || !h.alive || !h.cmd || h.cmd.type !== 'move') { this.mark.out = (this.mark.out || 0) + dt; if (this.mark.out > 0.2) this.mark = null; } else this.mark.out = 0; }
     this.decals = this.decals.filter(d => d.t < d.dur);
+    // v3.13 倒下動畫：身體被打飛、往後倒、閃白，0.42 秒後碎成粒子
+    if (this.corpses.length) this.corpses = this.corpses.filter(c => { if (this.time - c.t0 < c.dur) return true; const p = G.corpsePos(c, 1); G.FX.shatter(this, Object.assign({}, c.u, { x: p.x, y: p.y, z: 0 })); return false; });
     this.parts.update(dt);
     this.units = this.units.filter(u => u.alive || (u === this.hero));
     this.trauma = Math.max(0, this.trauma - dt * 1.6);
@@ -335,7 +337,7 @@ G.World = class {
 
   // ---------- 單位 AI ----------
   updateUnit(u, dt) {
-    u.flash -= dt; u.lunge = Math.max(0, u.lunge - dt * 6); if (u.recoil > 0) u.recoil = Math.max(0, u.recoil - dt * 7); u.cast = Math.max(0, u.cast - dt); u.spawnT = Math.max(0, u.spawnT - dt);
+    u.flash -= dt; u.lunge = Math.max(0, u.lunge - dt * 6); if (u.hurt > 0) u.hurt = Math.max(0, u.hurt - dt * 7); if (u.recoil > 0) u.recoil = Math.max(0, u.recoil - dt * 7); u.cast = Math.max(0, u.cast - dt); u.spawnT = Math.max(0, u.spawnT - dt);
     u.atkT -= dt; u.slow -= dt;
     if (u.hp < u.st.hp) u.hp = Math.min(u.st.hp, u.hp + u.st.hpReg * dt);
     this.tickStatus(u, dt); if (!u.alive) return;
@@ -601,7 +603,9 @@ G.World = class {
   say(n) { if (this.attract) return; n.age = 0; n.t = Math.max(2.2, n.t || 2.4); this.notices.push(n); }
   kill(t, src) {
     t.alive = false; t.hp = 0;
-    G.FX.shatter(this, t);
+    if (t.static || !this.corpses || !t.spr) G.FX.shatter(this, t);
+    else { const dir = src && src.x != null && Math.abs(src.x - t.x) > 1 ? Math.sign(t.x - src.x) : -t.face; this.corpses.push({ u: t, t0: this.time, dur: t.kind === 'boss' ? 0.6 : 0.42, x: t.x, y: t.y, dir, face: t.face }); G.FX.ring(this, t.x, t.y, 3, t.vis.r + 8, 0.2, t.side === 0 ? 9 : 2);
+      if (src && src === this.hero && !this.attract) { this.hitstop = Math.max(this.hitstop, t.kind === 'boss' ? 0.12 : 0.04); if (t.kind === 'boss') this.shake(0.45); } }   // v3.13 英雄收尾：短暫頓格（首領更重＋震動）
     if (t.static) {
       this.shake(0.8); this.hitstop = 0.1; this.sfx('building', t.x, t.y);
       for (let k = 0; k < 4; k++) G.FX.smoke(this, t.x + G.rr(-16, 16), t.y + G.rr(-6, 6), G.rr(0, 30), 8, 6);

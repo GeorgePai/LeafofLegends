@@ -152,6 +152,7 @@ G.Combat = {
     if (t.scape > 0) dmg = this.scapeHit(src, t, dmg);                   // v2.6 替罪：一部分傷害改由召喚物承受
     if (this.stats && h) { const real = Math.min(dmg, Math.max(0, t.hp)); if (src === h) { this.stats.dmg += real; t.heroHitT = this.time; if (t.static) this.stats.tower += real; } if (t === h) this.stats.taken += real; }
     t.hp -= dmg; t.flash = 0.09; t.lastHit = src;
+    if (!t.static) { t.hurt = Math.min(1, 0.55 + dmg / Math.max(1, t.st.hp) * 4); t.hurtDir = src && src.x > t.x ? -1 : 1; }   // v3.13 受擊：往後一縮（畫面用，傷害越重縮越多）
     // 吸血
     const ls = (o.life || 0) + (src.lifesteal || 0);
     if (ls && src.alive && src.hp != null) { src.hp = Math.min(src.st.hp, src.hp + dmg * ls / 100); if (Math.random() < 0.5) this.parts.add(src.x, src.y, 14, 0, 0, 30, 0.5, 10, 15, 1, -10, 0); }
