@@ -1,5 +1,5 @@
 'use strict';
-G.VERSION = 'V3.9';                                  // 版本號（唯一來源；setup.sh 也從這行讀）
+G.VERSION = 'V3.10';                                  // 版本號（唯一來源；setup.sh 也從這行讀）
 /* =========================================================
    選單：首頁 / 隊伍 / 圖鑑 / 教學
    版面：直屏上下堆疊，橫屏左右分欄
@@ -593,7 +593,7 @@ G.Menus = (() => {
       arrow('mwU', top - 6, -1, mw.tgt > 0); arrow('mwD', bot + 2, 1, mw.tgt < ITEMS.length - 1);
       c.globalAlpha = 1;
     }
-    G.Update.corner(c, uw - I.r - 2, uh - I.b - 6);                                      // v2.8.5 版本號＋有新版時「點擊更新」
+    if (appear >= 1) G.Update.corner(c, uw - I.r - 2, uh - I.b - 6);                     // v2.8.5 版本號＋有新版時「點擊更新」（v3.10 等選單滑入完才出現，避免滑入中的按鈕從版本號底下穿過）
     // 右上：鑰匙數；左下：開發者模式開關
     // v2.8.6 右上：即時在線人數（綠點慢慢呼吸）；鑰匙數量改在商店頁看
     // v3.2 右上角信箱（系統公告），有未讀／未領就亮紅點＋數字；在線人數往左挪
@@ -1438,10 +1438,10 @@ G.Menus = (() => {
           }
         },
         {
-          t: '防禦塔', m: '雙方各有{外、中、內}三座塔，基地前還有{主塔}。塔會越來越強，{連打同一個英雄會越打越痛}',
+          t: '防禦塔', m: '雙方各有{外、中、內}三座塔守著聖所。塔會越來越強，{連打同一個英雄會越打越痛}',
           draw(c, x, y, w, h, t) {
-            const gy = y + h * 0.84, L = ((t / 0.9) | 0) % 4;
-            [['enemy_tower', '外塔'], ['enemy_tower2', '中塔'], ['enemy_tower3', '內塔'], ['enemy_tower4', '主塔']].forEach(([n, lab], i) => { const tx = x + w * (0.13 + i * 0.25); tower(c, n, tx, gy); G.cn(c, lab, tx, y + 4, i === L ? 13 : 6, 0.5); });
+            const gy = y + h * 0.84, L = ((t / 0.9) | 0) % 3;
+            [['enemy_tower', '外塔'], ['enemy_tower2', '中塔'], ['enemy_tower3', '內塔']].forEach(([n, lab], i) => { const tx = x + w * (0.2 + i * 0.3); tower(c, n, tx, gy); G.cn(c, lab, tx, y + 4, i === L ? 13 : 6, 0.5); });
           }
         },
         {
@@ -1455,7 +1455,7 @@ G.Menus = (() => {
           }
         },
         {
-          z: 1, t: '摧毀聖所', m: '{內塔}倒了才能打主塔，主塔倒了才能打聖所，{拆掉聖所就贏}',
+          z: 1, t: '摧毀聖所', m: '{內塔}倒了才能打聖所，{拆掉聖所就贏}',
           draw(c, x, y, w, h, t) {
             const T = t % 4.2, gy = y + Math.round(h * 0.86), eh = G.SPR.eholy[0], ex = x + w * 0.62;
             const boom = T > 2.2 && T < 3.4;

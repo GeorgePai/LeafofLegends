@@ -452,7 +452,7 @@ G.VFX = {
     G.VFX.lines(W, x, y, 8, 14, rx * 1.3, E.c2);
     G.VFX.burst(W, x, y, 8, Math.round(40 * k), E.c, E.c2, 80, 280, 0.5, 1.1, 260, 1.5, [1, 3], 80, 300);
     G.VFX.burst(W, x, y, 6, Math.round(20 * k), 9, E.c, 30, 120, 0.8, 1.6, -80, 2, 1, 40, 160);
-    G.VFX.cracks(W, x, y, r * 0.9, 2.2, 8); G.FX.scorch(W, x, y, r * 0.7, 6);
+    G.VFX.cracks(W, x, y, r * 0.9, 1.6, 8); G.FX.scorch(W, x, y, r * 0.7, 2.5);   // v3.9 焦痕 6→2.5 秒（減少殘影）
     W.effects.push({ t: 0, dur: 0.75, layer: 1, draw(ctx, o) {        // 光柱
       const p = this.t / 0.75, cx = SX(x, o), cy = SY(y, 0, o), w = Math.max(2, Math.round((16 + 12 * (1 - p)) * k)), H = 240;
       ctx.globalAlpha = 0.55 * (1 - p); ctx.fillStyle = G.PAL[E.c]; ctx.fillRect(Math.round(cx - w / 2), Math.round(cy - H), w, H);
@@ -461,13 +461,16 @@ G.VFX = {
     } });
   },
   // 穿透大招：沿路徑長出一道光帶（前端發亮），結束後慢慢消失；途中每段迸出火花
+  // v3.9 改成「彗星光帶」：只留頭後面一段尾巴，跟著往前跑，到終點後尾巴 0.25 秒收掉（原本整條留到最後才淡出 → 殘影）
   ultSlash(W, x0, y0, x1, y1, D, el) {
-    const E = EL(el), FADE = 0.9;
+    const E = EL(el), FADE = 0.25, Lt = Math.hypot(x1 - x0, y1 - y0) || 1, tl = Math.min(1, 110 / Lt);
     W.effects.push({ t: 0, dur: D + FADE, layer: 1, draw(ctx, o) {
-      const k = Math.min(1, this.t / D), f = this.t < D ? 1 : 1 - (this.t - D) / FADE;
-      const ax = SX(x0, o), ay = SY(y0, 12, o), bx = SX(x0 + (x1 - x0) * k, o), by = SY(y0 + (y1 - y0) * k, 12, o);
-      ctx.globalAlpha = 0.7 * f; ctx.fillStyle = G.PAL[E.c]; G.pxLine(ctx, ax, ay, bx, by, 7); ctx.fillStyle = G.PAL[E.c2]; G.pxLine(ctx, ax, ay, bx, by, 4);
-      ctx.globalAlpha = f; ctx.fillStyle = G.PAL[9]; G.pxLine(ctx, ax, ay, bx, by, 1); ctx.globalAlpha = 1;
+      const k = Math.min(1, this.t / D), k0 = Math.min(k, Math.max(0, k - tl) + (this.t > D ? (this.t - D) / FADE * tl : 0)), f = this.t < D ? 1 : 1 - (this.t - D) / FADE;
+      if (k - k0 < 0.002) return;
+      const P = q => [SX(x0 + (x1 - x0) * q, o), SY(y0 + (y1 - y0) * q, 12, o)], [ax, ay] = P(k0), [mx, my] = P(k0 + (k - k0) * 0.45), [bx, by] = P(k);
+      ctx.globalAlpha = 0.35 * f; ctx.fillStyle = G.PAL[E.c]; G.pxLine(ctx, ax, ay, mx, my, 3);                   // 尾端細、淡
+      ctx.globalAlpha = 0.7 * f; ctx.fillStyle = G.PAL[E.c]; G.pxLine(ctx, mx, my, bx, by, 7); ctx.fillStyle = G.PAL[E.c2]; G.pxLine(ctx, mx, my, bx, by, 4);
+      ctx.globalAlpha = f; ctx.fillStyle = G.PAL[9]; G.pxLine(ctx, mx, my, bx, by, 1); ctx.globalAlpha = 1;
       if (this.t < D) G.glow(ctx, bx, by, 30, E.c, 0.7);
     } });
     for (let i = 1; i <= 6; i++) G.VFX.later(W, D * i / 6, () => { const px = x0 + (x1 - x0) * i / 6, py = y0 + (y1 - y0) * i / 6; G.VFX.spark(W, px, py, 12, 10, E.c2); G.VFX.ringAir(W, px, py, 12, 3, 22, 0.3, E.c, 2); G.VFX.burst(W, px, py, 12, 8, E.c, 9, 60, 180, 0.3, 0.6, 0, 4); });

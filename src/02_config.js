@@ -9,7 +9,7 @@
 G.TUNE = {
   foeMul: 3, foeGap: 0.25, foeCap: 60, towerOne: 2,   // v3.7 單路：三路的敵兵併成一路（×2→×3）、出兵間隔 0.25 秒、單路地圖塔血 ×2（塔從 10 座變 4 座）
     // v3.4 Pai：敵方每波數量 ×2（小兵點數上限 24 之後敵方太弱）、同一路出兵間隔 0.45→0.3 秒、場上敵兵上限 40→60 — 暫定
-  heroScale: 1.5,          // v3.8 英雄本體放大倍率（Pai：英雄太小）
+  heroScale: 1.25,         // v3.9 英雄本體放大倍率 1.5→1.25（Pai：太大隻）
   waveInterval: 20,        // 兵線間隔（秒）— 暫定
   firstAllyWave: 2,
   firstEnemyWave: 6,
@@ -210,7 +210,7 @@ G.MAPS.lanes5 = (() => {
 })();
 
 // ---------- v3.7 單路地圖（72×54，點對稱）----------
-// 只寫「我方聖所 → 地圖中心」的半條路（控制點），自動：平滑成彎路、點對稱補出敵方半條、沿路放塔（外／中／內＋主塔）、
+// 只寫「我方聖所 → 地圖中心」的半條路（控制點），自動：平滑成彎路、點對稱補出敵方半條、沿路放塔（外／中／內）、
 // 中心垂直穿過一條河、河邊兩個野生首領坑、路旁凹槽營地（紅／藍／鱷魚，敵方點對稱）
 // v3.7 Pai：中立資源全部放在雙方外塔之間的交戰區（半路的 55%～95%），搶野怪就會碰到對方、容易打起團戰
 // camps：[種類, 沿半路的位置 0~1, 在路的哪一側 ±1, 離路中心幾格]；boss：[離路中心幾格, 沿路方向偏移]
@@ -225,8 +225,8 @@ G.laneMap = spec => {
   const along = (pts, d) => { for (let i = 0; i < pts.length - 1; i++) { const a = pts[i], b = pts[i + 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (d <= L) { const t = d / L; return { p: [+(a[0] + (b[0] - a[0]) * t).toFixed(2), +(a[1] + (b[1] - a[1]) * t).toFixed(2)], u: [(b[0] - a[0]) / L, (b[1] - a[1]) / L] }; } d -= L; }
     const a = pts[pts.length - 2], b = pts[pts.length - 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]); return { p: b, u: [(b[0] - a[0]) / L, (b[1] - a[1]) / L] }; };
   const Lh = len(lane) / 2, hp = lane[0];
-  // 塔：主塔離聖所 6.5 格；內／中／外塔在半路的 36%／58%／79%（外塔之間留中立區）
-  const pt = [[along(lane, 6.5).p, 0, 9], [along(lane, Lh * 0.36).p, 0, 2], [along(lane, Lh * 0.58).p, 0, 1], [along(lane, Lh * 0.79).p, 0, 0]];
+  // v3.9 拿掉主塔（Pai：城堡主塔太突兀）→ 只剩內／中／外三座，等距排在半路的 28%／53%／78%（聖所→內塔、塔與塔之間都差不多遠，外塔之間留中立區）
+  const pt = [[along(lane, Lh * 0.28).p, 0, 2], [along(lane, Lh * 0.53).p, 0, 1], [along(lane, Lh * 0.78).p, 0, 0]];
   const et = pt.map(([p, l, t]) => [mir(p), l, t]);
   // 河：在中心垂直穿過路，一路延伸到地圖邊
   const cu = along(lane, Lh).u, n = [-cu[1], cu[0]], rv = [];

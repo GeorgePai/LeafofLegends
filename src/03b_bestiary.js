@@ -145,7 +145,7 @@ delete G.BESTIARY.babybear2;
 // K：配色 { s 石, hi 亮面, lo 暗面, m 磚縫, a 點綴, a2 點綴暗, c 水晶, cc 水晶亮, w 窗內 }
 // v3.9 立體塔：圓柱體受光（左上來光、蘭伯特明暗＋網點過渡）、磚縫沿弧線彎曲、接縫越靠邊越密、
 // 橢圓頂面與前後城垛分層、挑簷與底部接觸陰影、圓錐屋頂、多切面水晶（Pai：塔看起來太扁平）
-G.towerArt = (W, H, tier, K, main) => P => {
+G.towerArt = (W, H, tier, K) => P => {
   const RY = 0.4, BY = [0, 0.5, 0.75, 0.25];
   const lam = (nx, nz) => 0.2 + 0.8 * Math.max(0, -0.62 * nx + 0.78 * nz);
   const pick = (ramp, I, x, y) => { const v = G.clamp(I, 0, 1) * (ramp.length - 1); let i = Math.floor(v); if (v - i > BY[(x & 1) + ((y & 1) << 1)]) i++; return ramp[G.clamp(i, 0, ramp.length - 1)]; };
@@ -210,44 +210,7 @@ G.towerArt = (W, H, tier, K, main) => P => {
     if (w > 1) P.l(X + 1, Y + 2, X + 1, Y + hgt - 1, K.R[1]); else P.px(X, Y + 1, K.R[1]);
     P.px(X - (w >> 1), Y + hgt, K.R[K.R.length - 1]);                               // 窗台
   };
-  const R0 = K.R, cx = W / 2;
-  if (main) {
-    // 主塔（城堡）：後方圓形主樓（圓錐頂＋大水晶）→ 前方城牆（看得到牆頂走道）→ 左右前角圓塔
-    const yG = H - 7;                                                                  // 地面中心線
-    top(cx, yG, 30, R0); cyl(cx, yG, yG + 3, 30, R0);                                  // 大底座
-    const dR = 12, dT = 31; cyl(cx, dT, yG - 14, dR, R0, { brick: 1, aoT: 3 });         // 主樓
-    cyl(cx, dT - 4, dT, dR + 3, R0, {}); top(cx, dT - 4, dR + 3, R0);
-    win(cx, dT, dR, -0.35, 4, 6); win(cx, dT, dR, 0.35, 4, 6);
-    cone(cx, dT - 5, 14, dR + 4, K.RR);
-    crystal(cx, 0, 13, 9);
-    // 城牆：正面（平面，左亮右暗＋磚紋）＋上方牆頂走道
-    const x0 = 13, x1 = W - 13, wT = H - 36, wB = yG;
-    for (let X = x0; X < x1; X++) for (let Y = wT; Y <= wB; Y++) {
-      const f = (X - x0) / (x1 - x0), loc = Y - wT, row = Math.floor(loc / 4); let I = 0.62 - 0.16 * f;
-      const dk = loc % 4 === 3 || (X - x0 + (row % 2) * 3) % 6 === 5 ? 1 : 0; if (!dk && hash(row, Math.floor((X - x0 + (row % 2) * 3) / 6)) < 0.15) I -= 0.08;
-      if (loc < 3) I *= 0.6 + 0.13 * loc; if (wB - Y < 2) I *= 0.8;
-      P.px(X, Y, R0[Math.max(0, R0.indexOf(pick(R0, I, X, Y)) - dk)]);
-    }
-    for (let X = x0; X < x1; X++) for (let Y = wT - 5; Y < wT; Y++) P.px(X, Y, pick(R0, Y < wT - 3 ? 0.35 : 0.8, X, Y));   // 牆頂走道（後暗前亮）
-    for (let X = x0 + 2; X < x1 - 2; X += 5) for (let yy = 0; yy < 4; yy++) for (let xx = 0; xx < 3; xx++) P.px(X + xx, wT - 9 + yy, pick(R0, yy === 0 ? 0.95 : xx === 2 ? 0.5 : 0.7, X + xx, wT - 9 + yy));
-    // 城門：拱形深洞＋右側內壁受光＋鐵柵
-    const gw = 12, gT = yG - 17, gl = Math.round(cx - gw / 2);
-    P.r(gl - 2, gT - 2, gw + 4, 19, pick(R0, 0.85, 0, 0)); P.e(cx, gT + 4, gw / 2 + 2, gw / 2 + 2, pick(R0, 0.85, 0, 0));   // 門框石
-    P.e(cx, gT + 4, gw / 2, gw / 2, K.w); P.r(gl, gT + 4, gw, 13, K.w);
-    P.l(gl + gw - 1, gT + 4, gl + gw - 1, yG, R0[1]); P.l(gl + gw - 2, gT + 6, gl + gw - 2, yG, R0[1]);
-    for (let x = gl + 2; x < gl + gw - 2; x += 2) P.l(x, gT + 1, x, yG - 3, R0[2]); P.l(gl + 1, gT + 9, gl + gw - 3, gT + 9, R0[2]);
-    // 門兩側旗幟（布有皺褶明暗）
-    for (const sx of [cx - 14, cx + 10]) { const AR = K.AR; for (let yy = 0; yy < 13; yy++) for (let xx = 0; xx < 4; xx++) P.px(sx + xx, wT + 3 + yy, AR[xx === 0 ? 2 : xx === 3 ? 0 : 1]); P.px(sx + 1, wT + 16, AR[1]); P.px(sx + 2, wT + 16, AR[0]); P.px(sx + 1, wT + 7, K.CR[3]); }
-    // 前角圓塔
-    for (const tx of [10, W - 10]) {
-      const tT = H - 48; cyl(tx, tT, yG - 1, 8, R0, { brick: 1, aoT: 3 });
-      cyl(tx, tT - 4, tT, 10, R0, {}); top(tx, tT - 4, 10, R0);
-      win(tx, tT, 8, -0.2, 6, 5);
-      cone(tx, tT - 5, tT - 19, 11, K.RR);
-      P.px(tx, tT - 20, K.CR[3]); P.px(tx, tT - 21, K.CR[2]);
-    }
-    return;
-  }
+  const R0 = K.R, cx = W / 2;   // v3.9 主塔（城堡）已移除
   const rx = tier === 2 ? 12 : tier === 1 ? 11 : 10, pr = rx + 4, yB = Math.floor(H - 2 - 3 - pr * RY), yT = Math.round(H * (tier === 2 ? 0.42 : tier === 1 ? 0.38 : 0.34));
   // 底座：寬圓台（先畫頂面，塔身蓋上去後前方露出一圈月牙）
   top(cx, yB, pr, R0); cyl(cx, yB, yB + 3, pr, R0);
@@ -278,9 +241,9 @@ G.towerArt = (W, H, tier, K, main) => P => {
   const A = { R: [4, 5, 6, 7, 8], AR: [16, 22, 11, 20], RR: [16, 16, 22, 11, 20], CR: [16, 11, 20, 9], w: 1 };                    // 我方：淺石、綠葉點綴、綠水晶
   Object.assign(G.BESTIARY, {
     tw_e0: { w: 42, h: 57, tower: 1, draw: G.towerArt(42, 57, 0, E) }, tw_e1: { w: 44, h: 66, tower: 1, draw: G.towerArt(44, 66, 1, E) },
-    tw_e2: { w: 46, h: 75, tower: 1, draw: G.towerArt(46, 75, 2, E) }, tw_em: { w: 64, h: 84, tower: 1, draw: G.towerArt(64, 84, 9, E, 1) },
+    tw_e2: { w: 46, h: 75, tower: 1, draw: G.towerArt(46, 75, 2, E) },
     tw_p0: { w: 42, h: 57, tower: 1, draw: G.towerArt(42, 57, 0, A) }, tw_p1: { w: 44, h: 66, tower: 1, draw: G.towerArt(44, 66, 1, A) },
-    tw_p2: { w: 46, h: 75, tower: 1, draw: G.towerArt(46, 75, 2, A) }, tw_pm: { w: 64, h: 84, tower: 1, draw: G.towerArt(64, 84, 9, A, 1) }
+    tw_p2: { w: 46, h: 75, tower: 1, draw: G.towerArt(46, 75, 2, A) }
   });
 }
 
@@ -295,10 +258,10 @@ G.buildBestiary = function () {
     }
     G.SPR[k] = frames;
   }
-  const towerSpr = { player_tower: 'tw_p0', enemy_tower: 'tw_e0', enemy_tower2: 'tw_e1', enemy_tower3: 'tw_e2', enemy_tower4: 'tw_em', mushroom_tower: 'mtower' };   // v3.8 大塔
+  const towerSpr = { player_tower: 'tw_p0', enemy_tower: 'tw_e0', enemy_tower2: 'tw_e1', enemy_tower3: 'tw_e2', enemy_tower4: 'tw_e2', mushroom_tower: 'mtower' };   // v3.8 大塔
   for (const name in towerSpr) { const big = name === 'enemy_tower4'; G.VIS[name] = Object.assign({}, G.VIS[name] || {}, { spr: towerSpr[name], r: big ? 30 : name === 'mushroom_tower' ? 16 : 22, shadow: big ? 30 : name === 'mushroom_tower' ? 13 : 21 }); }
   // 我方塔依層級換圖（world 建塔時用）
-  G.TOWER_VIS = { 0: 'tw_p0', 1: 'tw_p1', 2: 'tw_p2', 9: 'tw_pm' };
+  G.TOWER_VIS = { 0: 'tw_p0', 1: 'tw_p1', 2: 'tw_p2' };
   for (const name in G.ORIG.units) {
     if (G.VIS[name]) continue;
     const s = G.SPR[name]; if (!s) continue;
