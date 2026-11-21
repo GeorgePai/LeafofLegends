@@ -17,6 +17,7 @@ G.skillReq = (sd, lv) => sd['lv' + lv] || 1;
 // 每升 1 級得 1 點藥水點；每種藥水最高 3 級，效果整場有效（不會消失）。lv：1～3 級的「累計」效果，越後面加越多（鼓勵專精）
 // k：效果種類（hpPct 最大 HP%、mpPct MP 回復%，其餘與計時增益共用：pow del crit arm spd cdr xp wave）；rev＝每級存 1 次復活
 G.POT_MAX = 3;
+G.POT_CAP = 16;   // v4.0 一場最多拿到 16 點藥水點（升級時送，拿滿就不再送）
 // v3.14 英雄階級：等級到了腳下光環換色、升級特效跟著變色（視覺上看得出變強）
 G.HERO_TIER = [{ lv: 1, n: '', c: 9 }, { lv: 4, n: '覺醒', c: 11 }, { lv: 7, n: '精英', c: 12 }, { lv: 10, n: '英傑', c: 17 }, { lv: 13, n: '傳奇', c: 14 }];
 G.heroTier = lv => { let t = 0; G.HERO_TIER.forEach((q, i) => { if (lv >= q.lv) t = i; }); return t; };
@@ -91,13 +92,12 @@ Object.assign(G.World.prototype, {
       const all = [...h.skills, ...h.pskills];
       if (G.Team.dev && !this.attract) {          // v2.6 開發者模式：開局直接滿級（所有技能都能升到 LV3 的等級），全部技能點自己分配
         h.level = Math.max(1, ...all.flatMap(s => [1, 2, 3].map(k => G.skillReq(s.s, k)))); h.exp = 0; h.calc(); h.hp = h.st.hp; h.mp = h.st.mp;
-        h.sp = h.skills.length * G.SKILL_MAX; h.pp = h.level - 1;
+        h.sp = (h.skills.length + h.pskills.length) * G.SKILL_MAX; h.pp = h.ppGot = Math.min(G.POT_CAP, h.level - 1);
       } else {
-        h.sp = 1; h.pp = 0;                        // 1 級時有 1 點，自動學第一個可學的主動技
+        h.sp = 1; h.pp = 0; h.ppGot = 0;           // 1 級時有 1 點，自動學第一個可學的主動技
         const first = h.skills.find(s => G.skillReq(s.s, 1) <= 1);
         if (first) this.levelSkill(first, true);
       }
-      this.autoPassive(true);                      // v3.14 英雄被動：等級到了自動升級，不花點數
     }
   },
   // ----- 每幀 -----
@@ -317,7 +317,7 @@ Object.assign(G.World.prototype, {
 
   // ----- 技能升級 -----
   canLevel(s) {
-    const h = this.hero; if (!h || !s || s.passive || s.lv >= G.SKILL_MAX || (h.sp || 0) <= 0) return false;   // v3.14 被動自動升級，不能花點數
+    const h = this.hero; if (!h || !s || s.lv >= G.SKILL_MAX || (h.sp || 0) <= 0) return false;   // v4.0 被動改回手動升級（花技能點）
     return h.level >= G.skillReq(s.s, s.lv + 1);
   },
   levelSkill(s, quiet) {
@@ -328,14 +328,6 @@ Object.assign(G.World.prototype, {
     if (!quiet) this.skillNotice(s);
     if (!quiet) { this.sfx('level'); G.FX.ring(this, h.x, h.y, 3, 22, 0.35, 13); for (let k = 0; k < 10; k++) this.parts.add(h.x + G.rr(-8, 8), h.y, G.rr(4, 20), 0, 0, G.rr(40, 80), 0.6, 13, 9, 1, -10, 0); }
     return true;
-  },
-  // v3.14 英雄被動：英雄等級到了就自動升級（回傳這次升了的被動）
-  autoPassive(quiet) {
-    const h = this.hero, up = []; if (!h) return up;
-    for (const s of h.pskills) while (s.lv < G.SKILL_MAX && h.level >= G.skillReq(s.s, s.lv + 1)) { s.lv++; up.push(s); }
-    if (up.length) { const hp = h.hp / h.st.hp, mp = h.st.mp ? h.mp / h.st.mp : 0; h.calc(); h.hp = h.st.hp * hp; h.mp = h.st.mp * mp; this.applyBuffs(h); }
-    if (!quiet) for (const s of up) (this.lvFx = this.lvFx || []).push({ sk: s, lv: s.lv });
-    return up;
   },
   // 升級頁有沒有東西可以選（技能點能用、或藥水點能用）
   lvChoices() {

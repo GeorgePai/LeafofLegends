@@ -140,7 +140,7 @@ G.World = class {
     h.skills = hd.skills.map(id => G.skillSlot(id));
     h.pskills = hd.passives.map(id => Object.assign(G.skillSlot(id), { passive: true }));
     h.passives = null; h.calc(); h.hp = h.st.hp; h.mp = h.st.mp;
-    h.cmd = null; h.path = null; h.pending = null; h.hold = false; h.repath = 0; h.dead = 0; h.sp = 0; h.pp = 0;
+    h.cmd = null; h.path = null; h.pending = null; h.hold = false; h.repath = 0; h.dead = 0; h.sp = 0; h.pp = 0; h.ppGot = 0; h.atkReq = null;
     this.hero = this.add(h);
     G.FX.spawn(this, h);
   }
@@ -157,6 +157,7 @@ G.World = class {
   update(dt) {
     this.frame++;
     if (this.hitstop > 0) { this.hitstop -= dt; return; }
+    this.statics = this.units.filter(u => u.static && u.alive);
     if (this.slowT > 0 && !this.over) { this.slowT -= dt; this.timeScale = this.slowT > 0 ? 0.35 : 1; }   // v3.14 升級慢動作
     if (this.lvT > 0) { this.lvT -= dt; if (this.lvT <= 0 && !this.over && this.lvChoices()) this.lvOpen = true; }   // v3.14 升級頁（UI 看到 lvOpen 就打開並暫停）
     dt *= this.timeScale;
@@ -276,7 +277,7 @@ G.World = class {
   }
   // v3.14 繞障：前方有建築（塔、聖樹）擋路時，沿著建築外緣的切線方向走（優先往原本的橫向位置那側繞）
   steer(u, dx, dy) {
-    for (const t of this.units) {
+    for (const t of this.statics || this.units) {                    // v4.0 效能：只看建築清單（每幀更新一次）
       if (!t.static || !t.alive || t === u.target) continue;
       if (u.kind === 'hero' && t.side !== u.side) continue;   // 英雄要打敵方建築時直接走過去
       const rx = u.x - t.x, ry = u.y - t.y, d = Math.hypot(rx, ry), R = t.r + u.r + 6, F = 34;
@@ -439,9 +440,25 @@ G.World = class {
       h.hp = Math.min(h.st.hp, h.hp + h.st.hp * T.sanctuaryHeal * dt); h.mp = Math.min(h.st.mp, h.mp + h.st.mp * T.sanctuaryHeal * dt);
       if (Math.random() < dt * 8) this.parts.add(h.x + G.rr(-10, 10), h.y, 2, 0, 0, 40, 0.6, 9, 7, 1, -10, 0);
     }
-    // 鍵盤直接移動
+    // v4.0 普攻鈕：普攻優先於移動（行進間按普攻 → 停下來打完這一下再繼續走；按住＝連續普攻）
+    const ar = h.atkReq;
+    if (ar) {
+      if (!this.valid(h, ar.t) || this.dist(h, ar.t) > h.st.range + T.heroAggro * 1.6) ar.t = ar.held && !ar.fix ? this.autoTarget(h, h.st.range + T.heroAggro) : null;
+      if (!ar.t) h.atkReq = null;
+      else if (ar.sw && h.atkT > 0.05) { if (!ar.held) h.atkReq = null; else ar.sw = false; }   // 這一下打完了
+      if (h.atkReq) {
+        const t = ar.t; h.target = t; this.cancelTeleport(true); h.path = null;
+        if (this.inRange(h, t)) { this.brake(h, dt); if (h.atkT <= 0) { this.tryAttack(h, t); ar.sw = true; } return; }
+        return this.chase(h, t, dt);
+      }
+    }
+    // 鍵盤／搖桿直接移動（v4.0 移動中按技能：射程內有目標就直接放，不會被移動吃掉）
     const kd = this.keyDir;
-    if (kd) { this.cancelTeleport(true); h.cmd = null; h.pending = null; h.path = null; return this.moveDir(h, kd[0], kd[1], dt); }
+    if (kd) {
+      this.cancelTeleport(true); h.cmd = null; h.path = null;
+      if (h.pending) { const p = h.pending, s = h.skills[p.i]; h.pending = null; if (s && this.valid(h, p.t) && this.dist(h, p.t) <= s.range + 10) { this.castSkill(h, p.i, p.t); return this.brake(h, dt); } }
+      return this.moveDir(h, kd[0], kd[1], dt);
+    }
     if (this.tp && this.tp.ch) { h.target = null; return this.brake(h, dt); }   // 傳送引導中：原地不動
     // 待施放技能：走到射程內再放
     if (h.pending) {
@@ -594,9 +611,20 @@ G.World = class {
     if (!s.needT) { this.castSkill(h, i, null); return 'ok'; }
     let t = this.valid(h, h.target) && this.dist(h, h.target) <= s.range + 10 ? h.target : this.nearestEnemy(h, s.range + 10);
     if (t) { this.castSkill(h, i, t); return 'ok'; }
+    if (this.keyDir) return 'none';                       // v4.0 搖桿移動中：射程內沒目標就不排隊（排了也會被移動取消）
     t = this.valid(h, h.target) ? h.target : this.nearestEnemy(h, s.range * 2.2);
     if (t) { h.pending = { i, t }; h.cmd = null; return 'queued'; }
     return 'none';
+  }
+  // v4.0 普攻鈕：t＝指定目標（拖曳選的）；沒指定就挑射程附近最好打的；held＝按住連續普攻
+  attackCmd(t, held) {
+    const h = this.hero; if (!h || !h.alive || h.chg) return 'none';
+    const T = G.TUNE, fix = !!t;
+    if (!t || !this.valid(h, t)) t = this.autoTarget(h, h.st.range + T.heroAggro);
+    if (!t) return 'none';
+    h.atkReq = { t, held: !!held, fix, sw: false };
+    if (fix) h.cmd = { type: 'attack', t, lock: true };      // 拖曳指定的目標：之後閒置時繼續打它
+    return 'ok';
   }
   // v2.4 指定施放（拖曳瞄準放開／按住快捷鍵放開）：A = { x, y, t }
   castAim(i, A) {
@@ -662,7 +690,7 @@ G.World = class {
     const need = () => G.ORIG.units[h.name].exp * h.level;
     while (h.exp >= need()) {
       const old = { hp: h.st.hp, power: h.st.power, armor: h.st.armor }, t0 = G.heroTier(h.level);
-      h.exp -= need(); h.level++; h.sp = (h.sp || 0) + 1; h.pp = (h.pp || 0) + 1; h.calc(); this.autoPassive(this.attract); this.applyBuffs(h);   // v3.14 每升 1 級：技能點、藥水點各 1
+      h.exp -= need(); h.level++; h.sp = (h.sp || 0) + 1; if ((h.ppGot || 0) < G.POT_CAP) { h.pp = (h.pp || 0) + 1; h.ppGot = (h.ppGot || 0) + 1; } h.calc(); this.applyBuffs(h);   // 每升 1 級：技能點 1、藥水點 1（v4.0 藥水點一場最多 16）
       h.hp = h.st.hp; h.mp = h.st.mp;
       const tier = G.heroTier(h.level) > t0;
       G.FX.levelUp(this, h, { hp: Math.round(h.st.hp - old.hp), pow: Math.round(h.st.power - old.power), tier }); this.sfx('level'); this.hitstop = 0.05;

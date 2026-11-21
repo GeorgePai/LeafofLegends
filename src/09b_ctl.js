@@ -15,7 +15,7 @@ G.Ctl = (() => {
     if (!C.s) {
       let v = null; try { v = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { }
       C.s = Object.assign({ move: touchDev() ? 'joy' : 'tap' }, v && typeof v === 'object' ? v : {});
-      C.s.lay = Object.assign({ p: {}, l: {} }, C.s.lay && typeof C.s.lay === 'object' ? C.s.lay : {});
+      C.s.lay = Object.assign({ p: {}, l: {} }, C.s.lay && typeof C.s.lay === 'object' && C.s.lv === 2 ? C.s.lay : {}); C.s.lv = 2;   // v4.0 加了普攻鈕，舊的自訂排版作廢
     }
     return C.s;
   };
@@ -24,15 +24,17 @@ G.Ctl = (() => {
   C.setMove = m => { C.get().move = m; C.save(); C.joyEnd(); };
 
   // ---------- 版面 ----------
-  C.IDS = ['joy', 'sk0', 'sk1', 'sk2', 'ps', 'zoom', 'cam'];
-  C.NAME = { sk0: '技能 1', sk1: '技能 2', sk2: '大招', ps: '被動', cam: '視角置中', zoom: '放大縮小', joy: '搖桿' };
-  const BASE = { sk0: [28, 28], sk1: [28, 28], sk2: [32, 32], ps: [20, 20], cam: [16, 16], zoom: [35, 16], joy: [56, 56] };
+  C.IDS = ['joy', 'atk', 'sk0', 'sk1', 'sk2', 'ps', 'zoom', 'cam'];
+  C.NAME = { atk: '普攻', sk0: '技能 1', sk1: '技能 2', sk2: '大招', ps: '被動', cam: '視角置中', zoom: '放大縮小', joy: '搖桿' };
+  const BASE = { atk: [40, 40], sk0: [28, 28], sk1: [28, 28], sk2: [32, 32], ps: [20, 20], cam: [16, 16], zoom: [35, 16], joy: [56, 56] };
   C.KMIN = 0.8; C.KMAX = 1.4;
   // 預設位置：[錨點 x（l 左／r 右）, 錨點 y（t 上／b 下）, 中心離錨點 x, 中心離錨點 y]
-  // 技能沿右下角排成弧形（反 L）：左下 技能 1 → 技能 2 → 右上 大招；被動（方形）在角落
+  // v4.0 仿傳說對決：右下角大顆普攻，技能沿著它排成弧形（左下 技能 1 → 技能 2 → 右上 大招），被動（方形）在大招上方
+  //      直屏：視角置中／縮放在搖桿上方；橫屏：在畫面下方中間
+  const R0 = { atk: ['r', 'b', 24, 24], sk0: ['r', 'b', 71, 28], sk1: ['r', 'b', 57, 59], sk2: ['r', 'b', 24, 73], ps: ['r', 'b', 24, 105] };
   const DEF = {
-    p: { ps: ['r', 'b', 17, 17], sk0: ['r', 'b', 66, 24], sk1: ['r', 'b', 50, 55], sk2: ['r', 'b', 17, 69], cam: ['r', 'b', 10, 101], zoom: ['r', 'b', 40, 101], joy: ['l', 'b', 44, 46] },
-    l: { ps: ['r', 'b', 17, 17], sk0: ['r', 'b', 66, 24], sk1: ['r', 'b', 50, 55], sk2: ['r', 'b', 17, 69], cam: ['r', 'b', 96, 10], zoom: ['r', 'b', 128, 10], joy: ['l', 'b', 48, 48] }
+    p: Object.assign({}, R0, { cam: ['l', 'b', 10, 98], zoom: ['l', 'b', 40, 98], joy: ['l', 'b', 44, 46] }),
+    l: Object.assign({}, R0, { cam: ['r', 'b', 104, 10], zoom: ['r', 'b', 136, 10], joy: ['l', 'b', 48, 48] })
   };
   C.port = () => G.Render.uh > G.Render.uw;
   C.okey = () => C.port() ? 'p' : 'l';
@@ -48,32 +50,43 @@ G.Ctl = (() => {
   // 主動技對應的位置：3 招 → 技能 1、2、大招；2 招 → 技能 2、大招（第 2 個被動放在技能 1 的位置）
   C.slotOf = (i, n) => n >= 3 ? 'sk' + Math.min(2, i) : 'sk' + (i + 3 - n);
   // 固定不能放的區域（左上角英雄資訊、右上角小地圖和按鈕）
-  C.fixed = () => { const A = C.area(); return [{ x: A.L, y: A.T, w: 112, h: 34 }, { x: A.R - 62, y: A.T, w: 62, h: 62 }]; };
+  C.fixed = () => { const A = C.area(), hb = (G.UI.topRB || 60) + 1; return [{ x: A.L, y: A.T, w: 112, h: 34 }, { x: A.R - 62, y: A.T, w: 62, h: hb }]; };   // 右上：小地圖＋按鈕列（hud 量出來的實際高度）
   const hit = (a, b, m = 2) => a.x < b.x + b.w + m && b.x < a.x + a.w + m && a.y < b.y + b.h + m && b.y < a.y + a.h + m;
+  // 圓形按鈕用圓形判定重疊（不然斜放的弧形會被方框誤判）
+  const ROUND = { atk: 1, sk0: 1, sk1: 1, sk2: 1, joy: 1 };
+  const over = (ia, a, ib, b) => {
+    if (ROUND[ia] && ROUND[ib]) return Math.hypot(a.cx - b.cx, a.cy - b.cy) < a.w / 2 + b.w / 2 + 2;
+    if (ROUND[ia] || ROUND[ib]) { const [c0, q] = ROUND[ia] ? [a, b] : [b, a], nx = G.clamp(c0.cx, q.x, q.x + q.w), ny = G.clamp(c0.cy, q.y, q.y + q.h); return Math.hypot(c0.cx - nx, c0.cy - ny) < c0.w / 2 + 2; }
+    return hit(a, b);
+  };
   C.bad = lay => { const r = {}, ids = C.IDS.filter(id => id !== 'joy' || C.joyOn()), rs = Object.fromEntries(ids.map(id => [id, C.rect(id, lay)])), fx = C.fixed();
-    ids.forEach((a, i) => { for (const f of fx) if (hit(rs[a], f, 0)) r[a] = 1; ids.slice(i + 1).forEach(b => { if (hit(rs[a], rs[b])) { r[a] = 1; r[b] = 1; } }); });
+    ids.forEach((a, i) => { for (const f of fx) if (hit(rs[a], f, 0)) r[a] = 1; ids.slice(i + 1).forEach(b => { if (over(a, rs[a], b, rs[b])) { r[a] = 1; r[b] = 1; } }); });
     return r; };
 
+  // v4.0 取消區：找一個不會和任何按鈕、固定資訊重疊的位置（技能群上方 → 左方 → 畫面上方中間）
+  C.cancelPos = () => {
+    const A = C.area(), lay = C.layNow(), ids = C.IDS.filter(id => id !== 'joy' || C.joyOn()), rs = ids.map(id => C.rect(id, lay)).concat(C.fixed()), r = 14;
+    const sk = ['sk0', 'sk1', 'sk2', 'atk', 'ps'].map(id => C.rect(id, lay)), top = Math.min(...sk.map(q => q.y)), left = Math.min(...sk.map(q => q.x)), mx = Math.round(sk.reduce((a, q) => a + q.cx, 0) / sk.length);
+    const cand = [[mx, top - 22], [mx - 30, top - 22], [left - 22, top + 10], [left - 22, top - 22], [Math.round((A.L + A.R) / 2), A.T + 80], [Math.round((A.L + A.R) / 2), Math.round((A.T + A.B) / 2) - 40]];
+    for (const [x, y] of cand) { const q = { x: x - r, y: y - r, w: r * 2, h: r * 2 + 12 }; if (x - r < A.L || x + r > A.R || y - r < A.T || y + r + 12 > A.B) continue; if (!rs.some(o => hit(q, o, 2))) return [x, y]; }
+    return [Math.round((A.L + A.R) / 2), Math.round((A.T + A.B) / 2) - 40];
+  };
   // ---------- 虛擬搖桿 ----------
   const J = C.J = { on: false, bx: 0, by: 0, kx: 0, ky: 0, dir: null };
   C.joyZone = (ux, uy) => {
     if (!C.joyOn()) return false;
-    const A = C.area(), r = C.rect('joy'), left = r.cx < (A.L + A.R) / 2;
-    if (Math.hypot(ux - r.cx, uy - r.cy) <= r.w * 0.7) return true;
-    const inX = left ? ux < A.L + (A.R - A.L) * 0.45 : ux > A.R - (A.R - A.L) * 0.45;
-    return inX && uy > A.T + 64 && uy > A.T + (A.B - A.T) * 0.4;
+    const r = C.rect('joy');
+    return Math.hypot(ux - r.cx, uy - r.cy) <= r.w * 0.95;   // v4.0 搖桿固定：按在搖桿附近（約 2 倍半徑）才算，其他地方拖曳＝看地圖
   };
   C.joyStart = (ux, uy) => {
     const r = C.rect('joy'), A = C.area(), R0 = r.w / 2;
-    J.on = true; J.dir = null;
-    if (Math.hypot(ux - r.cx, uy - r.cy) <= R0 * 1.2) { J.bx = r.cx; J.by = r.cy; }
-    else { J.bx = G.clamp(ux, A.L + R0, A.R - R0); J.by = G.clamp(uy, A.T + R0, A.B - R0); }
+    J.on = true; J.dir = null; J.bx = r.cx; J.by = r.cy;      // v4.0 搖桿固定在設定的位置，不跟著手指跑
+    G.Render.cam.follow = true;                                // 按下搖桿：鏡頭回到英雄（之後移動中可以另一指拖曳看地圖）
     C.joyMove(ux, uy);
   };
   C.joyMove = (ux, uy) => {
     if (!J.on) return;
     const R0 = C.rect('joy').w / 2 - 6; let dx = ux - J.bx, dy = uy - J.by, l = Math.hypot(dx, dy);
-    if (l > R0 * 1.6) { const k = (l - R0 * 1.6) / l; J.bx += dx * k; J.by += dy * k; dx = ux - J.bx; dy = uy - J.by; l = Math.hypot(dx, dy); }   // 拖太遠：底座跟著手指走
     const m = Math.min(l, R0); J.kx = J.bx + (l ? dx / l * m : 0); J.ky = J.by + (l ? dy / l * m : 0);
     if (l < 3) { J.dir = null; return; }
     const wx = dx / G.AX, wy = dy / G.AY, wl = Math.hypot(wx, wy); J.dir = [wx / wl, wy / wl];   // 螢幕方向 → 世界方向（地面有透視壓縮）
@@ -100,6 +113,7 @@ G.Ctl = (() => {
   C.drawPart = (c, id, r, col) => {
     const h = G.W && G.W.hero, U0 = U();
     if (id === 'joy') { const R0 = r.w / 2; G.pxDisc(c, r.cx, r.cy, R0, R0, 0, 0.35); G.pxEllipse(c, r.cx, r.cy, R0, R0, col); const kr = Math.round(R0 * 0.42); G.pxDisc(c, r.cx, r.cy, kr, kr, 7, 1); G.pxEllipse(c, r.cx, r.cy, kr, kr, 0); return; }
+    if (id === 'atk') { U0.circBtn(c, r.cx, r.cy, r.w / 2, 1, col); C.atkIcon(c, r.cx, r.cy, r.w / 2); return; }
     if (id === 'cam') { H().box(c, r.x, r.y, r.w, r.h, 1, col); H().icon(c, 'i_center', r.cx, r.cy); return; }
     if (id === 'zoom') { const w2 = Math.round((r.w - 3) / 2); H().box(c, r.x, r.y, w2, r.h, 0, col); H().icon(c, 'i_zout', r.x + w2 / 2, r.cy); H().box(c, r.x + r.w - w2, r.y, w2, r.h, 0, col); H().icon(c, 'i_zin', r.x + r.w - w2 / 2, r.cy); return; }
     let ic = 'i_lock';
@@ -143,6 +157,13 @@ G.Ctl = (() => {
       };
     }
   };
+  // 普攻鈕圖示：交叉雙劍（依按鈕大小放大）
+  C.atkIcon = (c, cx, cy, R0, col = 9) => {
+    const k = Math.max(1, Math.round(R0 / 10)), L = 5;
+    for (let i = -L; i <= L; i++) { c.fillStyle = P[0]; c.fillRect(cx + i * k - k, cy + i * k - k, k * 3, k * 3); c.fillRect(cx + i * k - k, cy - i * k - k, k * 3, k * 3); }
+    for (let i = -L; i <= L; i++) { c.fillStyle = P[i > L - 2 ? 5 : col]; c.fillRect(cx + i * k, cy + i * k, k, k); c.fillRect(cx - i * k, cy + i * k, k, k); }
+    c.fillStyle = P[13]; c.fillRect(cx + (L - 2) * k - k, cy + (L - 2) * k + k, k * 3, k); c.fillRect(cx - (L - 2) * k - k, cy + (L - 2) * k + k, k * 3, k);
+  };
   // 移動方式切換列（首頁設定、戰鬥操作設定共用）：回傳高度
   C.moveRow = (c, x, y, w) => {
     const b = H(), m = C.get().move, bw = Math.floor((w - 60 - 4) / 2);
@@ -152,10 +173,10 @@ G.Ctl = (() => {
       b.key(c, bx, y + o, bw, 18, o, on ? 13 : 5, on ? 2 : 1); G.cn(c, lab, bx + bw / 2, y + 3 + o, on ? 13 : 7, 0.5);
       b.btn(id, bx, y, bw, 18, () => { U().press[id] = 0.12; }, () => { if (!on) { C.setMove(k); G.Audio.play('click'); } });
     });
-    const d = G.cnWrap(m === 'joy' ? '在畫面左下拖曳搖桿移動' : '點地面，英雄就走過去', w);
+    const d = G.cnWrap(m === 'joy' ? '左下搖桿移動、右下普攻；另一指拖曳可看地圖' : '點地面，英雄就走過去', w);
     d.forEach((l, i) => G.cn(c, l, x, y + 22 + i * 13, 6));
     return 22 + d.length * 13;
   };
-  C.moveRowH = w => 22 + G.cnWrap(C.get().move === 'joy' ? '在畫面左下拖曳搖桿移動' : '點地面，英雄就走過去', w).length * 13;
+  C.moveRowH = w => 22 + G.cnWrap(C.get().move === 'joy' ? '左下搖桿移動、右下普攻；另一指拖曳可看地圖' : '點地面，英雄就走過去', w).length * 13;
   return C;
 })();

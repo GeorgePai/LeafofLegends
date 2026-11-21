@@ -1,5 +1,5 @@
 'use strict';
-G.VERSION = 'V3.14';                                  // 版本號（唯一來源；setup.sh 也從這行讀）
+G.VERSION = 'V4.0';                                  // 版本號（唯一來源；setup.sh 也從這行讀）
 /* =========================================================
    選單：首頁 / 隊伍 / 圖鑑 / 教學
    版面：直屏上下堆疊，橫屏左右分欄
@@ -368,12 +368,15 @@ G.Menus = (() => {
       if (S.s < S.max - 2) { const ax = Math.round(x + w / 2), ay = y + h - 6 + Math.round(Math.abs(Math.sin(gt * 4)) * 2); c.fillStyle = P[0]; c.fillRect(ax - 4, ay - 1, 9, 4); c.fillStyle = P[13]; c.fillRect(ax - 3, ay - 1, 7, 1); c.fillRect(ax - 2, ay, 5, 1); c.fillRect(ax - 1, ay + 1, 3, 1); c.fillRect(ax, ay + 2, 1, 1); }
     }
   }
+  // v4.0 新玩家提醒：隊伍、教學還沒看過（且玩不到 5 場）就在首頁按鈕上標「必看」
+  M.newbie = k => { let v = {}; try { v = JSON.parse(localStorage.getItem('leafwar_seen') || '{}') || {}; } catch (e) { } return !v[k] && !((G.Ach.P().games || 0) >= 5); };
+  M.seen = k => { let v = {}; try { v = JSON.parse(localStorage.getItem('leafwar_seen') || '{}') || {}; } catch (e) { } if (v[k]) return; v[k] = 1; try { localStorage.setItem('leafwar_seen', JSON.stringify(v)); } catch (e) { } };
   // 兩欄（橫屏）/ 上下（直屏）版面
   const land = () => R.uw > R.uh * 1.15;
 
   // ---------- 首頁 ----------
-  const ITEMS = [['單人', 'SOLO', 'i_play', () => G.Solo.open()], ['多人', 'MULTI', 'i_users', () => { modal = 2.2; }], ['隊伍', 'TEAM', 'i_tree', () => go('team')], ['商店', 'SHOP', 'i_key', () => go('store')],
-    ['成就', 'TROPHY', 'i_trophy', () => go('ach')], ['排行', 'RANK', 'i_rank', () => go('rank')], ['圖鑑', 'BOOK', 'i_book', () => go('book')], ['教學', 'GUIDE', 'i_guide', () => M.openGuide(false)], ['帳號', 'ACCOUNT', 'i_save', () => go('save')], ['設定', 'SETTING', 'i_gear', () => { setOpen = true; }], ['反饋', 'MAIL', 'i_pen', () => go('fb')], ['關於', 'ABOUT', 'i_info', () => go('about')]];
+  const ITEMS = [['單人', 'SOLO', 'i_play', () => G.Solo.open()], ['多人', 'MULTI', 'i_users', () => { modal = 2.2; }], ['隊伍', 'TEAM', 'i_tree', () => { M.seen('隊伍'); go('team'); }], ['商店', 'SHOP', 'i_key', () => go('store')],
+    ['成就', 'TROPHY', 'i_trophy', () => go('ach')], ['排行', 'RANK', 'i_rank', () => go('rank')], ['圖鑑', 'BOOK', 'i_book', () => go('book')], ['教學', 'GUIDE', 'i_guide', () => { M.seen('教學'); M.openGuide(false); }], ['帳號', 'ACCOUNT', 'i_save', () => go('save')], ['設定', 'SETTING', 'i_gear', () => { setOpen = true; }], ['反饋', 'MAIL', 'i_pen', () => go('fb')], ['關於', 'ABOUT', 'i_info', () => go('about')]];
   // 執行首頁選項：會切換畫面的先播轉場（按鈕撥開 → 光圈展開）；多人、設定是彈窗，直接開
   const runItem = i => { if (G.Trans.busy()) return; const it = ITEMS[i]; if (it[0] === '多人' || it[0] === '設定') it[3](); else G.Trans.start(it[3]); };
   const mw = G.UI.wheel();                                 // 首頁滾輪
@@ -574,6 +577,11 @@ G.Menus = (() => {
         G.text(c, en, x + w2 - 7, y + 7 + p, ctr ? 13 : 5, 1, null, 1);
         if (i === 3 && G.FreeChest && G.FreeChest.ready()) { const n = 'FREE', dw = G.textW(n) + 4; c.fillStyle = P[0]; c.fillRect(x + w2 - 5 - dw, y - 4 + p, dw + 2, 9); c.fillStyle = P[11]; c.fillRect(x + w2 - 4 - dw, y - 3 + p, dw, 7); G.text(c, n, x + w2 - 2 - dw, y - 2 + p, 0); }   // 賭徒寶箱可免費開
         if (i === 4 && G.Ach.unclaimed() > 0) { const n = String(G.Ach.unclaimed()), dw = G.textW(n) + 4; c.fillStyle = P[0]; c.fillRect(x + w2 - 5 - dw, y - 4 + p, dw + 2, 9); c.fillStyle = P[10]; c.fillRect(x + w2 - 4 - dw, y - 3 + p, dw, 7); G.text(c, n, x + w2 - 2 - dw, y - 2 + p, 9); }   // 有成就可以領：紅點
+        if ((cn === '隊伍' || cn === '教學') && M.newbie(cn)) {                                  // v4.0 新玩家提醒：「必看」標籤上下彈跳（看過就消失）
+          const n = '必看', dw = G.cnW(n) + 6, hop = Math.round(Math.abs(Math.sin(gt * 5)) * -2), bx2 = x + w2 - 5 - dw, by2 = y - 8 + p + hop;
+          c.fillStyle = P[0]; c.fillRect(bx2 - 1, by2 - 1, dw + 2, 15); c.fillStyle = P[13]; c.fillRect(bx2, by2, dw, 13); G.cn(c, n, bx2 + dw / 2, by2 + 1, 0, 0.5);
+          c.fillStyle = P[13]; c.fillRect(bx2 + dw / 2 - 1, by2 + 13, 3, 1); c.fillRect(bx2 + dw / 2, by2 + 14, 1, 1);
+        }
         if (cn === '反饋' && G.Rank && G.Rank.fb.unread > 0) { const n = String(G.Rank.fb.unread), dw = G.textW(n) + 4; c.fillStyle = P[0]; c.fillRect(x + w2 - 5 - dw, y - 4 + p, dw + 2, 9); c.fillStyle = P[10]; c.fillRect(x + w2 - 4 - dw, y - 3 + p, dw, 7); G.text(c, n, x + w2 - 2 - dw, y - 2 + p, 9); }   // 有成就可以領：紅點   // v2.8.6 開發者回信：紅色數字
         if (!ctr) { c.fillStyle = 'rgba(12,12,12,' + Math.min(0.5, ad * 0.24).toFixed(3) + ')'; c.fillRect(x, y + p, w2 + 1, bh + 3 - p); }   // 柔和陰影（半透明，不用顆粒）
         tap(id, x, y, w2, bh, () => { if (Math.abs(mw.pos - i) < 0.5) runItem(i); else mw.go(i); });
@@ -1084,7 +1092,7 @@ G.Menus = (() => {
     {
       name: '操作', pages: [
         {
-          z: 1, t: '移動', m: '拖曳左下的{搖桿}移動；在「{設定}」可以改成{點地面}', d: '{左鍵點地面}，英雄就走過去',
+          z: 1, t: '移動', m: '按住左下的{搖桿}移動（搖桿固定在原地）；「{設定}」可改成{點地面}', d: '{左鍵點地面}，英雄就走過去',
           draw(c, x, y, w, h, t, dk) {
             if (!dk) {                                       // v3.14 手機：搖桿
               const T = t % 3.4, gy = y + Math.round(h * 0.62), jx = x + 26, jy = y + h - 26, on = T > 0.4 && T < 2.6, a = (T - 0.4) * 1.6, dx = on ? Math.cos(a) : 0, dy = on ? Math.sin(a) * 0.6 : 0;
@@ -1130,7 +1138,7 @@ G.Menus = (() => {
           }
         },
         {
-          z: 1, t: '移動視角', m: '{單指滑動}看地圖其他地方', d: '{按住左鍵拖曳}移動視角',
+          z: 1, t: '移動視角', m: '{單指滑動}看地圖其他地方；搖桿移動時也能用{另一指}滑', d: '{按住左鍵拖曳}移動視角',
           // 整個場景（地面、樹叢、塔）一起平移：左邊是英雄，滑過去看到右邊的敵塔
           draw(c, x, y, w, h, t, dk) {
             const T = t % 3.4, k = ss(seg(T, 0.4, 1.7)) - ss(seg(T, 2.4, 3.2)), off = Math.round(k * w * 0.5), W2 = Math.ceil(w * 1.6);
@@ -1224,7 +1232,18 @@ G.Menus = (() => {
           }
         },
         {
-          z: 1, t: '鎖定目標', m: '{點敵人或塔}鎖定，英雄會一路追打；{點地面}解除', d: '{左鍵點敵人或塔}鎖定，英雄會一路追打；{點地面}解除',
+          t: '普攻', only: 'm', m: '點右下大顆{普攻鈕}打附近敵人，{按住}連續攻擊；{拖曳}可自己選目標',
+          draw(c, x, y, w, h, t) {
+            const T = t % 4, gy = Math.round(y + h * 0.6), hx = x + w * 0.2, ex1 = x + w * 0.42, ex2 = x + w * 0.62, bx = Math.round(x + w - 20), by = Math.round(y + h - 18), drag = T > 2 && T < 3.4, f = ss(seg(T, 2.1, 2.6));
+            unit(c, 'leafy', hx, gy, false); unit(c, 'babybear', ex1, gy, false, -1, T > 0.7 && T < 1); unit(c, 'babybear', ex2, gy - 10, false, -1, T > 3.3 && T < 3.6);
+            if (drag) { const tx2 = ex2; G.pxEllipse(c, Math.round(tx2), gy - 8, 9, 4, 10); c.fillStyle = P[10]; c.globalAlpha = 0.6; G.pxLine(c, hx, gy - 4, tx2, gy - 10, 1); c.globalAlpha = 1; }
+            G.UI.circBtn(c, bx, by, 13, T > 0.4 && T < 0.8 || drag ? 3 : 1, 10, T > 0.4 && T < 0.8 ? 1 : 0); G.Ctl.atkIcon(c, bx, by, 13);
+            if (T < 1) hand(c, bx, by, T > 0.4 && T < 0.8); else if (drag) hand(c, Math.round(bx - f * 22), Math.round(by - f * 14), true);
+            G.cn(c, drag ? '拖曳選目標' : T < 1.2 ? '點一下普攻' : '', x + w / 2, y + 4, 13, 0.5);
+          }
+        },
+        {
+          z: 1, t: '鎖定目標', m: '點地面模式：{點敵人或塔}鎖定，英雄會一路追打；{點地面}解除', d: '{左鍵點敵人或塔}鎖定，英雄會一路追打；{點地面}解除',
           draw(c, x, y, w, h, t, dk) {
             const T = t % 4, gy = y + h * 0.8, tx = x + w * 0.72, k = ss(seg(T, 1.0, 2.0)), hx = lerp(x + w * 0.15, x + w * 0.42, k);
             if (T > 0.75) lockRing(c, Math.round(tx), Math.round(gy), 12, T - 0.75);
@@ -1236,7 +1255,7 @@ G.Menus = (() => {
           }
         },
         {
-          t: '施放技能', m: '{點技能按鈕}施放；右下弧形從左到右是技能 1、2、{右上是大招}', d: '按 {Q／E／R} 施放技能',
+          t: '施放技能', m: '{點技能按鈕}施放；繞著普攻鈕從左到右是技能 1、2、{大招}', d: '按 {Q／E／R} 施放技能',
           draw(c, x, y, w, h, t, dk) {
             const T = t % 3.6, gy = y + Math.round(h * 0.6), hx = x + w * 0.16, bx = x + w * 0.46;
             unit(c, 'leafy', hx, gy, false);
@@ -1245,8 +1264,9 @@ G.Menus = (() => {
             if (f > 0 && f < 1) { const s = G.SPR.mistic[0]; c.drawImage(s.n, Math.round(lerp(hx + 8, bx, f) - s.w / 2), gy - 12); }
             if (hit) { const k = (T - 1.45) / 0.35; G.pxEllipse(c, bx, gy - 6, 4 + k * 16, 4 + k * 16, 9); }
             const press = T > 0.75 && T < 0.95, cx0 = x + w - 10, cy0 = y + h - 10;   // 弧形：技能 1（左下）→ 技能 2 → 大招（右上），被動在角落
-            const pos = [[cx0 - 38, cy0 - 4, 'i_mistic', 9], [cx0 - 27, cy0 - 26, 'i_slam', 9], [cx0 - 4, cy0 - 38, 'i_meteor', 10]];
-            H().box(c, cx0 - 8, cy0 - 8, 12, 12, 0, 4); H().icon(c, 'i_crit', cx0 - 2, cy0 - 2);
+            const pos = [[cx0 - 42, cy0 - 4, 'i_mistic', 9], [cx0 - 31, cy0 - 30, 'i_slam', 9], [cx0 - 4, cy0 - 44, 'i_meteor', 10]];
+            G.UI.circBtn(c, cx0 - 4, cy0 - 4, 13, 1, 10); G.Ctl.atkIcon(c, cx0 - 4, cy0 - 4, 13);                     // v4.0 角落大顆普攻、被動在大招上方
+            H().box(c, cx0 - 10, cy0 - 70, 12, 12, 0, 17); H().icon(c, 'i_crit', cx0 - 4, cy0 - 64);
             pos.forEach(([px, py, ic, r], i) => { cBtn(c, px, py, r, ic, i === 0 && press); if (dk) key(c, 'QER'[i], px - 18, py - 6, i === 0 && press); });
             if (!dk && T < 1.2) hand(c, pos[0][0], Math.round(lerp(y + h + 6, pos[0][1], ss(seg(T, 0.2, 0.75)))), press);
           }
@@ -1260,7 +1280,7 @@ G.Menus = (() => {
           }
         },
         {
-          t: '升級選擇', m: '升級時{戰鬥暫停}，每次得到{技能點}和{藥水點}各 1 點，慢慢選要升什麼',
+          t: '升級選擇', m: '升級時{戰鬥暫停}，得到{技能點}、{藥水點}各 1；點選項看說明，按「{升級}」確認',
           draw(c, x, y, w, h, t, dk) {
             const T = t % 4.4, pw = Math.min(w - 12, 132), px = Math.round(x + w / 2 - pw / 2), py = y + 4, cw = 22, open = T > 0.6;
             if (!open) { unit(c, 'leafy', x + w / 2, y + h * 0.7, false); G.text(c, 'LV UP', x + w / 2, y + h * 0.7 - 30 - T * 10, 13, 1, 0, 0.5); return; }
@@ -1272,7 +1292,7 @@ G.Menus = (() => {
           }
         },
         {
-          t: '藥水強化', m: '每種藥水{最高 3 級}，效果{整場有效}；點右上的{升級}鈕隨時打開（戰鬥會暫停）',
+          t: '藥水強化', m: '每種藥水{最高 3 級}、效果{整場有效}；一場最多 {16 點}藥水點',
           draw(c, x, y, w, h, t, dk) {
             const T = t % 4, gy = y + Math.round(h * 0.68), hx = x + w * 0.3, lv = Math.min(3, Math.floor(T / 1.1) + 1);
             unit(c, 'leafy', hx, gy, false);
@@ -1299,13 +1319,13 @@ G.Menus = (() => {
           }
         },
         {
-          t: '技能升級', m: '主動技在{升級頁}用技能點升，{最高 3 級}；{被動}會隨英雄等級{自動升級}',
+          t: '技能升級', m: '技能和{被動}都在{升級頁}用技能點升，{最高 3 級}；滿級外框變金色',
           draw(c, x, y, w, h, t, dk) {
             const T = t % 3.6, r = 14, cx = Math.round(x + w * 0.38), cy = Math.round(y + h / 2 + 2), lv = T > 1.4 ? (T > 2.6 ? 3 : 2) : 1;
             cBtn(c, cx, cy, r, 'i_mistic', false, lv >= 3 ? 13 : 5, lv);
             const px = Math.round(x + w * 0.68), py = cy - 10, plv = T > 2 ? 2 : 1;
             H().box(c, px, py, 20, 20, 0, 17); H().icon(c, 'i_crit', px + 10, py + 10); for (let k = 0; k < 3; k++) { c.fillStyle = P[0]; c.fillRect(px + 5 + k * 3, py + 2, 4, 3); c.fillStyle = P[k < plv ? 17 : 3]; c.fillRect(px + 6 + k * 3, py + 3, 2, 1); }
-            G.cn(c, lv >= 3 ? '滿級' : 'Lv' + lv, cx, cy + r + 4, lv >= 3 ? 13 : 9, 0.5); G.cn(c, '自動', px + 10, py + 24, 17, 0.5);
+            G.cn(c, lv >= 3 ? '滿級' : 'Lv' + lv, cx, cy + r + 4, lv >= 3 ? 13 : 9, 0.5); G.cn(c, '被動', px + 10, py + 24, 17, 0.5);
           }
         },
         {
@@ -1318,7 +1338,7 @@ G.Menus = (() => {
           }
         },
         {
-          t: '技能說明', m: '{長按}技能或增益圖示，看說明和數值', d: '{按住}技能或增益圖示，看說明和數值',
+          t: '技能說明', m: '在{升級頁}長按技能看說明；戰鬥中{長按}增益圖示或被動也能看', d: '在{升級頁}按住技能看說明；戰鬥中{按住}增益圖示或被動也能看',
           draw(c, x, y, w, h, t, dk) {
             const T = t % 3.6, bw = 22, bx = Math.round(x + w - bw - 8), by = Math.round(y + h - bw - 6), hold = T > 0.6 && T < 3.0;
             G.UI.circBtn(c, bx + bw / 2, by + bw / 2, bw / 2, 1, 5, hold ? 1 : 0); H().icon(c, 'i_mistic', bx + bw / 2, by + bw / 2 + (hold ? 1 : 0));

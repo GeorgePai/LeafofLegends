@@ -19,7 +19,10 @@ G.boot = function () {
   G.UI.goTitle(); G.UI.screen = 'tap'; G.Intro.reset(); G.Audio.init();   // 點一下開始（解鎖聲音）→ 開場動畫 → 標題
   const STEP = 1 / 60;
   let last = performance.now(), acc = 0, fpsT = 0, fpsN = 0;
+  // v4.0 省電：畫面最多每秒 60 張（高刷新率手機不再跑 120 張）；暫停、升級頁、按鈕排版時 30 張（畫面幾乎不動）
   function frame(now) {
+    const U0 = G.UI, still = U0.paused || U0.lvUp || (G.Ctl && G.Ctl.ed), minMs = still ? 1000 / 30 : 1000 / 60;
+    if (now - last < minMs - 2) { requestAnimationFrame(frame); return; }
     let dt = (now - last) / 1000; last = now;
     if (dt > 0.1) dt = 0.1; if (dt < 0) dt = 0;
     fpsT += dt; fpsN++;
@@ -28,7 +31,7 @@ G.boot = function () {
     const W = G.W, U = G.UI;
     if (!U.paused && !U.lvUp && !(G.Menus && G.Menus.covers(U.screen)) && !(G.StageGo && G.StageGo.hold())) {
       W.keyDir = U.screen === 'battle' ? U.keyDir() : null;
-      if (W.keyDir) G.Render.cam.follow = true;
+      if (W.keyDir && !G.Ctl.joyDir()) G.Render.cam.follow = true;   // 鍵盤移動：鏡頭跟著；v4.0 搖桿移動時可以另一指拖曳看地圖（按下搖桿那一刻才回到英雄）
       acc += dt;
       let n = 0;
       while (acc >= STEP && n < 6) { W.update(STEP); acc -= STEP; n++; }

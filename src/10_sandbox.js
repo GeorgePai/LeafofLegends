@@ -169,6 +169,8 @@ G.Team = {
       // v1.2 起：角色要開寶箱取得；開局只有「普通」稀有度。鑰匙 v2.7 開局 8 把；v3.3 改成 0 把，建立帳號才送 8 把（G.SaveUI 的 grant）
       if (!this.v.owned) { this.v.owned = { h: G.HEROES.map(h => h.name).filter(n => G.rarityOf(n) === 0), m: G.ROSTER.minions.filter(n => G.rarityOf(n) === 0) }; this.v.keys = 0; this.sanitize(true); }
       if (this.v.keys == null) this.v.keys = 8;
+      // v4.0 預設陣容補滿點數上限（新玩家；或還是當初預設 3 隻沒動過的舊存檔）
+      if (!this.v.df24) { const lo = this.v.loadout, d0 = G.STAGES[0].loadout; if (lo.length === d0.length && lo.every((e, i) => e.n === d0[i] && e.l === i % 3)) this.fillDefault(); this.v.df24 = 1; this.save(); }
       try { this.dev = localStorage.getItem('leafwar_dev') === '1'; } catch (e) { }
     }
     return this.v;
@@ -194,6 +196,12 @@ G.Team = {
   newIn(list) { const v = this.get(); return !!(v.nw && v.nw.some(n => list.includes(n))); },
   // 出戰英雄／陣容裡若有未擁有的角色就移除（關閉開發者模式、舊存檔升級時）
   sanitize(silent) { const v = this.v; if (!v || !v.owned) return; if (!this.owns(G.HEROES[v.hero].name)) v.hero = Math.max(0, G.HEROES.findIndex(h => this.owns(h.name))); v.loadout = v.loadout.filter(e => this.owns(e.n)); if (!silent) this.save(); else this.save(); },
+  // 用擁有的小兵輪流補到點數上限，三路平均、每路混搭
+  fillDefault() {
+    const v = this.v, m = G.STAGES[0].loadout.filter(n => this.owns(n)).concat(v.owned.m.filter(n => !G.STAGES[0].loadout.includes(n) && this.owns(n))); if (!m.length) return;
+    v.loadout = []; let i = 0;
+    while (i < 60) { const n = m[(i + Math.floor(i / 3)) % m.length]; if (this.used() + this.cost(n) > G.TUNE.plantPoints) break; v.loadout.push({ n, l: i % 3 }); i++; }
+  },
   save() { try { localStorage.setItem('leafwar_team', JSON.stringify(this.v)); } catch (e) { } },
   cost: n => G.ORIG.units[n].unit_point || 4,         // 傭兵原著無點數，暫定 4
   used() { return this.get().loadout.reduce((a, e) => a + this.cost(e.n), 0); },
