@@ -119,11 +119,23 @@ G.Render = (() => {
         b.globalAlpha = 0.3 + 0.35 * cp; b.fillStyle = G.PAL[E.c2]; b.fillRect(Math.round(gx - 5 - cp * 6), 0, Math.round(10 + cp * 12), Math.round(gy)); b.fillStyle = G.PAL[9]; b.fillRect(Math.round(gx - 1 - cp * 2), 0, Math.round(2 + cp * 4), Math.round(gy)); b.globalAlpha = 1;
       }
   };
+  // v3.14 英雄腳下：階級光環（覺醒綠、精英藍、英傑紫、傳奇橘）＋藥水符文（升過的藥水各一顆小光點繞著轉，滿級較大）
+  R.heroAura = function (b, u, gx, gy, shR, rt) {
+    const W = G.W, T = G.HERO_TIER ? G.heroTier(u.level || 1) : 0, col = T ? G.HERO_TIER[T].c : 9, rx = shR + 3, ry = shR * 0.42 + 2;
+    if (T) { G.glow(b, gx, gy + 1, rx + 4 + T, col, 0.1 + T * 0.03 + 0.03 * Math.sin(rt * 2.4), 0.45); }
+    G.pxEllipse(b, gx, gy + 1, rx, ry, col, 5, rt * 12);
+    if (T >= 2 && W && W.parts && !W.attract && Math.random() < 0.06 * T && u.alive) W.parts.add(u.x + G.rr(-rx, rx) / G.AX * 0.5, u.y + G.rr(-2, 2), 1, 0, 0, G.rr(20, 40), G.rr(0.6, 1), col, 9, 1, -6, 0);
+    const pot = W && u === W.hero && W.pot; if (!pot) return;
+    const ids = G.POT.filter(it => pot[it.id] > 0); const n = ids.length; if (!n) return;
+    ids.forEach((it, i) => { const a = rt * 0.9 + i / n * 6.283, x = Math.round(gx + Math.cos(a) * (rx + 3)), y = Math.round(gy + 1 + Math.sin(a) * (ry + 1.5)), lv = pot[it.id], back = Math.sin(a) < 0;
+      b.globalAlpha = back ? 0.45 : 0.9; b.fillStyle = G.PAL[0]; b.fillRect(x - 1, y - 1, lv >= 3 ? 3 : 2, lv >= 3 ? 3 : 2); b.fillStyle = G.PAL[it.col]; b.fillRect(x - (lv >= 3 ? 1 : 0), y - (lv >= 3 ? 1 : 0), lv >= 3 ? 2 : 1, lv >= 3 ? 2 : 1);
+      if (lv >= 3 && !back) G.glow(b, x, y, 3, it.col, 0.25); b.globalAlpha = 1; });
+  };
   R.chgBody = function (b, u, base, ax, ay, rt) {
       const cp = Math.min(1, u.chg.T / u.chg.dur), E = G.ELEM[u.chg.el] || G.ELEM.arcane, gl = G.glowOf(base, E.c, 1, 2);
       b.globalAlpha = 0.25 + 0.6 * cp * (0.75 + 0.25 * Math.sin(rt * 30)); b.drawImage(gl.c, ax - gl.p, ay - gl.p); b.globalAlpha = 1;
   };
-  R.uScale = u => u.kind === 'hero' ? G.TUNE.heroScale || 1 : 1;
+  R.uScale = u => u.kind === 'hero' ? (G.TUNE.heroScale || 1) * (1 + Math.min(G.TUNE.heroGrow * 12, Math.max(0, (u.level || 1) - 1) * G.TUNE.heroGrow)) : 1;   // v3.14 英雄每升 1 級身形 +1.2%（最多 +14%）
   // v3.13 倒下動畫的位置：被打飛（先快後慢）＋拋物線彈起；p＝0~1
   G.corpsePos = (c, p) => { const e = 1 - (1 - p) * (1 - p) * (1 - p), big = c.u.kind === 'boss'; return { x: c.x + c.dir * (big ? 14 : 26) * e, y: c.y, z: Math.sin(Math.min(1, p / 0.8) * Math.PI) * (big ? 6 : 12) }; };   // v3.8 英雄本體放大（以腳底為中心）
 
@@ -264,7 +276,7 @@ G.Render = (() => {
         const UK = R.uScale(u), shR = u.vis.shadow * G.AX * (u.vis.fly ? 0.7 : 1) * UK;
         G.pxDisc(b, q(gx), q(gy), shR, Math.max(1.5, shR * 0.42), 0, u.static ? 0.7 : 0.55);
         if (!u.vis.fly) G.pxDisc(b, q(gx) + 1, q(gy), shR * 0.55, Math.max(1, shR * 0.22), 0, 0.4);   // v3.2 腳底接觸陰影（環境光遮蔽），角色像真的踩在地上
-        if (u === h0) G.pxEllipse(b, gx, gy + 1, shR + 3, shR * 0.42 + 2, 9, 5, rt * 12);
+        if (u === h0) R.heroAura(b, u, gx, gy, shR, rt);
         if (u.chg) R.chgFloor(b, u, gx, gy, shR, rt);        // 施法前搖：腳下法陣（v3.9 抽成共用，隊伍展示也用）
         const tgt = h0 && h0.target === u && h0.alive;
         const lockedU = h0 && h0.alive && h0.cmd && h0.cmd.lock && h0.cmd.t === u;

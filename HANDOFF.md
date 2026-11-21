@@ -2,7 +2,7 @@
 
 > 新 session 只要讀這份。排行榜相關再看 `LEADERBOARD.md`。**做任何新設計前，先對照第 8 節「設計守則」**。
 > 各版完成內容在 `CHANGELOG.md`、暫定數值在 `VALUES.md`，需要時用 grep 找到段落再讀，不要整份讀。
-> 最後更新：2026-11-22，版本 **V3.13**
+> 最後更新：2026-11-22，版本 **V3.14**
 
 ## 1. 專案是什麼
 - Pai 的 HTML5 瀏覽器遊戲，仿 Gamevil《Plants War》（推塔＋英雄操作＋小兵兵線）。**v3.7 起改成單路地圖**（每關一張、每邊內／中／外三座塔＋聖所，v3.10 拿掉主塔）
@@ -55,10 +55,11 @@
 | 06c_vfx | **技能特效（v1.5）**：加色光暈 `G.glow`、元素分類 `G.elemOf/G.ELEM`、`G.VFX`（施法法陣 `cast`、增益 `buffCast`、投射物外觀 `drawProj`＋殘影 `p.hist`＋拖尾 `trail`、命中 `impact/hitSpark`、星芒 `spark`、光源 `light/groundLight`、電弧 `arc`、落雷 `bolt`、光束 `beam`、隕石 `meteor/meteorImpact`、大地 `quake`、地刺 `spikes`、裂痕 `cracks`、身上狀態 `auraBack/auraFront`）。技能投射物帶 `fx`（元素）與 `fxS`（進階版）；延遲事件一律用 `G.VFX.later`，不用 setTimeout |
 | 06e_stages | **單人關卡（v3.0）**：`G.THEMES` 場景、`G.withTheme`／`G.themeImg`、9 個新敵人、`G.SOLO` 五關設定、`G.SOLO_HZ` 規則數值、`G.SoloW`（wave/tick/erupt/died/weather/finish/best/open） |
 | 07_world | 單位、AI、兵線、英雄指令、經驗升級、跟隨 `followAI/followSlots`（v3.12 起只給死靈召喚物用，玩家召集已拿掉）、獵手 AI 分派 |
-| 07b_systems | 技能升級、金幣/商店/背包、計時增益、野區、技能數值表 `G.skillRows`、**敵方獵手 `hunter`（`spawnHunter/junglerAI/hunterReward`；v3.12 每 40 秒升級、守首領坑）、塔傳送 `startTeleport/updateTeleport`** |
+| 07b_systems | 技能升級（v3.14 被動 `autoPassive` 自動升級、`lvChoices`）、**藥水強化 `G.POT`／`W.pot`／`upPot`／`applyPots`、復活次數 `W.rev`（v3.14 拿掉金幣/商店/背包）**、英雄階級 `G.HERO_TIER/heroTier`、計時增益、野區、技能數值表 `G.skillRows`、**敵方獵手 `hunter`（`spawnHunter/junglerAI/hunterReward`；v3.12 每 40 秒升級、守首領坑）、塔傳送 `startTeleport/updateTeleport`** |
 | 08b_hd | **HD-2D 鏡頭後製（v3.2.2）**：`G.HD`（WebGL 著色器：透視、景深、柔光、調色、光束；光塵），`on/P/active/over/render` |
 | 08_render | v3.13 生命感姿勢層（`u.life`、`PT` 整組變形）、倒下 `W.corpses`＋`G.corpsePos`；`R.resize`（固定比例＋整數倍）、`R.zoomMin`（可縮到全圖）、`R.hiQ/blitUI`、世界繪製（護盾光殼、稀有度外框、血條、準心、迷霧） |
-| 09_ui | 戰鬥 HUD（v3.8 大招橫幅 `ultBanner`；v3.11 暫停離開確認 `leaveAsk`；`leaveBattle` 會 `G.Ach.abandon`）：HP/MP/XP 三條等粗、鑰匙＋K/D/A 列、小地圖 `mapDraw`＋展開大地圖 `bigMap`、戰鬥數據 `statPanel`、廣播 `drawNotices`、技能水平列＋置中鈕（大招上方）、長按技能卡（動畫，`cardC`）、增益卡、商店、左側道具欄（效果短標）、暫停選單（有名稱）；所有輸入（`evXY` 已扣黑邊）|
+| 09_ui | 戰鬥 HUD（v3.14 升級頁 `lvPage/openLv/closeLv/potCard`、圓形技能鈕 `U.circBtn`、設定面板 `setPanel`；v3.8 大招橫幅 `ultBanner`；v3.11 暫停離開確認 `leaveAsk`；`leaveBattle` 會 `G.Ach.abandon`）：HP/MP/XP 三條等粗、鑰匙＋K/D/A 列、小地圖 `mapDraw`＋展開大地圖 `bigMap`、戰鬥數據 `statPanel`、廣播 `drawNotices`、技能水平列＋置中鈕（大招上方）、長按技能卡（動畫，`cardC`）、增益卡、商店、左側道具欄（效果短標）、暫停選單（有名稱）；所有輸入（`evXY` 已扣黑邊）|
+| 09b_ctl | **v3.14 操作設定 `G.Ctl`**：移動方式（joy／tap，localStorage `leafwar_ctl`）、按鈕版面 `rect(id)`（joy/sk0/sk1/sk2/ps/zoom/cam，直／橫屏各一份，錨點＋大小 0.8～1.4）、`slotOf`、虛擬搖桿 `joyZone/joyStart/joyMove/joyEnd/joyDir/drawJoy`、排版編輯器 `openEd/drawEd`（重疊變紅不能存）、`moveRow` |
 | 10_sandbox | 中文字工具 `G.cn/cnWrap`、標籤 `tagOf`、**技能展示沙盒 `G.Sandbox`（依技能類型的情境：`scBasic/scActive/scBuff/scPassive/scNecro`，被動用對照演出；v3.9 大招走 `cast()`→`beginCharge` 播大招儀式，借用 `G.Render.chgFloor/chgBody`）** |
 | 11_menus | 首頁（大標題 5×7 字形 `TITLE_GLYPH`）、隊伍／圖鑑（共用轉盤 `cars.team/book`，橫屏轉盤高度依 `nameplateH`）、技能展示彈窗 `demoPanel`（動畫＋數值表 `lvTable`：每列同一行，放不下就數值欄左右滑動 `TS`）、數值條 `G.statBars/G.statMax`、陣容 `teamBox`（v3.7 拿掉上中下路）、教學（5 類（v2.8.4 拿掉英雄），說明文字用 `{重點}` 上色；`G.Menus.openGuide(fromBattle)`、`M._gt(t)` 測試用跳時間）；捲動狀態 `SM`/`SD` 分開 |
 | 12_store | **商店／寶箱**：`G.CHESTS`（機率表）、`G.Store`（畫面、說明視窗、開箱動畫、寶箱像素圖 `drawChest`） |
@@ -109,13 +110,16 @@
 - v3.10：拿掉主塔（三座塔等距重排）、英雄 ×1.25、大招殘影修正（穿透光帶改彗星尾巴、焦痕縮短）
 - v3.11：「不計入排行」改成按重新開始／回首頁才跳確認
 - v3.13：角色生命感動畫（呼吸、走路彈跳前傾揚塵、轉身、受擊、落地、倒下打飛翻倒）、英雄收尾頓格
+- v3.14：**拿掉戰鬥商店與金幣 → 升級暫停選擇頁（技能點＋藥水點，藥水 3 級整場有效、復活存次數）**、右上「升級」鈕、搖桿＋弧形技能鈕（主動圓／被動方、被動自動升級）、自訂按鈕位置、升級體感（階級光環、身形成長、滿級特效）、廣播／大招名稱不擋中間、小兵不再卡塔後
 - v3.12：拿掉召集／解散、拿掉野區小怪（只剩兩隻野生首領）、獵手改成隨時間升級並守首領坑、塔 ×0.85、成就 65 個
 - v2.4：敵塔範圍＋鎖定警示、道路 ×1.5、結算放慢＋鎖值＋音效、新藥水 5 種＋全部藥水特效、DEV 密碼、技能範圍顯示＋指定施放（拖曳／取消）、LOGO 改版、塔射程 190/210
 
 ## 6. 待 Pai 決定
+- （v3.14）升級／藥水／搖桿／按鈕位置等暫定數值見 VALUES 6zk；觸控裝置預設搖桿（電腦預設點地面）；HP／MP 立即回復藥水和無敵藥水拿掉了；版本號用 V3.14（改動很大，Pai 可決定要不要改叫 V4.0）
+- （v3.14）升級頁點一下就升級（沒有確認），長按看說明；點數可以留著，之後從右上「升級」鈕再用
 - 畫質再提升：A＝高解析文字（像素角色＋平滑字體），B＝提高像素解析度（480×270，整套美術重畫）。尚未選擇
 - 圖鑑動畫重畫：Pai 說「有些動畫可以描繪得更好」，等他指定哪幾隻
-- 暫定數值全部在 `VALUES.md`（最新：6zj v3.13 段；v3.7 以後的 6zd～6zg 都還沒經 Pai 確認）
+- 暫定數值全部在 `VALUES.md`（最新：6zk v3.14 段；v3.7 以後的 6zd～6zg 都還沒經 Pai 確認）
 - （v2.7）成就鑰匙過剩：全收集只要 90 把，成就給 138 把；「群英薈萃／森羅萬象」較晚完成的那個獎勵用不到。Pai 決定先保留，等鑰匙有新用途再說
 - （v2.4）首頁 RESET 要不要也加密碼鎖？隕石等範圍技仍可在塔射程外打到塔（目前視為合理技能消耗），要不要禁止？
 - （v2.5）重生時間、塔成長／升溫、野怪脫戰規則等暫定數值待確認（VALUES.md 6h）

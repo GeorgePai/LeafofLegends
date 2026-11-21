@@ -599,7 +599,7 @@ G.VFX.potion = function (W, h, it) {
   if (k === 'hp' || k === 'mp') {      // 回復：十字光點往上飄＋身體一閃＋數字
     const c2 = k === 'hp' ? 15 : 16;
     for (let i = 0; i < 14; i++) V.later(W, i * 0.04, () => { const a = Math.random() * 6.28; W.parts.add(x + Math.cos(a) * 9, y + Math.sin(a) * 4, G.rr(0, 6), 0, 0, G.rr(40, 70), 0.7, i % 3 ? col : 9, c2, i % 4 ? 1 : 2, -10, 1, 2); });
-    V.groundLight(W, x, y, 26, col, 0.8, 0.5); G.FX.popText(W, x, y, 30, '+' + it.v, col);
+    V.groundLight(W, x, y, 26, col, 0.8, 0.5); if (!it.noPop) G.FX.popText(W, x, y, 30, '+' + it.v, col);
     if (k === 'mp') for (let i = 0; i < 16; i++) { const a = i / 16 * 6.28, r = 26; W.parts.add(x + Math.cos(a) * r, y + Math.sin(a) * r * 0.6, 8, -Math.cos(a) * r * 2.6, -Math.sin(a) * r * 1.6, 20, 0.4, 11, 9, 1, 0, 0); }   // 魔力從四周吸進來
   } else if (k === 'del') {            // 攻速：黃色快速往上的環＋速度線
     for (let i = 0; i < 3; i++) V.later(W, i * 0.08, () => V.ringAir(W, x, y, 6 + i * 8, 6, 16, 0.3, 13));
@@ -625,7 +625,6 @@ G.VFX.potion = function (W, h, it) {
   } else if (k === 'wave') {           // 小兵：葉片旋起＋向外擴散的大波紋＋廣播
     for (let i = 0; i < 3; i++) V.later(W, i * 0.15, () => G.FX.ring(W, x, y, 8, 60 + i * 20, 0.6, 11, 1));
     for (let i = 0; i < 18; i++) { const a = i / 18 * 6.28; W.parts.add(x + Math.cos(a) * 6, y + Math.sin(a) * 4, 4, Math.cos(a) * 60, Math.sin(a) * 36, G.rr(60, 120), G.rr(0.6, 1), i % 2 ? 11 : 16, 20, 2, 120, 1.5, 2); }
-    W.say({ s: '我方出兵加速', ic: 'p_wave', col: 11, t: 2 });
   } else if (k === 'inv') {            // 無敵：白閃＋金色光柱
     W.flashScreen = Math.max(W.flashScreen || 0, 0.08); V.light(W, x, y, 12, 30, 13, 0.6, 0.8); V.ringAir(W, x, y, 12, 4, 26, 0.4, 13, 2);
     G.FX.levelUp && W.effects.push({ t: 0, dur: 0.5, layer: 1, draw(ctx, o) { const p = this.t / this.dur, cx = Math.round(SX(x, o)), cy = Math.round(SY(y, 0, o)), w = Math.round(6 * (1 - p)) + 1; ctx.globalAlpha = 1 - p; ctx.fillStyle = G.PAL[9]; ctx.fillRect(cx - (w >> 1), cy - 80, w, 80); ctx.fillStyle = G.PAL[13]; ctx.fillRect(cx - (w >> 1) - 1, cy - 80, 1, 80); ctx.fillRect(cx + w - (w >> 1), cy - 80, 1, 80); ctx.globalAlpha = 1; } });

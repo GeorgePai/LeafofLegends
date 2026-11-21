@@ -23,7 +23,7 @@ G.ACH = [
   { id: 'boss50', c: 0, t: 4, n: '屠龍者', d: '累計擊倒 50 隻敵方首領', g: 50, v: P => P.bosses },
   { id: 'tower20', c: 0, t: 2, n: '拆遷大隊', d: '累計推倒 20 座敵塔', g: 20, v: P => P.towers },
   { id: 'tower100', c: 0, t: 3, n: '城牆粉碎機', d: '累計推倒 100 座敵塔', g: 100, v: P => P.towers },
-  { id: 'gold', c: 0, t: 3, n: '富可敵國', d: '累計賺到 10 萬金幣', g: 100000, v: P => Math.floor(P.gold) },
+  { id: 'gold', c: 0, t: 3, n: '煉金大師', d: '累計升級藥水 300 次', g: 300, v: P => P.potUp },   // v3.14 拿掉金幣：改成藥水強化（id 不變，存檔碼相容）
   // v2.6 新增
   { id: 'wins50', c: 0, t: 3, n: '百戰百勝', d: '累計獲勝 50 場', g: 50, v: P => P.wins },
   { id: 'dmg', c: 0, t: 3, n: '毀天滅地', d: '英雄累計造成 50 萬點傷害', g: 500000, v: P => Math.floor(P.dmg) },
@@ -37,20 +37,20 @@ G.ACH = [
   { id: 'few', c: 1, t: 3, n: '以少勝多', d: '小兵總點數 4 點以內並獲勝', hint: '兵不在多。', g: 1, v: (P, B, M) => M && M.win && M.pts <= 4 ? 1 : 0 },
   { id: 'streak', c: 1, t: 2, n: '一騎當千', d: '4 秒內連續擊倒 5 個敵人', g: 5, v: (P, B) => B.streak },
   { id: 'demolish', c: 1, t: 3, n: '拆家專家', d: '單場推倒 8 座敵塔', g: 8, v: (P, B) => B.towers },
-  { id: 'rich', c: 1, t: 2, n: '小富翁', d: '單場累積 3000 金幣', g: 3000, v: (P, B) => Math.floor(B.gold) },
+  { id: 'rich', c: 1, t: 2, n: '三管齊下', d: '單場把 3 種藥水升到滿級', g: 3, v: (P, B) => B.potMax },
   { id: 'assist', c: 1, t: 2, n: '最佳助攻', d: '單場 20 次助攻', g: 20, v: (P, B) => B.assists },
   { id: 'lv10', c: 1, t: 2, n: '登峰造極', d: '單場把英雄升到 Lv10', g: 10, v: (P, B) => B.level },
   { id: 'tame', c: 1, t: 1, n: '馴獸師', d: '收服一隻野生首領', g: 1, v: P => P.wboss },
   { id: 'tame2', c: 1, t: 3, n: '雙霸主', d: '同一場收服兩隻野生首領', g: 2, v: (P, B) => B.wboss },
   { id: 'hunter', c: 1, t: 1, n: '反獵殺', d: '擊倒敵方獵手', g: 1, v: P => P.hunters },
-  { id: 'potion', c: 1, t: 1, n: '藥罐子', d: '單場喝掉 10 瓶藥水', g: 10, v: (P, B) => B.potions },
-  { id: 'fullbag', c: 1, t: 1, n: '全副武裝', d: '背包同時裝滿 6 種藥水', g: 6, v: (P, B) => B.bag },
+  { id: 'potion', c: 1, t: 1, n: '藥罐子', d: '單場升級藥水 10 次', g: 10, v: (P, B) => B.potUp },
+  { id: 'fullbag', c: 1, t: 1, n: '全副武裝', d: '單場升級 6 種不同的藥水', g: 6, v: (P, B) => B.potKinds },
   // v2.6 新增
   { id: 'pacifist', c: 1, t: 3, n: '不戰而勝', d: '英雄擊倒 5 個以內並獲勝', hint: '讓小兵們去打吧。', g: 1, v: (P, B, M) => M && M.win && M.st.kills <= 5 ? 1 : 0 },
   { id: 'marathon', c: 1, t: 2, n: '持久戰', d: '打超過 30 分鐘才獲勝', g: 1, v: (P, B, M) => M && M.win && M.st.time >= 1800 ? 1 : 0 },
   { id: 'tank', c: 1, t: 2, n: '銅牆鐵壁', d: '單場承受 5000 點傷害並獲勝', g: 1, v: (P, B, M) => M && M.win && M.st.taken >= 5000 ? 1 : 0 },
   { id: 'allmax', c: 1, t: 2, n: '技藝精通', d: '單場把所有技能升到 3 級', g: 1, v: (P, B) => B.allmax },
-  { id: 'spend', c: 1, t: 1, n: '揮金如土', d: '單場在商店花掉 2000 金幣', g: 2000, v: (P, B) => B.spent },
+  { id: 'spend', c: 1, t: 1, n: '有備無患', d: '單場存到 3 次復活', g: 3, v: (P, B) => B.revMax },
   { id: 'streak10', c: 1, t: 4, n: '殺神降臨', d: '4 秒內連續擊倒 10 個敵人', g: 10, v: (P, B) => B.streak },
   // ----- 收藏 -----
   { id: 'chest1', c: 2, t: 1, n: '開箱初體驗', d: '第一次開寶箱', g: 1, v: P => P.chests },
@@ -88,8 +88,8 @@ G.ACH_BY = Object.fromEntries(G.ACH.map(a => [a.id, a]));
 
 G.Ach = (() => {
   const A = {};
-  const ADD = ['kills', 'deaths', 'assists', 'camps', 'towers', 'gold', 'time', 'bosses', 'hunters', 'wboss', 'potions', 'dmg', 'tps'];
-  const BEST = ['streak', 'towers', 'gold', 'assists', 'level', 'wboss', 'potions', 'bag', 'camps', 'allmax', 'spent', 'kills'];   // v3.6 kills＝單場最高擊殺（排行）
+  const ADD = ['kills', 'deaths', 'assists', 'camps', 'towers', 'gold', 'time', 'bosses', 'hunters', 'wboss', 'potions', 'dmg', 'tps', 'potUp'];
+  const BEST = ['streak', 'towers', 'gold', 'assists', 'level', 'wboss', 'potions', 'bag', 'camps', 'allmax', 'spent', 'kills', 'potUp', 'potKinds', 'potMax', 'revMax'];   // v3.6 kills＝單場最高擊殺（排行）
   A.recent = [];                                     // 本場新達成（結算畫面用）
   A.banner = null;                                   // 選單畫面的成就通知
   // 檔案：缺的欄位自動補上（舊存檔相容）
@@ -153,7 +153,7 @@ G.Ach = (() => {
     if (A.off() || !W || W.attract || !W._cm) return;
     const P = A.P(), st = W.stats;
     for (const k of ADD) { const d = (st[k] || 0) - W._cm[k]; if (d) { P[k] += d; W._cm[k] = st[k] || 0; } }
-    const live = { streak: st.streak, towers: st.towers, gold: st.gold, assists: st.assists, level: W.hero ? W.hero.level : 0, wboss: st.wboss, potions: st.potions, bag: W.bag.length, camps: st.camps, spent: st.spent || 0, kills: st.kills,
+    const live = { streak: st.streak, towers: st.towers, gold: 0, assists: st.assists, level: W.hero ? W.hero.level : 0, wboss: st.wboss, potions: st.potions, bag: 0, camps: st.camps, spent: 0, kills: st.kills, potUp: st.potUp || 0, potKinds: st.potKinds || 0, potMax: st.potMax || 0, revMax: st.revMax || 0,
       allmax: W.hero && [...W.hero.skills, ...W.hero.pskills].every(q => q.lv >= G.SKILL_MAX) ? 1 : 0 };
     for (const k of BEST) P.best[k] = Math.max(P.best[k], live[k] || 0);
     G.Team.save();

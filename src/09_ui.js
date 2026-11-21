@@ -83,7 +83,7 @@ G.UI = (() => {
   // ---------- 畫面切換 ----------
   const leaveBattle = () => { if (G.W && !G.W.attract && G.Ach) { G.Ach.commit(G.W); G.Ach.abandon(G.W); } };   // v3.8 沒打完就離開：這場不算進排行
   U.goTitle = U.goMenu = () => { U.leaveAsk = null; if (U.screen && U.screen !== 'menu' && U.screen !== 'tap' && U.screen !== 'intro' && G.Trans) G.Trans.reveal(); leaveBattle(); if (G.Menus) G.Menus.resetIntro(); U.screen = 'menu'; U.paused = false; if (!G.W || !G.W.attract) G.newWorld({ attract: true }); R.cam.zoom = 1; G.Audio.setMode('menu'); };
-  U.start = st => { if (typeof st === 'number') U.stageI = st; leaveBattle(); U.leaveAsk = null; U.bagW = null; U.bagUse = null; U.bagEx = 1; U.tpAsk = null; G.Team.sanitize(); const T = G.Team.get(); U.screen = 'battle'; U.paused = false; G.newWorld({ hero: T.hero, loadout: T.loadout, stage: U.stageI || 0 }); R.cam.follow = true; R.cam.zoom = 1; G.Audio.musicRestart('battle'); G.Audio.setMode('battle'); G.Audio.play('level'); };
+  U.start = st => { if (typeof st === 'number') U.stageI = st; leaveBattle(); U.leaveAsk = null; U.lvUp = null; U.ctlOpen = false; if (G.Ctl) { G.Ctl.joyEnd(); G.Ctl.closeEd(); } U.tpAsk = null; G.Team.sanitize(); const T = G.Team.get(); U.screen = 'battle'; U.paused = false; G.newWorld({ hero: T.hero, loadout: T.loadout, stage: U.stageI || 0 }); R.cam.follow = true; R.cam.zoom = 1; G.Audio.musicRestart('battle'); G.Audio.setMode('battle'); G.Audio.play('level'); };
   // 全畫面暗幕：純黑半透明（不用顆粒，眼睛比較舒服）
   const dim = (...a) => U.h.dim(...a);
   const _dim = (c, a) => { if (R.hi) for (const q of R.hi) q.cov = true; c.fillStyle = 'rgba(10,10,10,' + a + ')'; c.fillRect(0, 0, R.uw, R.uh); };
@@ -110,58 +110,57 @@ G.UI = (() => {
 
   // ---------- 技能按鈕（主動：點擊施放；被動：只顯示；長按任一顆 → 資訊卡）----------
   const LP = 0.35;                                       // 長按秒數
-  function skillBtn(c, s, x, y, w) {
-    const h = W.hero, i = h.skills.indexOf(s), id = 'sk' + (s.passive ? 'p' + h.pskills.indexOf(s) : i);
-    x += sh(id);
+  // v3.14 圓形按鈕（主動技）：落地影＋外框＋內面（上緣亮一點，看得出可以按）
+  const circBtn = U.circBtn = (c, cx, cy, r, bg, bd, o = 0) => {
+    G.pxDisc(c, cx + 1, cy + 2, r, r, 0, 0.6);
+    G.pxDisc(c, cx, cy + o, r, r, bd);
+    G.pxDisc(c, cx, cy + o, r - 1, r - 1, 0);
+    G.pxDisc(c, cx, cy + o, r - 2, r - 2, bg <= 1 ? 2 : bg);
+    G.pxDisc(c, cx, cy + 1 + o, r - 3, r - 3, bg <= 1 ? 1 : G.clamp(bg - 1, 0, 9));
+  };
+  function skillBtn(c, s, r) {
+    const h = W.hero, i = h.skills.indexOf(s), id = 'sk' + (s.passive ? 'p' + h.pskills.indexOf(s) : i), w = r.w;
+    const x = r.x + sh(id), y = r.y, cx = r.cx + sh(id), cy = r.cy;
     const cost = Math.round(s.mp * (1 - (h.mpDisc || 0) / 100)), pr = U.press[id] > 0 || (U.hold && U.hold.id === id), noMp = !s.passive && h.mp < cost, cd = s.cd > 0, lock = !s.lv;
-    const o = pr ? 1 : 0;
-    if (s.passive) {                                      // 被動：暗底 + 虛線內框
-      box(c, x, y + o, w, w, 0, lock ? 3 : 4);
+    const o = pr ? 1 : 0, mx = s.lv >= G.SKILL_MAX;
+    if (s.passive) {                                      // 被動：方形暗底 + 虛線內框（紫色＝被動）
+      box(c, x, y + o, w, w, 0, lock ? 3 : mx ? 17 : 4);
       c.fillStyle = P[lock ? 2 : 3]; for (let k = 2; k < w - 2; k += 2) { c.fillRect(x + k, y + 2 + o, 1, 1); c.fillRect(x + k, y + w - 3 + o, 1, 1); c.fillRect(x + 2, y + k + o, 1, 1); c.fillRect(x + w - 3, y + k + o, 1, 1); }
-      icon(c, s.icon, x + w / 2, y + w / 2 + o, lock);
+      icon(c, s.icon, cx, cy + o, lock);
     } else {
-      box(c, x, y + o, w, w, pr ? 3 : 1, s.ready > 0 ? 9 : (h.pending && h.pending.i === i && ((U.t * 8) | 0) % 2 ? 9 : lock ? 3 : 5));
-      icon(c, s.icon, x + w / 2, y + w / 2 + o, lock || noMp || cd || !h.alive);
+      const R0 = Math.floor(w / 2), bd = s.ready > 0 ? 9 : (h.pending && h.pending.i === i && ((U.t * 8) | 0) % 2 ? 9 : lock ? 3 : mx ? 13 : 5);   // v3.14 滿級：金色外框
+      circBtn(c, cx, cy, R0, pr ? 3 : 1, bd, o);
+      icon(c, s.icon, cx, cy + o, lock || noMp || cd || !h.alive);
       if (cd && !lock) {
-        const f = s.cd / s.cdMax, cx = x + w / 2, cy = y + w / 2;
+        const f = s.cd / s.cdMax, rr = (R0 - 2) * (R0 - 2);
         c.fillStyle = P[0];
-        for (let yy = 1; yy < w - 1; yy++) for (let xx = 1; xx < w - 1; xx++) {
-          let a = Math.atan2(x + xx + 0.5 - cx, -(y + yy + 0.5 - cy)) / (Math.PI * 2); if (a < 0) a += 1;
-          if (a > 1 - f && G.bayer(xx, yy) < 0.75) c.fillRect(x + xx, y + yy, 1, 1);
+        for (let yy = -R0 + 2; yy <= R0 - 2; yy++) for (let xx = -R0 + 2; xx <= R0 - 2; xx++) {
+          if (xx * xx + yy * yy > rr) continue;
+          let a = Math.atan2(xx + 0.5, -(yy + 0.5)) / (Math.PI * 2); if (a < 0) a += 1;
+          if (a > 1 - f && G.bayer(xx + 64, yy + 64) < 0.75) c.fillRect(cx + xx, cy + yy + o, 1, 1);
         }
-        G.text(c, Math.ceil(s.cd), x + w / 2, y + w / 2 - 2, 9, 1, 0, 0.5);
+        G.text(c, Math.ceil(s.cd), cx, cy - 4 + o, 9, R0 >= 13 ? 2 : 1, 0, 0.5);
       }
-      if (!lock) G.text(c, cost, x + w - 2, y + w - 7 + o, noMp ? 10 : 6, 1, 0, 1);
+      if (!lock && !cd) G.text(c, cost, cx, cy + R0 - 8 + o, noMp ? 10 : 6, 1, 0, 0.5);
     }
-    if (lock) icon(c, 'i_lock', x + w / 2, y + w / 2 + o);
-    // 技能等級（左上三格）
-    const lx = Math.round(x + w / 2 - 5);                // 技能等級（上方置中三格）
-    for (let k = 0; k < G.SKILL_MAX; k++) { c.fillStyle = P[0]; c.fillRect(lx + k * 3, y + 2 + o, 4, 3); c.fillStyle = P[k < s.lv ? 13 : 3]; c.fillRect(lx + 1 + k * 3, y + 3 + o, 2, 1); }
-    const bcx = x + w / 2, bcy = y + w / 2;
-    U.btns.push({ id, x, y, w, h: w, down: () => { U.hold = { id, t: 0, s, fired: false, x, y, w }; if (!s.passive && s.lv) U.aim = { i, s, pre: true, on: false, bx: bcx, by: bcy, dx: 0, dy: 0 }; },
+    if (lock) icon(c, 'i_lock', cx, cy + o);
+    // 技能等級：上緣三顆小點
+    const lx = Math.round(cx - 5), ly = s.passive ? y + 2 + o : Math.round(cy - w / 2 + 3 + o);
+    for (let k = 0; k < G.SKILL_MAX; k++) { c.fillStyle = P[0]; c.fillRect(lx + k * 3, ly, 4, 3); c.fillStyle = P[k < s.lv ? (s.passive ? 17 : 13) : 3]; c.fillRect(lx + 1 + k * 3, ly + 1, 2, 1); }
+    U.btns.push({ id, x: r.x, y: r.y, w, h: r.h, down: () => { U.hold = { id, t: 0, s, fired: false, x: r.x, y: r.y, w }; if (!s.passive && s.lv) U.aim = { i, s, pre: true, on: false, bx: cx, by: cy, dx: 0, dy: 0 }; },
       drag: s.passive ? null : (ux, uy) => U.aimDrag(ux, uy), up: () => {
       if (U.aim && U.aim.on) { U.aimRelease(); return; }
       U.aim = null;
       if (U.hold && U.hold.fired) return;
       if (s.passive) { U.press[id] = 0.12; U.toastMsg('長按查看說明', 7); G.Audio.play('tick'); return; }
-      const r = W.trySkill(i); U.press[id] = 0.12;
-      if (r === 'ok' || r === 'queued') G.Audio.play('click');
+      const r2 = W.trySkill(i); U.press[id] = 0.12;
+      if (r2 === 'ok' || r2 === 'queued') G.Audio.play('click');
       else {
         deny(id);
-        if (r === 'none' && h.alive && s.needT) G.FX.ring(W, h.x, h.y, s.range, s.range + 4, 0.45, 7, 1);
-        if (r === 'mp') U.toastMsg('MP不足', 11); if (r === 'lock') U.toastMsg('尚未學習', 7);
+        if (r2 === 'none' && h.alive && s.needT) G.FX.ring(W, h.x, h.y, s.range, s.range + 4, 0.45, 7, 1);
+        if (r2 === 'mp') U.toastMsg('MP不足', 11); if (r2 === 'lock') U.toastMsg('尚未學習', 7);
       }
     } });
-    // 可升級：黃色 ＋（在按鈕正上方置中）
-    if (W.canLevel(s)) {
-      const bx = Math.round(x + w / 2 - 5), by = Math.round(y - 14 + Math.sin(U.t * 6) * 1), uid = 'up' + id;
-      U.ups.push(() => {
-        c.fillStyle = P[0]; c.fillRect(bx - 1, by - 1, 12, 12);
-        c.fillStyle = P[U.press[uid] > 0 ? 14 : 13]; c.fillRect(bx, by, 10, 10); c.fillStyle = P[9]; c.fillRect(bx, by, 10, 1);
-        c.fillStyle = P[0]; c.fillRect(bx + 4, by + 2, 2, 6); c.fillRect(bx + 2, by + 4, 6, 2);
-        btn(uid, bx - 3, by - 3, 15, 15, () => { U.press[uid] = 0.12; if (!W.levelSkill(s)) deny(id); });
-      });
-    }
   }
   U.toastMsg = (s, col = 9) => { U.toast = { s, t: 0.9, col }; };
   // ---------- v2.4 技能瞄準（仿傳說對決：點一下＝快速施放；按住拖曳＝自己選落點；拖到「取消」放開＝取消）----------
@@ -260,7 +259,8 @@ G.UI = (() => {
   }
   // 增益資訊卡（長按左上狀態圖示）：名稱、效果、剩餘時間
   G.buffInfo = key => {
-    if (key.startsWith('i_')) { const it = G.SHOP_BY[key.slice(2)]; return it ? { n: it.n, d: it.d.replace(/，\s*[\d.]+\s*秒$/, '') } : { n: key, d: '' }; }
+    if (key === 'i_inv') return { n: '無敵', d: '{不受傷害與控制}' };   // v3.14 復活後的無敵
+    if (key.startsWith('i_')) { const it = G.SHOP_BY[key.slice(2)]; return it ? { n: it.n, d: G.potTxt(it, 1) } : { n: key, d: '' }; }
     return { n: key, d: '' };
   };
   function buffCard(c, key, ax, ay) {
@@ -331,33 +331,41 @@ G.UI = (() => {
 
   // ---------- 廣播 ----------
   G.NOTICE_IN = 0.28; G.NOTICE_OUT = 0.3;
-  // v3.8 大招名稱橫幅：從左邊快速滑入、帶元素色的速度線，停 0.9 秒後往右滑出
+  // v3.14 廣播與大招名稱改成「不擋畫面中央」：
+  //  橫屏＝廣播在上方中間（左上資訊和右上小地圖之間）、大招名稱在左側；直屏＝廣播靠左在狀態列下方、大招名稱靠右在小地圖下方
+  //  都是 1 倍字、半透明細條，最多同時 2 則
+  G.NOTICE_N = 2;
+  const noticeBox = () => { const I = R.ins, uw = R.uw, port = R.uh > uw; return port ? { x0: I.l, x1: uw - I.r - 68, y0: I.t + 52, al: 0 } : { x0: I.l + 104, x1: uw - I.r - 66, y0: I.t + 1, al: 0.5 }; };
   function ultBanner(c) {
-    const B = W.ultBan; B.t += M_DT; const T = B.t, D = 1.5; if (T > D || !B.n) { W.ultBan = null; return; }
-    const E = G.ELEM[B.el] || G.ELEM.arcane, uw = R.uw, I = R.ins, k2 = G.cnW(B.n) * 2 <= uw - 40 ? 2 : 1, h = 14 * k2 + 8, y = Math.round(I.t + (R.uh - I.t - I.b) * 0.26);
-    const inK = Math.min(1, T / 0.16), outK = Math.max(0, (T - (D - 0.25)) / 0.25), off = Math.round((1 - inK) * -uw + outK * uw);
-    c.save(); c.globalAlpha = 0.78; c.fillStyle = P[0]; c.fillRect(off, y, uw, h); c.globalAlpha = 1;
-    c.fillStyle = P[E.c]; c.fillRect(off, y, uw, 1); c.fillRect(off, y + h - 1, uw, 1);
-    for (let i = 0; i < 9; i++) { const ly = y + 2 + ((i * 5) % (h - 4)), lx = off + ((T * 420 + i * 97) % (uw + 60)) - 30, L = 18 + (i * 13) % 30; c.globalAlpha = 0.5; c.fillStyle = P[i % 2 ? E.c : E.c2]; c.fillRect(Math.round(lx), ly, L, 1); }
-    c.globalAlpha = 1; G.cnBig(c, B.n, uw / 2 + off, y + 4, E.c, k2); c.restore();
+    const B = W.ultBan; B.t += M_DT; const T = B.t, D = 1.6; if (T > D || !B.n) { W.ultBan = null; return; }
+    const E = G.ELEM[B.el] || G.ELEM.arcane, I = R.ins, uw = R.uw, port = R.uh > uw, tw = G.cnW(B.n), w = tw + 26, hh = 15;
+    const right = port, y = port ? I.t + 114 : I.t + 54, edge = right ? uw - I.r : I.l;
+    const inK = 1 - Math.pow(1 - Math.min(1, T / 0.18), 3), outK = Math.max(0, (T - (D - 0.3)) / 0.3), x = Math.round(right ? edge - w * inK : edge - w + w * inK);
+    c.save(); c.globalAlpha = 1 - outK;
+    c.fillStyle = 'rgba(8,8,8,0.72)'; c.fillRect(x, y, w, hh);
+    c.fillStyle = P[E.c]; c.fillRect(x, y, w, 1); c.fillRect(x, y + hh - 1, w, 1);
+    c.fillStyle = P[E.c]; c.fillRect(right ? x : x + w - 2, y, 2, hh);                   // 內側色條
+    for (let i = 0; i < 4; i++) { const ly = y + 3 + i * 3, L2 = 6 + ((T * 90 + i * 37) % 14); c.globalAlpha = (1 - outK) * 0.55; c.fillStyle = P[i % 2 ? E.c : E.c2]; c.fillRect(Math.round(right ? x + w - 4 - L2 - ((T * 60 + i * 11) % 8) : x + 4 + ((T * 60 + i * 11) % 8)), ly, L2, 1); }
+    c.globalAlpha = 1 - outK; G.cn(c, B.n, Math.round(right ? x + 6 : x + w - 6 - tw), y + 2, E.c);
+    c.restore();
   }
   function drawNotices(c) {
-    const uw = R.uw, uh = R.uh, T0 = R.ins.t, port = uh > uw;
-    const y0 = T0 + (port ? 92 : 56), step = 19, ease = k => 1 - Math.pow(1 - k, 3);
-    W.notices.slice(0, 4).forEach((n, i) => {
-      const tw = G.cnW(n.s) + 24, tx = Math.round(uw / 2 - tw / 2), ty = y0 + i * step;
-      n.y = n.y == null ? ty : n.y + (ty - n.y) * Math.min(1, M_DT * 12);   // 上面那則離開時，下面的平滑補位
-      let x = tx, al = 1;                                    // 從畫面左緣滑入＋淡入；往右滑到右緣＋淡出（文字不會跑出畫面）
-      const xl = R.ins.l, xr = uw - R.ins.r - tw;
-      if (n.age < G.NOTICE_IN) { const k = ease(n.age / G.NOTICE_IN); x = Math.round(xl + (tx - xl) * k); al = k; }
-      else if (n.age > n.t) { const k = Math.min(1, (n.age - n.t) / G.NOTICE_OUT); x = Math.round(tx + (Math.max(tx, xr) - tx) * k * k); al = 1 - k; }
+    const A = noticeBox(), maxW = A.x1 - A.x0, ease = k => 1 - Math.pow(1 - k, 3), fromR = A.al === 0 ? false : null;
+    let yy = A.y0;
+    W.notices.slice(0, G.NOTICE_N).forEach(n => {
+      const ls = n._ls && n._w === maxW ? n._ls : (n._ls = G.cnWrap(n.s, maxW - 20), n._w = maxW, n._ls), tw = Math.max(...ls.map(l => G.cnW(l))) + 20, hh = ls.length * 12 + 3;
+      const tx = Math.round(A.al ? (A.x0 + A.x1) / 2 - tw / 2 : A.x0);
+      n.y = n.y == null ? yy : n.y + (yy - n.y) * Math.min(1, M_DT * 12);   // 上面那則離開時，下面的平滑補位
+      let x = tx, al = 1;
+      if (n.age < G.NOTICE_IN) { const k = ease(n.age / G.NOTICE_IN); al = k; x = Math.round(tx - (1 - k) * 12); }
+      else if (n.age > n.t) { const k = Math.min(1, (n.age - n.t) / G.NOTICE_OUT); al = 1 - k; }
       const y = Math.round(n.y);
       c.globalAlpha = Math.max(0.05, al);
-      box(c, x, y, tw, 16, 0, n.col);
-      c.fillStyle = P[n.col]; c.fillRect(x + 1, y + 1, 2, 14);                 // 左側色條
-      icon(c, n.ic, x + 11, y + 8); G.cn(c, n.s, x + 19, y + 2, 9);
-      if (n.age < G.NOTICE_IN && x - 27 > 0) { c.fillStyle = P[n.col]; for (let k = 0; k < 3; k++) c.fillRect(x - 6 - k * 7, y + 4 + k * 4, 4, 1); }   // 進場速度線
-      c.globalAlpha = 1;
+      c.fillStyle = 'rgba(8,8,8,0.7)'; c.fillRect(x, y, tw, hh);
+      c.fillStyle = P[n.col]; c.fillRect(x, y, 2, hh);                                        // 左側色條
+      icon(c, n.ic, x + 10, y + Math.round(hh / 2));
+      ls.forEach((l, i) => G.cn(c, l, x + 18, y + 1 + i * 12, 9));
+      c.globalAlpha = 1; yy += hh + 2;
     });
   }
   // ---------- 即時戰鬥數據 ----------
@@ -366,7 +374,7 @@ G.UI = (() => {
     dim(c, 0.75);
     U.btns = []; btn('stBg', 0, 0, uw, uh, () => { U.statP = false; G.Audio.play('click'); });
     const w = Math.min(uw - I.l - I.r - 12, 260), cols = w >= 250 ? 2 : 1, t = st.time | 0;
-    const rows = [['野生首領', st.wboss], ['推倒敵塔', st.towers], ['累積金幣', Math.floor(st.gold)], ['取得鑰匙', W.keysGot || 0], ['造成傷害', Math.round(st.dmg)], ['承受傷害', Math.round(st.taken)], ['對塔傷害', Math.round(st.tower)], ['英雄等級', 'Lv' + h.level]];
+    const rows = [['野生首領', st.wboss], ['推倒敵塔', st.towers], ['升級藥水', st.potUp || 0], ['取得鑰匙', W.keysGot || 0], ['造成傷害', Math.round(st.dmg)], ['承受傷害', Math.round(st.taken)], ['對塔傷害', Math.round(st.tower)], ['英雄等級', 'Lv' + h.level]];
     const nr = Math.ceil(rows.length / cols), hh = 22 + 34 + nr * 14 + 8, x = Math.round(uw / 2 - w / 2), y = Math.round(G.clamp(uh / 2 - hh / 2, I.t + 2, uh - hh - 2));
     box(c, x, y, w, hh, 1, 7);
     G.cn(c, '戰鬥數據', x + 6, y + 3, 9); G.text(c, String((t / 60) | 0) + ':' + String(t % 60).padStart(2, '0'), x + w - 24, y + 6, 7, 1, null, 1);
@@ -424,6 +432,12 @@ G.UI = (() => {
     // 展開大地圖（暫停左邊）
     U.h.key(c, Rt - 32, by, 14, 12, U.bigMap, U.bigMap ? 13 : 5); expandIcon(c, Rt - 32 + 3, by + 2, 8, 8, U.bigMap ? 13 : 8);
     btn('bigmap', Rt - 32, by, 14, 12, () => { U.bigMap = !U.bigMap; G.Audio.play(U.bigMap ? 'open' : 'click'); if (U.bigMap && G.Ach && G.W && !G.W.attract) G.Ach.on('map'); });
+    // v3.14 升級進度（地圖左邊）：還有點數可以用 → 黃框呼吸＋右上角數字；點開會暫停
+    { const ch = W.lvChoices(), n = (ch & 1 ? h.sp || 0 : 0) + (ch & 2 ? h.pp || 0 : 0), on = n > 0, lx = Rt - 48, pr = U.press.lvBtn > 0;
+      if (on) { c.globalAlpha = 0.35 + 0.25 * Math.sin(U.t * 5); c.fillStyle = P[13]; c.fillRect(lx - 1, by - 1, 16, 15); c.globalAlpha = 1; }
+      U.h.key(c, lx, by, 14, 12, pr, on ? 13 : 5); icon(c, 'i_up', lx + 7, by + 6);
+      if (on) { const ns = String(Math.min(9, n)); c.fillStyle = P[0]; c.fillRect(lx - 3, by - 4, 7, 7); c.fillStyle = P[10]; c.fillRect(lx - 2, by - 3, 5, 5); G.text(c, ns, lx + 0.5, by - 3, 9, 1, null, 0.5); }   // 左上角紅點＋數字
+      btn('lvBtn', lx, by, 14, 12, () => { U.press.lvBtn = 0.1; }, () => { U.openLv(false); }); }
     // 鎖定中的目標：圖示 + 血條（點一下鏡頭移過去）
     const lt = h.alive && h.cmd && h.cmd.lock && h.cmd.t && h.cmd.t.alive ? h.cmd.t : null;
     if (lt) {
@@ -437,92 +451,40 @@ G.UI = (() => {
       G.text(c, Math.ceil(lt.hp), lx + lw - 3, ly + 12, 9, 1, 0, 1);
       btn('lockT', lx, ly, lw, 21, () => { R.cam.follow = false; R.cam.x = lt.x; R.cam.y = lt.y; G.Audio.play('tick'); });
     }
-    // 左下：商店（金幣）；道具欄貼左邊垂直排列（展開時顯示名稱）
-    const sx0 = L, sy0 = B - 24, spr = U.press.shop > 0 ? 1 : 0;
-    U.h.key(c, sx0, sy0 + spr, 24, 22, spr, U.shop ? 13 : 5);
-    icon(c, 'i_shop', sx0 + 12, sy0 + 8 + spr);
-    const gtxt = String(Math.floor(W.gold)); G.text(c, gtxt, sx0 + 12, sy0 + 15 + spr, 13, 1, null, 0.5);
-    btn('shop', sx0, sy0, 24, 22, () => { U.press.shop = 0.12; U.shop = !U.shop; U.shopSel = U.shopSel || 'hp'; G.Audio.play('open'); });
-    // 右下：視角置中（大招按鈕正上方，避開升級＋）
-    const cx2 = Rt - 13 - 8, cy2 = B - 26 - 16 - 20;
-    box(c, cx2, cy2, 16, 16, R.cam.follow ? 1 : 3, R.cam.follow ? 5 : 9); icon(c, 'i_center', cx2 + 8, cy2 + 8);
-    btn('center', cx2, cy2, 16, 16, () => { R.cam.follow = true; G.Audio.play('click'); });
-    // v3.2.4 放大／縮小：視角置中鈕左邊（[−][＋][置中]），到極限變暗
-    [[-1, 'zout', 'i_zout', 38], [1, 'zin', 'i_zin', 19]].forEach(([dir, id, ic, off]) => {
-      const zx = cx2 - off, ok = R.zoomAt(dir), o = U.press[id] > 0 ? 1 : 0;
-      if (!ok) c.globalAlpha = 0.45;
-      box(c, zx, cy2 + o, 16, 16, 0, 5); icon(c, ic, zx + 8, cy2 + 8 + o);
-      c.globalAlpha = 1;
-      btn(id, zx, cy2, 16, 16, () => { U.press[id] = 0.12; }, () => { if (R.zoomBy(dir)) G.Audio.play('tick'); else deny(id); });
-    });
-    // 傳送冷卻排在縮放鈕左邊；左邊道具欄展開會太擠時（窄手機直屏）改排到縮放鈕正上方一列
-    const tpOn = !!(W.tp && W.tp.cd > 0), bagR = W.bag.length ? L + 3 + 18 + Math.max(...G.SHOP.map(d => G.cnW(d.e || d.n))) + 6 + 8 : L + 24;
-    const up = cx2 - 38 - 19 * (tpOn ? 1 : 0) < bagR + 4;
-    const tpX = up ? cx2 - 38 : cx2 - 57, tpY = up ? cy2 - 19 : cy2;
-    // 傳送：冷卻中 → 準心鈕上方顯示塔圖示 + 秒數；引導中 → 畫面中下方進度條
+    const Ct = G.Ctl;
+    // 視角置中、放大／縮小（位置可在操作設定自訂）
+    { const r = Ct.rect('cam'); box(c, r.x, r.y, r.w, r.h, R.cam.follow ? 1 : 3, R.cam.follow ? 5 : 9); icon(c, 'i_center', r.cx, r.cy);
+      btn('center', r.x, r.y, r.w, r.h, () => { R.cam.follow = true; G.Audio.play('click'); }); }
+    { const r = Ct.rect('zoom'), w2 = Math.round((r.w - 3) / 2);
+      [[-1, 'zout', 'i_zout', r.x], [1, 'zin', 'i_zin', r.x + r.w - w2]].forEach(([dir, id, ic, zx]) => {
+        const ok = R.zoomAt(dir), o = U.press[id] > 0 ? 1 : 0;
+        if (!ok) c.globalAlpha = 0.45;
+        box(c, zx, r.y + o, w2, r.h, 0, 5); icon(c, ic, zx + w2 / 2, r.cy + o);
+        c.globalAlpha = 1;
+        btn(id, zx, r.y, w2, r.h, () => { U.press[id] = 0.12; }, () => { if (R.zoomBy(dir)) G.Audio.play('tick'); else deny(id); });
+      }); }
+    // 傳送引導中 → 畫面中下方進度條
     const tp = W.tp;
-    if (tp && tp.cd > 0) {
-      const tx = tpX, ty = tpY, ts = G.SPR.ptower[0], k = Math.min(1, 14 / ts.h);
-      box(c, tx, ty, 16, 16, 0, 4); c.globalAlpha = 0.45; c.drawImage(ts.n, Math.round(tx + 8 - ts.w * k / 2), Math.round(ty + 15 - ts.h * k), Math.round(ts.w * k), Math.round(ts.h * k)); c.globalAlpha = 1;
-      G.text(c, Math.ceil(tp.cd), tx + 8, ty + 6, 13, 1, 0, 0.5);
-    }
     if (tp && tp.ch) {
       const bw2 = 90, bx2 = Math.round(uw / 2 - bw2 / 2), by2 = Math.round(uh * 0.68);
       box(c, bx2, by2, bw2, 24, 0, 13);
       G.cn(c, '傳送中', bx2 + 6, by2 + 2, 13); G.text(c, tp.ch.t.toFixed(1), bx2 + bw2 - 6, by2 + 5, 9, 1, 0, 1);
       bar(c, bx2 + 6, by2 + 17, bw2 - 12, 2, 1 - tp.ch.t / tp.ch.max, 'w');
     }
-    // 道具欄：直式滾輪（中間那格＝點一下使用；上下兩格＝點一下轉過來；上下滑動捲動）
-    // 一段時間沒碰 → 自動縮小成只剩中間那格的圖示、變半透明；點一下展開
-    const bag = W.bag;
-    if (bag.length) {
-      const bw = U.bagW || (U.bagW = U.wheel()); bw.sp = 18;
-      if (U.bagGo != null) { bw.go(U.bagGo); U.bagGo = null; U.bagUse = U.t; }   // 剛買的道具轉到中間並展開
-      if (U.bagUse == null) U.bagUse = U.t;
-      if (bw.drag || !bw.settled) U.bagUse = U.t;
-      bw.update(M_DT, bag.length);
-      const open = U.t - U.bagUse < G.TUNE.bagIdle;
-      U.bagEx = G.clamp((U.bagEx == null ? 1 : U.bagEx) + (open ? 1 : -1) * M_DT * 5, 0, 1);
-      const ex = U.bagEx, ee = ex * ex * (3 - 2 * ex);
-      const step = 18, labW = Math.max(...G.SHOP.map(d => G.cnW(d.e || d.n))), pwF = 18 + labW + 6, pw = Math.round(16 + (pwF - 16) * ee);   // 每格同寬（以最寬的效果標為準）
-      const x0 = L + 3, cy = sy0 - 30, top = cy - step - 9, hh = step * 3 + 2;   // 中間那格（16×16）與右下「視角置中」鈕同一水平線、同大小
-      if (ex > 0.5) wheelBtn(bw, x0 - 2, top - 1, pwF + 4, hh + 2);
-      c.save(); c.beginPath(); c.rect(x0 - 3, top - 2, pwF + 8, hh + 4); c.clip();
-      const order = bag.map((it, k) => k).sort((p2, q) => Math.abs(q - bw.pos) - Math.abs(p2 - bw.pos));
-      for (const k of order) {
-        const d = k - bw.pos, ad = Math.abs(d); if (ad > 1.6) continue;
-        const ctr = ad < 0.5; if (!ctr && ee < 0.05) continue;
-        const it = bag[k], dd = G.SHOP_BY[it.id], id = 'it' + k, o = U.press[id] > 0 ? 1 : 0;
-        const y = Math.round(cy - 8 + d * step - (ctr ? Math.round(bw.bump * 1) : 0)), x = x0 + sh(id) + Math.round(Math.min(1, ad) * 3), w2 = pw - Math.round(Math.min(1, ad) * 3);
-        c.globalAlpha = ctr ? 0.5 + 0.5 * ee : ee;                // 收起時：只剩中間圖示、半透明
-        box(c, x, y + o, w2, 16, ctr ? 1 : 0, ctr ? (ee > 0.5 ? 13 : 5) : 3, ctr);
-        icon(c, dd.ic, x + 8, y + 7 + o);
-        if (it.n > 1) G.text(c, it.n, x + 15, y + 11 + o, ctr ? 9 : 7, 1, 0, 1);
-        if (ee > 0.6 && 18 + G.cnW(dd.e || dd.n) + 2 <= w2) { c.globalAlpha *= (ee - 0.6) / 0.4; G.cn(c, dd.e || dd.n, x + 18, y + 2 + o, ctr ? 9 : 7); c.globalAlpha = ctr ? 0.5 + 0.5 * ee : ee; }   // 框放得下才畫字（縮放動畫中不會超出框）
-        if (!ctr) { c.fillStyle = 'rgba(12,12,12,' + Math.min(0.42, ad * 0.3).toFixed(3) + ')'; c.fillRect(x, y + o, w2, 16); }   // 柔和陰影
-        c.globalAlpha = 1;
-        btn(id, x, y, ex > 0.5 ? w2 : 16, 16, () => { U.press[id] = 0.12; }, () => {
-          if (U.bagEx < 0.5) { U.bagUse = U.t; G.Audio.play('open'); return; }          // 收起中：先展開
-          U.bagUse = U.t;
-          if (Math.abs(bw.pos - k) < 0.5) { const r = W.useItem(it.id); if (r === 'rev') { U.toastMsg('陣亡時會自動使用', 19); G.Audio.play('tick'); } else if (!r) deny(id); } else { bw.go(k); G.Audio.play('tick'); }
-        });
-        if (ex > 0.5) tagWheel(bw);
-      }
-      c.restore();
-      if (ee > 0.5) {
-        c.globalAlpha = (ee - 0.5) * 2;
-        // 中間選取框（黃色小三角）＋ 上下還有道具的提示
-        const ay = cy - 1, bl = ((U.t * 3) | 0) % 2;
-        c.fillStyle = P[13]; for (let k = 0; k < 3; k++) c.fillRect(x0 + pwF + 2 + k, ay - 2 + k, 1, 5 - k * 2);
-        const more = (dir, yy) => { c.fillStyle = P[bl ? 7 : 5]; for (let k = 0; k < 3; k++) c.fillRect(x0 + 8 - k, yy + (dir < 0 ? k : 2 - k), 1 + k * 2, 1); };
-        if (bw.pos > 1.5) more(-1, top - 5); if (bw.pos < bag.length - 2.5) more(1, top + hh + 2);
-        // 位置刻度（左側直排）
-        for (let k = 0; k < bag.length; k++) { c.fillStyle = P[Math.round(bw.pos) === k ? 13 : 3]; c.fillRect(L, Math.round(cy - bag.length * 2 + k * 4), 1, Math.round(bw.pos) === k ? 3 : 2); }
-        c.globalAlpha = 1;
-      } else if (bag.length > 1) { c.globalAlpha = 0.5; G.text(c, bag.length, x0 + 18, cy - 2, 6); c.globalAlpha = 1; }   // 收起時：旁邊小字顯示有幾種
-    }
-    // 增益狀態（頭像下方）：長按顯示效果與剩餘時間
+    // 狀態列（頭像下方）：復活次數、傳送冷卻、計時增益；長按增益顯示效果與剩餘時間
     let bxx = L; const byy = T0 + 34;
+    if (W.rev > 0) {
+      box(c, bxx, byy, 13, 13, 0, 19, false); icon(c, 'p_rev', bxx + 6.5, byy + 6.5); G.text(c, W.rev, bxx + 12, byy + 9, 9, 1, 0, 1);
+      btn('revI', bxx - 1, byy - 1, 15, 15, null, () => { U.toastMsg('陣亡時自動復活，剩 ' + W.rev + ' 次', 19); G.Audio.play('tick'); });
+      bxx += 15;
+    }
+    if (tp && tp.cd > 0) {
+      const ts = G.SPR.ptower[0], k = Math.min(1, 11 / ts.h);
+      box(c, bxx, byy, 13, 13, 0, 4, false); c.globalAlpha = 0.45; c.drawImage(ts.n, Math.round(bxx + 6.5 - ts.w * k / 2), Math.round(byy + 12 - ts.h * k), Math.round(ts.w * k), Math.round(ts.h * k)); c.globalAlpha = 1;
+      G.text(c, Math.ceil(tp.cd), bxx + 6.5, byy + 4, 13, 1, 0, 0.5);
+      btn('tpI', bxx - 1, byy - 1, 15, 15, null, () => { U.toastMsg('傳送冷卻中', 7); G.Audio.play('tick'); });
+      bxx += 15;
+    }
     for (const k in h.tb || {}) {
       const b2 = h.tb[k], f = b2.t / b2.max, id = 'bf_' + k, hold = U.hold && U.hold.id === id;
       box(c, bxx, byy, 13, 13, hold ? 3 : 0, b2.col != null ? b2.col : 5, false);
@@ -532,19 +494,18 @@ G.UI = (() => {
       btn(id, bxx - 1, byy - 1, 15, 17, () => { U.hold = { id, t: 0, buff: k, fired: false, x: bx3, y: byy + 19 }; }, () => { if (U.hold && U.hold.fired) return; U.toastMsg('長按查看說明', 7); });
       bxx += 15;
     }
-    // 右下：技能水平一列（被動在左、大招在最右角落）
-    U.ups = [];
-    const act = h.skills, row = [...h.pskills, ...act], gap = 4, SW = 26;   // 大小統一
-    let rx = Rt;
-    for (let k = row.length - 1; k >= 0; k--) { rx -= SW; skillBtn(c, row[k], rx, B - SW, SW); rx -= gap; }
-    rx += gap;
+    // v3.14 搖桿（左下）
+    Ct.drawJoy(c);
+    // v3.14 技能：右下弧形（左下 技能 1 → 技能 2 → 右上 大招）、被動方形在角落；位置可自訂
+    const act = h.skills, nA = act.length;
+    act.forEach((s, i) => skillBtn(c, s, Ct.rect(Ct.slotOf(i, nA))));
+    h.pskills.forEach((s, i) => skillBtn(c, s, Ct.rect(i === 0 ? 'ps' : 'sk0')));
     if (U.aim && (!h.alive || W.over)) U.aim = null;
     if (U.aim && U.aim.on) U.aimUpdate();
-    aimCancelUI(c, Math.round(Rt - 13), Math.round(B - 92));   // 取消區：視角置中鈕正上方（拇指往上拖就到）
-    for (const f of U.ups) f();
-    if (h.sp > 0 && act.concat(h.pskills).some(s => W.canLevel(s))) { G.text(c, '+' + h.sp, rx - 3, B - 26, 13, 1, 0, 1); }
+    { const rs = act.map((s, i) => Ct.rect(Ct.slotOf(i, nA))), ax = Math.min(...rs.map(r => r.cx)), ay = Math.min(...rs.map(r => r.y)) - 30;   // 取消區：技能群左上方（拇指往上拖就到）
+      aimCancelUI(c, Math.round(G.clamp(ax, L + 14, Rt - 14)), Math.round(G.clamp(ay, T0 + 76, B - 14))); }
     // 長按資訊卡
-    if (U.hold && U.hold.fired) { const hs = U.hold; if (hs.buff) { if (h.tb && h.tb[hs.buff]) buffCard(c, hs.buff, hs.x, hs.y); } else skillCard(c, hs.s, hs.x, hs.y); }
+    if (U.hold && U.hold.fired && !U.lvUp) { const hs = U.hold; if (hs.buff) { if (h.tb && h.tb[hs.buff]) buffCard(c, hs.buff, hs.x, hs.y); } else if (hs.s) skillCard(c, hs.s, hs.x, hs.y); }
     if (U.bigMap) { bigMap(c); return; }
     if (U.statP) { statPanel(c); return; }
     // 廣播（擊敗野怪等）：由左滑入 → 停留 → 向右滑出；多則時上下堆疊
@@ -552,7 +513,6 @@ G.UI = (() => {
     if (W.ultBan) ultBanner(c);
     keyFly(c);
     if (U.heroPanel) heroPanel(c);
-    if (U.shop) shopPanel(c);
     // 英雄死亡倒數
     if (!h.alive && !W.over) {
       G.text(c, Math.ceil(h.dead), uw / 2, uh / 2 - 12, 9, 4, 0, 0.5);
@@ -613,70 +573,130 @@ G.UI = (() => {
     G.cn(c, '黃色＝增益中　點一下關閉', x + w / 2, y + hh - 14, 4, 0.5);
   }
 
-  // ---------- 商店 ----------
-  function shopPanel(c) {
-    const uw = R.uw, uh = R.uh, I = R.ins, cols = 4, gap = 4, chh = 40, cw = Math.min(38, Math.floor((uw - I.l - I.r - 8 - 12 - gap * 3) / 4));
-    const gw = cols * cw + (cols - 1) * gap + 12, rowsN = Math.ceil(G.SHOP.length / cols), it = G.SHOP_BY[U.shopSel] || G.SHOP[0], bw = 40;
-    // v2.8.6 畫面不夠高（橫屏／電腦）：說明改放在格子右邊，不再被切掉
-    const dl0 = G.cnWrapRich(it.d.replace('，', '\n'), gw - 12 - bw - 8), side = 22 + rowsN * (chh + gap) + Math.max(34, 17 + dl0.length * 13 + 4) > uh - I.t - I.b - 4 && uw - I.l - I.r - 8 >= gw + 100;
-    const dw = side ? Math.min(150, uw - I.l - I.r - 8 - gw) : 0, pw = gw + dw;
-    const dl = side ? G.cnWrapRich(it.d.replace('，', '\n'), dw - 10) : dl0, dh = side ? 0 : Math.max(34, 17 + dl.length * 13 + 4);
-    const ph = side ? Math.max(22 + rowsN * (chh + gap) + 2, 22 + 18 + dl.length * 13 + 30) : 22 + rowsN * (chh + gap) + dh;
-    const px = Math.round(uw / 2 - pw / 2), py = Math.round(G.clamp(uh / 2 - ph / 2 - (side ? 0 : 8), I.t + 2, Math.max(I.t + 2, uh - I.b - ph - (side ? 2 : 30))));
-    btn('shopBg', 0, 0, uw, uh, null, () => { U.shop = false; });
-    dim(c, 0.6);
-    box(c, px, py, pw, ph, 1, 7);
-    btn('shopIn', px, py, pw, ph, null, null);
-    G.cn(c, '商店', px + 6, py + 4, 9);
-    icon(c, 'i_gold', px + pw - 46, py + 9); G.text(c, Math.floor(W.gold), px + pw - 40, py + 7, 13, 1, 0);
-    const cl = px + pw - 13; U.h.key(c, cl, py + 3, 10, 10, U.press.shopX > 0, 6); c.fillStyle = P[9]; for (let k = 0; k < 4; k++) { c.fillRect(cl + 3 + k, py + 6 + k, 1, 1); c.fillRect(cl + 6 - k, py + 6 + k, 1, 1); }
-    btn('shopX', cl - 2, py + 1, 14, 14, () => { U.press.shopX = 0.1; }, () => { U.shop = false; G.Audio.play('click'); });
-    G.SHOP.forEach((it, k) => {
-      const x = px + 6 + (k % cols) * (cw + gap), y = py + 20 + ((k / cols) | 0) * (chh + gap), sel = U.shopSel === it.id, can = W.gold >= it.cost;
-      const id = 'shop_' + it.id, o = U.press[id] > 0 ? 1 : 0;
-      box(c, x, y + o, cw, chh, sel ? 2 : 1, sel ? 13 : 4);
-      if (!can) c.globalAlpha = 0.45; icon(c, it.ic, x + cw / 2, y + 9 + o); c.globalAlpha = 1;   // v2.5 錢不夠：圖示半透明（原本用暗色版，部分藥水沒有暗色圖 → 整個看不到）
-      G.cn(c, it.n.replace('藥水', ''), x + cw / 2, y + 15 + o, can ? 8 : 5, 0.5);
-      icon(c, 'i_gold', x + 8, y + chh - 6 + o); G.text(c, it.cost, x + 13, y + chh - 8 + o, can ? 13 : 5, 1);
-      const have = (W.bag.find(b => b.id === it.id) || {}).n; if (have) G.text(c, 'X' + have, x + cw - 3, y + 3 + o, 9, 1, 0, 1);
-      btn(id, x, y, cw, chh, () => { U.press[id] = 0.1; }, () => { if (U.shopSel === it.id) doBuy(it); else { U.shopSel = it.id; G.Audio.play('tick'); } });
-    });
-    // 選中項目的說明 + 購買
-    if (side) {                                                                  // 右欄：名稱、說明、購買鈕在最下面
-      const sx = px + gw - 2, can = W.gold >= it.cost, o = U.press.buy > 0 ? 1 : 0, by2 = py + ph - 24;
-      c.fillStyle = P[3]; c.fillRect(sx, py + 20, 1, ph - 26);
-      G.cn(c, it.n, sx + 6, py + 20, 9); dl.forEach((l, i) => G.cnRich(c, l, sx + 6, py + 36 + i * 13, 6));
-      box(c, sx + 6, by2 + o, dw - 10, 18, o ? 3 : can ? 13 : 2, can ? 9 : 4);
-      G.cn(c, '購買', sx + 6 + (dw - 10) / 2, by2 + 3 + o, can ? 0 : 5, 0.5);
-      btn('buy', sx + 6, by2, dw - 10, 18, () => { U.press.buy = 0.12; }, () => doBuy(it));
-      return;
+  // ---------- v3.14 升級頁（升級時自動打開、或點右上「升級」；打開時戰鬥暫停）----------
+  // 每升 1 級：技能點、藥水點各 1。點卡片＝升級；長按＝看說明。點數可以留著之後再用
+  U.openLv = auto => {
+    if (!W || W.over || U.lvUp) return;
+    if (U.aim) U.aim = null; U.hold = null; if (G.Ctl) G.Ctl.joyEnd(); U.bigMap = false; U.statP = false; U.heroPanel = false;
+    U.lvUp = { t: 0, auto: !!auto, fl: {}, sp: [] }; G.Audio.play(auto ? 'level' : 'open');
+  };
+  U.closeLv = () => {
+    if (!U.lvUp) return; U.lvUp = null; U.hold = null; G.Audio.play('click');
+    const h = W.hero, L = W.lvFx || []; W.lvFx = [];   // 回到戰場後，在英雄身上補播剛剛升級的特效
+    if (!h || !h.alive) return;
+    L.forEach((q, k) => G.VFX.later(W, k * 0.22, () => {
+      if (q.pot) { if (q.pot.k === 'rev') { G.FX.ring(W, h.x, h.y, 4, 40, 0.5, 19, 2); G.VFX.light(W, h.x, h.y, 12, 24, 19, 0.5, 0.7); W.sfx('shield'); } else G.VFX.potion(W, h, Object.assign({}, q.pot, { k: q.pot.k === 'hpPct' ? 'hp' : q.pot.k === 'mpPct' ? 'mp' : q.pot.k, noPop: 1 })); }
+      else if (q.sk) { const el = q.sk.passive ? 17 : 13; G.FX.ring(W, h.x, h.y, 3, 30, 0.4, el, 2); G.VFX.spark(W, h.x, h.y, 26, 9, el, 0.25); for (let n = 0; n < 12; n++) W.parts.add(h.x + G.rr(-8, 8), h.y, G.rr(4, 20), 0, 0, G.rr(40, 90), 0.7, el, 9, 1, -10, 0); }
+    }));
+  };
+  // 升級頁版面：直屏＝技能一列、藥水 4 欄；橫屏＝左邊技能 2×2、右邊藥水 6 欄
+  function lvLayout() {
+    const I = R.ins, uw = R.uw, uh = R.uh, h = W.hero, port = uh > uw, nS = h.skills.length + h.pskills.length, nP = G.POT.length, g = 3;
+    const aw = uw - I.l - I.r - 8;
+    if (port) {
+      const pw = Math.min(aw, 196), cw = Math.min(42, Math.floor((pw - 12 - (Math.max(4, nS) - 1) * g) / Math.max(4, nS))), pc = 4, chS = 36, chP = 40;
+      const prow = Math.ceil(nP / pc), ph = 20 + 14 + chS + 8 + 14 + prow * (chP + g) - g + 8 + 20 + 6;
+      return { port, pw, ph, cw, chS, chP, g, sc: nS, pc, sx: 6, sy: 34, px: 6, py: 34 + chS + 8 + 14 };
     }
-    const dy = py + ph - dh + 3, can = W.gold >= it.cost;
-    c.fillStyle = P[3]; c.fillRect(px + 6, dy - 3, pw - 12, 1);
-    G.cn(c, it.n, px + 6, dy, 9); dl.forEach((l, i) => G.cnRich(c, l, px + 6, dy + 14 + i * 13, 6));
-    const bx = px + pw - bw - 6, by2 = Math.round(dy + (dh - 6) / 2 - 9), o = U.press.buy > 0 ? 1 : 0;
-    box(c, bx, by2 + o, bw, 18, o ? 3 : can ? 13 : 2, can ? 9 : 4);
-    G.cn(c, '購買', bx + bw / 2, by2 + 3 + o, can ? 0 : 5, 0.5);
-    btn('buy', bx, by2, bw, 18, () => { U.press.buy = 0.12; }, () => doBuy(it));
+    const pc = 6, sc = 2, cw = Math.min(36, Math.floor((aw - 12 - 8 - (sc - 1) * g - (pc - 1) * g) / (sc + pc))), chS = 34, chP = 38;
+    const sw = sc * cw + (sc - 1) * g, pw = 12 + sw + 8 + pc * cw + (pc - 1) * g, prow = Math.ceil(nP / pc), srow = Math.ceil(nS / sc);
+    const bodyH = Math.max(srow * (chS + g) - g, prow * (chP + g) - g), ph = 18 + 14 + bodyH + 6 + 20 + 6;
+    return { port, pw, ph, cw, chS, chP, g, sc, pc, sx: 6, sy: 32, px: 6 + sw + 8, py: 32 };
   }
-  function doBuy(it) {
-    const r = W.buy(it.id);
-    if (r === 'ok') { U.toastMsg('已購買 ' + it.n, 13); U.bagGo = W.bag.findIndex(q => q.id === it.id); }
-    else { deny('buy'); U.toastMsg(r === 'gold' ? '金幣不足' : '背包已滿', 10); }
+  function lvCard(c, id, x, y, w, hh, bd, flash, fn, hold) {
+    const o = U.press[id] > 0 ? 1 : 0;
+    box(c, x, y + o, w, hh, o ? 3 : 1, bd);
+    if (flash > 0) { c.globalAlpha = Math.min(1, flash * 2.5) * 0.7; c.fillStyle = P[flash > 0.25 ? 9 : 13]; c.fillRect(x + 1, y + 1 + o, w - 2, hh - 2); c.globalAlpha = 1; }
+    btn(id, x, y, w, hh, () => { U.press[id] = 0.12; U.hold = Object.assign({ id, t: 0, fired: false, x, y, w }, hold); }, () => { if (U.hold && U.hold.fired) return; fn(); });
+    return o;
   }
-
+  const pips = (c, cx, y, lv, col) => { const lx = Math.round(cx - 5); for (let k = 0; k < G.SKILL_MAX; k++) { c.fillStyle = P[0]; c.fillRect(lx + k * 3, y, 4, 3); c.fillStyle = P[k < lv ? col : 3]; c.fillRect(lx + 1 + k * 3, y + 1, 2, 1); } };
+  function lvBurst(x, y, col) { const L = U.lvUp; for (let k = 0; k < 14; k++) { const a = Math.random() * 6.28, sp = G.rr(20, 60); L.sp.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 20, t: G.rr(0.35, 0.6), col: k % 3 ? col : 9 }); } }
+  function lvPage(c) {
+    const L = U.lvUp, h = W.hero, uw = R.uw, uh = R.uh, I = R.ins; L.t += M_DT;
+    for (const k in L.fl) L.fl[k] -= M_DT;
+    const Y = lvLayout(), e = Math.min(1, L.t / 0.22), ee = 1 - Math.pow(1 - e, 3);
+    dim(c, 0.72 * ee);
+    U.btns = []; btn('lvBg', 0, 0, uw, uh, null, null);
+    const pw = Y.pw, ph = Y.ph, x0 = Math.round(uw / 2 - pw / 2), y0 = Math.round(G.clamp(uh / 2 - ph / 2, I.t + 2, Math.max(I.t + 2, uh - I.b - ph - 2)) + (1 - ee) * 16);
+    c.globalAlpha = ee;
+    box(c, x0, y0, pw, ph, 1, 13);
+    // 標題：升級！Lv5 ／ 升級進度 Lv5；右邊經驗條
+    const tt = L.auto ? '升級！' : '升級進度'; icon(c, 'i_up', x0 + 9, y0 + 9); const tw = G.cn(c, tt, x0 + 17, y0 + 3, 13);
+    G.text(c, 'LV' + h.level, x0 + 17 + tw + 5, y0 + 6, 9, 1);
+    { const bw = Math.min(56, pw - 17 - tw - 40 - 30), bx = x0 + pw - bw - 6; if (bw >= 24) { bar(c, bx, y0 + 7, bw, 3, h.exp / W.expNeed(h), 'xp'); G.text(c, 'XP', bx - 11, y0 + 6, 21, 1); } }
+    // 技能區
+    const lab = (t, n, x, y) => { const w0 = G.cn(c, t, x, y, 9); G.cn(c, '點數', x + w0 + 6, y, 6); G.text(c, n, x + w0 + 6 + G.cnW('點數') + 4, y + 3, n > 0 ? 13 : 5, 1); };
+    lab('技能', h.sp || 0, x0 + Y.sx, y0 + (Y.port ? 20 : 18));
+    const sks = [...h.skills, ...h.pskills];
+    sks.forEach((s, k) => {
+      const col = k % Y.sc, row = (k / Y.sc) | 0, x = x0 + Y.sx + col * (Y.cw + Y.g), y = y0 + Y.sy + row * (Y.chS + Y.g), id = 'lvS' + k;
+      const can = W.canLevel(s), mx = s.lv >= G.SKILL_MAX, req = mx ? 0 : G.skillReq(s.s, s.lv + 1), blink = ((U.t * 3) | 0) % 2;
+      const bd = s.passive ? 17 : can ? (blink ? 13 : 14) : mx ? 13 : 4;
+      const o = lvCard(c, id, x, y, Y.cw, Y.chS, bd, L.fl[id] || 0, () => {
+        if (s.passive) { deny(id); U.toastMsg('被動會隨英雄等級自動升級', 17); return; }
+        if (W.levelSkill(s, true)) { L.fl[id] = 0.45; (W.lvFx = W.lvFx || []).push({ sk: s, lv: s.lv }); lvBurst(x + Y.cw / 2, y + 10, 13); G.Audio.play('level'); return; }
+        deny(id); U.toastMsg(mx ? '已經滿級' : !(h.sp > 0) ? '沒有技能點了' : '英雄 Lv' + req + ' 才能升級', 7);
+      }, { s });
+      icon(c, s.icon, x + Y.cw / 2, y + 10 + o, !s.lv);
+      pips(c, x + Y.cw / 2, y + 19 + o, s.lv, s.passive ? 17 : 13);
+      const st = s.passive ? ['自動', 17] : can ? ['升級', blink ? 13 : 14] : mx ? ['滿級', 13] : null;
+      if (st) G.cn(c, st[0], x + Y.cw / 2, y + Y.chS - 13 + o, st[1], 0.5);
+      else G.text(c, 'LV' + req, x + Y.cw / 2, y + Y.chS - 9 + o, 5, 1, null, 0.5);
+    });
+    // 藥水區
+    const pY = Y.py - 14; lab('藥水', h.pp || 0, x0 + Y.px, y0 + pY);
+    G.POT.forEach((it, k) => {
+      const col = k % Y.pc, row = (k / Y.pc) | 0, x = x0 + Y.px + col * (Y.cw + Y.g), y = y0 + Y.py + row * (Y.chP + Y.g), id = 'lvP' + k;
+      const lv = W.pot[it.id] || 0, mx = lv >= G.POT_MAX, can = W.canPot(it.id);
+      const o = lvCard(c, id, x, y, Y.cw, Y.chP, mx ? 13 : can ? 6 : 4, L.fl[id] || 0, () => {
+        if (W.upPot(it.id)) { L.fl[id] = 0.45; lvBurst(x + Y.cw / 2, y + 8, it.col); G.Audio.play('level'); return; }
+        deny(id); U.toastMsg(mx ? '已經滿級' : '沒有藥水點了', 7);
+      }, { pot: it });
+      if (!lv && !can) c.globalAlpha *= 0.4; icon(c, it.ic, x + Y.cw / 2, y + 8 + o); c.globalAlpha = Math.min(1, ee);   // 藥水圖示沒有暗色版 → 用半透明
+      G.cn(c, it.e, x + Y.cw / 2, y + 14 + o, lv ? 9 : 6, 0.5);
+      pips(c, x + Y.cw / 2, y + 27 + o, lv, it.col === 9 ? 13 : it.col);
+      const vt = it.k === 'rev' ? (W.rev > 0 ? 'X' + W.rev : '') : lv ? G.potVal(it, lv) : '';
+      if (vt) G.text(c, vt, x + Y.cw / 2, y + 32 + o, lv ? 9 : 5, 1, null, 0.5);
+    });
+    // 繼續戰鬥
+    const bw = Math.min(120, pw - 12), bx = Math.round(x0 + pw / 2 - bw / 2), by = y0 + ph - 26, done = !W.lvChoices(), ob = U.press.lvGo > 0 ? 1 : 0;
+    U.h.key(c, bx, by + ob, bw, 20, ob, done ? 13 : 7, done ? 2 : 1); G.cn(c, '繼續戰鬥', bx + bw / 2, by + 4 + ob, done ? 13 : 9, 0.5);
+    btn('lvGo', bx, by, bw, 20, () => { U.press.lvGo = 0.12; }, () => U.closeLv());
+    c.globalAlpha = 1;
+    // 點擊光點
+    for (let k = L.sp.length - 1; k >= 0; k--) { const q = L.sp[k]; q.t -= M_DT; if (q.t <= 0) { L.sp.splice(k, 1); continue; } q.x += q.vx * M_DT; q.y += q.vy * M_DT; q.vy += 120 * M_DT; c.fillStyle = P[q.col]; c.fillRect(Math.round(q.x), Math.round(q.y), 1, 1); }
+    // 長按：技能卡／藥水卡
+    if (U.hold && U.hold.fired) { if (U.hold.s) skillCard(c, U.hold.s, U.hold.x + U.hold.w, U.hold.y + 4); else if (U.hold.pot) potCard(c, U.hold.pot, U.hold.x, U.hold.y); }
+  }
+  // 藥水資訊卡：名稱、說明、1～3 級的效果（目前等級亮黃）
+  function potCard(c, it, ax, ay) {
+    const lv = W.pot[it.id] || 0, w = Math.min(it.k === 'rev' ? 184 : 160, R.uw - R.ins.l - R.ins.r - 8);
+    const head = it.k === 'rev' ? G.cnWrapRich('每升 1 級存 1 次復活。' + G.potTxt(it, 1), w - 12) : [];
+    const rows = it.k === 'rev' ? [] : [1, 2, 3].map(k => ['Lv' + k, G.cnWrapRich(G.potTxt(it, k), w - 38)]);
+    const hh = 22 + head.length * 13 + rows.reduce((a2, r2) => a2 + r2[1].length * 13, 0) + 8 + (it.k === 'rev' ? 13 : 0);
+    const x = Math.round(G.clamp(ax - w / 2 + 18, R.ins.l + 2, R.uw - R.ins.r - w - 2)), y = Math.round(G.clamp(ay - hh - 6, R.ins.t + 2, R.uh - hh - 2));
+    dim(c, 0.6); box(c, x, y, w, hh, 1, it.col === 9 ? 7 : it.col);
+    icon(c, it.ic, x + 11, y + 10); G.cn(c, it.n, x + 22, y + 3, 9); G.cn(c, lv ? 'Lv ' + lv + '/3' : '未升級', x + w - 6, y + 3, 6, 1);
+    let yy = y + 20;
+    head.forEach(l => { G.cnRich(c, l, x + 6, yy, 7); yy += 13; });
+    if (it.k === 'rev') { G.cn(c, '目前存了 ' + (W.rev || 0) + ' 次', x + 6, yy, 13); yy += 13; }
+    rows.forEach(([a, ls], k) => { const on = k + 1 === lv; G.cn(c, a, x + 6, yy, on ? 13 : 5); ls.forEach(l => { G.cnRich(c, l, x + 32, yy, on ? 9 : 6); yy += 13; }); });
+  }
   // ---------- 暫停 ----------
   function pause(c) {
     const uw = R.uw, uh = R.uh;
+    if (G.Ctl.ed) { G.Ctl.drawEd(c); return; }                                       // v3.14 自訂按鈕位置
     dim(c, 0.7);
     // 每個按鈕都有圖示＋名稱
     // v3.10 「這場不計入排行」改成按了重新開始／回首頁之後才跳確認（Pai：直接寫在暫停裡很冗）
     const ranked = !G.Team.dev && W && !W.over && !W.attract, leave = (k, fn) => () => { if (ranked) { U.leaveAsk = k; G.Audio.play('open'); } else fn(); };
     if (U.leaveAsk) return leaveAsk(c);
-    const items = [['i_play', '繼續', () => { U.paused = false; }], ['i_guide', '教學', () => G.Menus.openGuide(true)], ['i_retry', '重新開始', leave('retry', () => U.start(U.hero))],
+    if (U.ctlOpen) return setPanel(c);
+    const items = [['i_play', '繼續', () => { U.paused = false; }], ['i_guide', '教學', () => G.Menus.openGuide(true)], ['i_gear', '設定', () => { U.ctlOpen = true; }], ['i_retry', '重新開始', leave('retry', () => U.start(U.hero))],
       ['i_tree', '回首頁', leave('home', () => U.goTitle())]];
     const bw = Math.max(Math.max(...items.map(q => G.cnW(q[1]))) + 34, Math.min(150, uw - R.ins.l - R.ins.r - 16)), bh = 20, gap = 4;
-    const tot = 18 + items.length * (bh + gap) + 4 + 44;
+    const tot = 18 + items.length * (bh + gap) - gap;
     const x = Math.round(uw / 2 - bw / 2); let y = Math.round(uh / 2 - tot / 2);
     G.cn(c, '暫停', uw / 2, y, 9, 0.5); y += 18;
     items.forEach(([ic, lab, fn], i) => {
@@ -685,8 +705,18 @@ G.UI = (() => {
       btn(id, x, y, bw, bh, () => { U.press[id] = 0.12; G.Audio.play('click'); }, fn);
       y += bh + gap;
     });
-    // 音量
-    y += 2; box(c, x, y, bw, 44, 1, 4, false); U.volPanel(c, x + 4, y + 2, bw - 8);
+  }
+  // v3.14 戰鬥中設定：音量、移動方式、自訂按鈕位置
+  function setPanel(c) {
+    const uw = R.uw, uh = R.uh, I = R.ins, w = Math.min(uw - I.l - I.r - 12, 200), iw = w - 12, mh = G.Ctl.moveRowH(iw);
+    const hh = 22 + 44 + 6 + mh + 6 + 20 + 6 + 20 + 6, x = Math.round(uw / 2 - w / 2); let y = Math.round(G.clamp(uh / 2 - hh / 2, I.t + 2, Math.max(I.t + 2, uh - I.b - hh - 2)));
+    btn('spBg', 0, 0, uw, uh, null, null);
+    box(c, x, y, w, hh, 1, 7); icon(c, 'i_gear', x + 10, y + 10); G.cn(c, '設定', x + 18, y + 4, 9);
+    y += 22; box(c, x + 6, y, iw, 44, 1, 4, false); U.volPanel(c, x + 8, y + 2, iw - 4); y += 44 + 6;
+    G.Ctl.moveRow(c, x + 6, y, iw); y += mh + 6;
+    const b2 = (id, lab, col, fn) => { const o = U.press[id] > 0 ? 1 : 0; U.h.key(c, x + 6, y + o, iw, 20, o, col); G.cn(c, lab, x + 6 + iw / 2, y + 4 + o, col === 13 ? 13 : 9, 0.5); btn(id, x + 6, y, iw, 20, () => { U.press[id] = 0.12; G.Audio.play('click'); }, fn); y += 26; };
+    b2('spLay', '自訂按鈕位置', 7, () => G.Ctl.openEd());
+    b2('spBack', '返回', 13, () => { U.ctlOpen = false; });
   }
   // 離開確認：這場還沒打完 → 不會計入排行
   function leaveAsk(c) {
@@ -711,7 +741,7 @@ G.UI = (() => {
     return { s: Math.round(sc), g: G2[1], col: G2[2] };
   };
   // 本場亮點（最多 2 個）
-  const highlights = st => [[st.deaths === 0 && st.time > 300, '不死之身', 11], [st.towers >= 5, '推塔王', 14], [st.kills >= 30, '收割者', 10], [st.assists >= 15, '神助攻', 18], [(st.bosses || 0) >= 3, '首領剋星', 12], [st.gold >= 3000, '小富翁', 13]].filter(q => q[0]).slice(0, 2);
+  const highlights = st => [[st.deaths === 0 && st.time > 300, '不死之身', 11], [st.towers >= 5, '推塔王', 14], [st.kills >= 30, '收割者', 10], [st.assists >= 15, '神助攻', 18], [(st.bosses || 0) >= 3, '首領剋星', 12], [(st.potMax || 0) >= 3, '三管齊下', 13]].filter(q => q[0]).slice(0, 2);
   function end(c) {
     // v2.4：數值用遊戲結束那一刻的快照（W.overSt），背景戰鬥繼續也不會再變；節奏放慢、一組一組出現；點畫面可跳到最後
     const uw = R.uw, uh = R.uh, I = R.ins, win = W.over.win, st = W.overSt || W.stats, h = W.hero;
@@ -777,8 +807,8 @@ G.UI = (() => {
       }); }
     yr += 32;
     // ── 其他數據（兩欄，數字跳動）
-    { const vals = [st.towers, st.bosses || 0, st.wboss || 0, Math.floor(st.gold), Math.round(st.dmg), Math.round(st.taken)], vw = Math.max(...vals.map(v => G.cnW(String(v))));
-      const long = ['推倒敵塔', '擊倒首領', '野生首領', '累積金幣', '造成傷害', '承受傷害'], short = ['推塔', '首領', '野王', '金幣', '輸出', '承傷'];
+    { const vals = [st.towers, st.bosses || 0, st.wboss || 0, st.potUp || 0, Math.round(st.dmg), Math.round(st.taken)], vw = Math.max(...vals.map(v => G.cnW(String(v))));
+      const long = ['推倒敵塔', '擊倒首領', '野生首領', '升級藥水', '造成傷害', '承受傷害'], short = ['推塔', '首領', '野王', '藥水', '輸出', '承傷'];
       const labs = LD && Math.floor((rw - 6) / 2) < 52 + vw + 4 ? short : long, rows = labs.map((l, i) => [l, vals[i]]);   // 橫屏放不下兩欄 → 用短標籤
       const need = Math.max(...rows.map(q => G.cnW(q[0]))) + Math.max(...rows.map(q => G.cnW(String(q[1])))) + 4, cols = Math.floor((rw - 6) / 2) >= need ? 2 : 1, nr = Math.ceil(rows.length / cols), cw = Math.floor((rw - (cols - 1) * 6) / cols);   // 兩欄放不下就改一欄
       rows.forEach(([lab, v], i) => {
@@ -840,13 +870,16 @@ G.UI = (() => {
     for (const k in U.press) U.press[k] -= dt;
     for (const k in U.shakeB) U.shakeB[k] -= dt;
     if (U.toast) { U.toast.t -= dt; if (U.toast.t <= 0) U.toast = null; }
+    if ((U.paused || U.lvUp || U.screen !== 'battle') && G.Ctl) G.Ctl.joyEnd();
     const c = R.uctx; c.clearRect(0, 0, R.uw, R.uh); c.imageSmoothingEnabled = false; R.hi = [];
     if (G.Dom) G.Dom.begin();
     if (G.Menus && G.Menus[U.screen]) G.Menus[U.screen](c);
     else {
+      if (W.lvOpen && !U.paused && !U.lvUp && !W.over && U.screen === 'battle') { W.lvOpen = false; U.openLv(true); }   // v3.14 升級：暫停並打開升級頁
       if (!(W.over && W.over.t > 1.6)) hud(c);
-      if (W.over && W.over.t > 1.6) end(c);
+      if (W.over && W.over.t > 1.6) { U.lvUp = null; end(c); }
       else if (U.paused) { U.btns = []; pause(c); }
+      else if (U.lvUp) lvPage(c);
     }
     if (G.Ach && G.Ach.drawBanner) G.Ach.drawBanner(c);
     if (G.Mail) G.Mail.drawCast(c, M_DT);                                         // v3.2 系統公告跑馬燈
@@ -944,7 +977,8 @@ G.UI = (() => {
       if (U.screen !== 'battle' || U.paused || (W.over)) return;
       if (e.pointerType === 'mouse' && e.button === 2 && U.aim && U.aim.on) { U.aimCancel(); p.mode = 'none'; return; }   // 右鍵取消瞄準
       if (e.pointerType === 'mouse' && e.button !== 0) { p.mode = 'pan'; R.cam.follow = false; return; }
-      const others = [...ptrs.values()].filter(q => q !== p && q.mode !== 'ui');
+      if (G.Ctl.joyZone(ux, uy) && !U.lvUp) { p.mode = 'joy'; G.Ctl.joyStart(ux, uy); return; }   // v3.14 搖桿
+      const others = [...ptrs.values()].filter(q => q !== p && q.mode !== 'ui' && q.mode !== 'joy');
       if (others.length) {
         const q = others[0];
         q.mode = 'pinch'; p.mode = 'pinch';
@@ -958,6 +992,7 @@ G.UI = (() => {
       if (e.pointerType === 'mouse') U.mouse = evXY(e);
       const p = ptrs.get(e.pointerId); if (!p) return;
       const [x, y] = evXY(e), dx = x - p.x, dy = y - p.y; p.x = x; p.y = y;
+      if (p.mode === 'joy') { const [ux, uy] = toUI(x, y); G.Ctl.joyMove(ux, uy); return; }
       if (p.mode === 'ui' && p.btn && p.btn.hdrag) {          // v2.7 左右滑動的表格：橫向拖曳才滑表格，直向拖曳照常捲動
         if (!p.hlock && Math.abs(x - p.sx) > 4 * R.dpr && Math.abs(x - p.sx) >= Math.abs(y - p.sy)) p.hlock = true;
         if (p.hlock) { p.btn.hdrag(toUI(x, y)[0]); return; }
@@ -987,6 +1022,7 @@ G.UI = (() => {
     const upf = e => {
       const p = ptrs.get(e.pointerId); if (!p) return;
       ptrs.delete(e.pointerId);
+      if (p.mode === 'joy') G.Ctl.joyEnd();
       if (p.mode === 'wait' && e.type === 'pointerup' && U.screen === 'battle' && !U.paused && W && !W.over) { worldTap(p.x, p.y); R.cam.vx = R.cam.vy = 0; }   // 點一下 = 移動
       if (p.mode === 'pan' && performance.now() - (p.lastMove || 0) > 80) R.cam.vx = R.cam.vy = 0;
       if (p.mode === 'car') G.Menus.carRelease();
@@ -1020,7 +1056,9 @@ G.UI = (() => {
       if (G.StageGo && G.StageGo.active()) { if (k === 'enter' || k === ' ' || k === 'escape') G.StageGo.skip(); return; }   // v3.1 過場中不吃快捷鍵（Enter／空白／Esc＝跳過）
       if (U.screen !== 'battle') { if (G.Menus && G.Menus.key) G.Menus.key(k); return; }
       if (k === 'escape' && U.aim && U.aim.on) { U.aimCancel(); return; }
-      if (k === 'escape' && U.shop) { U.shop = false; return; }
+      if (G.Ctl.ed) { if (k === 'escape') G.Ctl.closeEd(); return; }
+      if (U.lvUp) { if (k === 'escape' || k === 'enter' || k === ' ' || k === 'l') U.closeLv(); return; }   // v3.14 升級頁：Esc／Enter／L 繼續戰鬥
+      if (k === 'escape' && U.ctlOpen) { U.ctlOpen = false; return; }
       if (k === 'escape' && U.leaveAsk) { U.leaveAsk = null; return; }               // v3.10 離開確認：Esc＝取消
       if (k === 'escape' || k === 'p') { U.paused = !U.paused; U.leaveAsk = null; return; }
       if (U.paused || !W || W.over) return;
@@ -1028,8 +1066,7 @@ G.UI = (() => {
       if (sk != null && U.mouse && W.hero && W.hero.alive && W.hero.skills[sk] && W.hero.skills[sk].lv && !W.hero.chg) { U.aim = { i: sk, s: W.hero.skills[sk], on: true, mouse: true, key: k }; U.aimUpdate(); }
       else if (sk != null) { const r = W.trySkill(sk); U.press['sk' + sk] = 0.12; if (r !== 'ok' && r !== 'queued') { deny('sk' + sk); if (r === 'mp') U.toastMsg('MP不足', 11); if (r === 'lock') U.toastMsg('尚未學習', 7); } }
       if (k === 'c') R.cam.follow = true;
-      if (k === 'z') W.usePotion(0); if (k === 'x') W.usePotion(1);
-      if (k === 'b') { U.shop = !U.shop; U.shopSel = U.shopSel || 'hp'; G.Audio.play('open'); }
+      if (k === 'l') U.openLv(false);
       if (k === 'u') { if (!W.autoLevel()) G.Audio.play('deny'); }
       if (k === 'm') G.Audio.toggleMute();
       if (k === 'f') U.showFps = !U.showFps;
@@ -1037,6 +1074,7 @@ G.UI = (() => {
     addEventListener('keyup', e => { const k = e.key.toLowerCase(); keys[k] = false; if (U.aim && U.aim.mouse && U.aim.key === k) U.aimRelease(); });
     addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
     U.keyDir = () => {
+      const jd = G.Ctl.joyDir(); if (jd) return jd;   // v3.14 搖桿優先
       let x = 0, y = 0;
       if (keys.a || keys.arrowleft) x--; if (keys.d || keys.arrowright) x++;
       if (keys.w || keys.arrowup) y--; if (keys.s || keys.arrowdown) y++;

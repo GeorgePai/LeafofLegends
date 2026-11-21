@@ -230,7 +230,7 @@ G.Combat = {
     if (sd.type === 'necro') { G.VFX.cast(this, u, sd.attribute === 'clone' ? 'clone' : 'necro'); if (this._ultNow === u) G.VFX.ultBlast(this, u.x, u.y, 'clone', 70); return this.necroSkill(u, sd, lv); }   // v2.6 死靈技能（v3.8 大招爆發）
     if (t) u.face = t.x > u.x ? 1 : -1;
     const w0 = G.WEAPONS_BY_ID[sd.weapon_id];
-    const el = sd.type === 'buff' ? (sd.attribute === 'armor_per' ? 'shield' : sd.attribute === 'weapon' ? 'zap' : 'rage') : G.elemOf(w0), S = G.elemStrong(w0);
+    const el = sd.type === 'buff' ? (sd.attribute === 'armor_per' ? 'shield' : sd.attribute === 'weapon' ? 'zap' : 'rage') : G.elemOf(w0), S = G.elemStrong(w0) || (u.kind === 'hero' && lv >= G.SKILL_MAX);   // v3.14 英雄技能升到滿級：換成進階特效（光更亮、尾巴更長）
     if (sd.type === 'buff') G.VFX.buffCast(this, u, el); else G.VFX.cast(this, u, el);
     if (sd.type === 'buff' && this._ultNow === u) { G.VFX.ultBlast(this, u.x, u.y, el, 70); u.ultEnd = this.time + (v2 || 8); u.ultEl = el; }   // v3.8 增益大招：變身爆發＋持續火焰光環
     // 主動增益

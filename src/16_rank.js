@@ -152,7 +152,7 @@ G.Rank = (() => {
     if (U.screen === 'battle' && G.W && !G.W.attract) { const W = G.W, h = W.hero, S = W.stats || {}; o.g = W.stageI || 0; o.b = Math.round(W.time || 0); if (h) { o.l = h.level; o.h = h.name; } o.k = (S.kills || 0) + '/' + (S.deaths || 0) + '/' + (S.assists || 0); if (W.over) o.w = W.over.win ? 1 : 2;
       if (U.fpsA) { o.f = Math.round(U.fpsA); o.fl = Math.round(U.fpsLo || U.fpsA); }   // v3.4 幀數（平均／最低）、畫質（HD 解析度 %、超取樣倍數）
       if (G.HD && G.HD.ok) o.q = Math.round(G.HD.q * 100); o.ss = G.Render.SS || 1; }
-    if (U.screen === 'battle' && U.shop) o.s = 'shop_b';
+    if (U.screen === 'battle' && U.lvUp) o.s = 'lvup_b';   // v3.14 升級頁（戰鬥暫停中）
     return JSON.stringify(o);
   };
   let lastSc = '';
@@ -395,7 +395,7 @@ G.RankUI = (() => {
   // ---- 管理玩家（開發者模式）：隱藏＝不出現在排行、可復原；刪除＝永久移除（要按兩下）----
   // ---- v3.2 玩家動態 ----
   let det = null;
-  const SCN = { menu: '首頁', stages: '選關卡', battle: '戰鬥中', pause: '戰鬥暫停中', shop_b: '戰鬥中・逛商店', team: '隊伍', book: '圖鑑', store: '商店（寶箱）', ach: '成就', rank: '排行榜', save: '帳號', guide: '教學', fb: '反饋', about: '關於', mail: '信箱', intro: '開場動畫', tap: '開始畫面', bg: '切到背景' };
+  const SCN = { menu: '首頁', stages: '選關卡', battle: '戰鬥中', pause: '戰鬥暫停中', shop_b: '戰鬥中・逛商店', lvup_b: '戰鬥中・選升級', team: '隊伍', book: '圖鑑', store: '商店（寶箱）', ach: '成就', rank: '排行榜', save: '帳號', guide: '教學', fb: '反饋', about: '關於', mail: '信箱', intro: '開場動畫', tap: '開始畫面', bg: '切到背景' };
   const st = p => { try { return p.st ? JSON.parse(p.st) : {}; } catch (e) { return {}; } };
   const ago = s => s < 60 ? '剛剛' : s < 3600 ? Math.floor(s / 60) + ' 分鐘前' : s < 86400 ? Math.floor(s / 3600) + ' 小時前' : Math.floor(s / 86400) + ' 天前';
   const mmss = s => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
@@ -437,7 +437,7 @@ G.RankUI = (() => {
     if (!A.busy && A.t && !A.err && Date.now() - A.t > 15000) Kk.admLoad();               // 只有上次成功才自動更新（失敗不重試，避免密碼錯誤次數累積）                          // v3.2 停在這頁時每 15 秒更新動態
     const now = Date.now() / 1000, last = p => Math.max(p.pt || 0, p.updated || 0, p.created || 0), days = p => Math.max(0, Math.floor((now - (last(p) || now)) / 86400)), GH = G.RANK_GHOST;
     const on = p => p.pt && now - p.pt < 120, L = A.list.concat(A.guests || []).sort((a, b) => (on(b) - on(a)) || last(b) - last(a)), acc = L.filter(p => !p.g);   // v3.4 訪客（未存檔）一起列，在線的排前面
-    const hid = acc.filter(p => p.hidden).length, gh = acc.filter(p => days(p) >= GH).length, onN = L.filter(on).length, gN = L.filter(p => p.g && on(p)).length, fight = L.filter(p => on(p) && /^(battle|pause|shop_b)$/.test(st(p).s)).length, pbw = 52;
+    const hid = acc.filter(p => p.hidden).length, gh = acc.filter(p => days(p) >= GH).length, onN = L.filter(on).length, gN = L.filter(p => p.g && on(p)).length, fight = L.filter(p => on(p) && /^(battle|pause|shop_b|lvup_b)$/.test(st(p).s)).length, pbw = 52;
     // 上方摘要：總數、在線（戰鬥中）、隱藏、幽靈；幽靈帳號（GH 天以上沒上線）右邊一鍵清除（要按兩下）
     const hl = G.cnWrap(A.err || '共 ' + acc.length + ' 人・在線 ' + onN + (fight ? '（戰鬥 ' + fight + '）' : '') + (gN ? '・未存檔 ' + gN : '') + (hid ? '・隱藏 ' + hid : '') + (gh ? '・幽靈 ' + gh : ''), W - (gh ? pbw + 8 : 0));
     hl.forEach((l, i) => G.cn(c, l, x, y + i * 13, A.err ? 10 : 13));

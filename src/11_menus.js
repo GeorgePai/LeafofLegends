@@ -1,5 +1,5 @@
 'use strict';
-G.VERSION = 'V3.13';                                  // 版本號（唯一來源；setup.sh 也從這行讀）
+G.VERSION = 'V3.14';                                  // 版本號（唯一來源；setup.sh 也從這行讀）
 /* =========================================================
    選單：首頁 / 隊伍 / 圖鑑 / 教學
    版面：直屏上下堆疊，橫屏左右分欄
@@ -648,10 +648,11 @@ G.Menus = (() => {
     if (setOpen) {                                       // 設定：音樂／音效音量
       H().btn('stBg', 0, 0, uw, uh, null, () => { setOpen = false; });
       H().dim(c, 0.7);
-      const w = Math.min(uw - 16, 200), h = 26 + 44 + 26, x = Math.round(uw / 2 - w / 2), y = Math.round(uh / 2 - h / 2);
+      const w = Math.min(uw - 16, 200), mh = G.Ctl.moveRowH(w - 12), h = 26 + 44 + 6 + mh + 26, x = Math.round(uw / 2 - w / 2), y = Math.round(uh / 2 - h / 2);
       H().box(c, x, y, w, h, 1, 7); H().btn('stIn', x, y, w, h, null, null);
       H().icon(c, 'i_gear', x + 10, y + 10); G.cn(c, '設定', x + 18, y + 4, 9);
       U().volPanel(c, x + 6, y + 24, w - 12);
+      G.Ctl.moveRow(c, x + 6, y + 24 + 44 + 6, w - 12);                               // v3.14 移動方式（按鈕位置在戰鬥暫停→設定裡調）
       btnSecondary(c, 'stOk', Math.round(x + w / 2 - 30), y + h - 22, 60, 16, '完成', () => { setOpen = false; });
     }
     G.Menus.pillPos = LD ? [bx, uh - I.b - 15, uw - I.r - 26 - bx] : null;   // 橫屏：備份提醒改成選單下方的小膠囊（不蓋到 LOGO）
@@ -930,10 +931,10 @@ G.Menus = (() => {
     const colW = LD ? Math.min(200, Math.round((Rr - L) * 0.52)) : Rr - L;
     const bpot = btab === 5;
     let y = tabsS(c, L, y0, LD ? colW : Math.min(colW, 220), ['BOSS', '小怪', '塔', '野怪', '獵手', '藥水'], btab, i => { if (i === btab) return; btab = i; if (i < 5) { sel.enemy = lists[i][0]; car.pos = car.tgt = 0; car.settled = true; } sbKey = ''; skillSel = -1; G.Audio.play('tick'); }, 'tab', 'book');
-    if (bpot) {                                         // v2.5 藥水一覽：圖示、名稱、價格、效果（可捲動）
+    if (bpot) {                                         // v2.5 藥水一覽：圖示、名稱、效果（v3.14 改成 1～3 級強化）（可捲動）
       const w = Math.min(Rr - L, LD ? 420 : 300), x = Math.round(L + (Rr - L) / 2 - w / 2), cols = LD && w >= 360 ? 2 : 1, cw = Math.floor((w - (cols - 1) * 6) / cols);
       scrollDetail(c, x, y + 2, w, B - y - 4, 'potions', top => {
-        const rows = G.SHOP.map(it => ({ it, ls: G.cnWrapRich(it.d, cw - 30) })), hs = rows.map(r => 18 + r.ls.length * 13 + 3);
+        const rows = G.POT.map(it => ({ it, ls: G.cnWrapRich(it.k === 'rev' ? '每級存 1 次復活。' + G.potTxt(it, 1) : it.d + it.lv.join('／') + it.u, cw - 30) })), hs = rows.map(r => 18 + r.ls.length * 13 + 3);   // v3.14 升級時用藥水點強化，1～3 級效果
         let yy = top;
         for (let i = 0; i < rows.length; i += cols) {
           const rh = Math.max(...hs.slice(i, i + cols)), vis = yy + rh > y + 2 && yy < B - 2;   // 只畫看得到的列
@@ -941,7 +942,7 @@ G.Menus = (() => {
             const { it, ls } = rows[i + j], bx = x + j * (cw + 6);
             H().box(c, bx, yy, cw, rh, 0, 4, false); H().icon(c, it.ic, bx + 12, yy + 12);
             const inV = ty => ty >= y + 1 && ty + 12 <= B - 2;   // 捲到一半被裁掉的字不畫
-            if (inV(yy + 3)) { G.cn(c, it.n, bx + 24, yy + 3, 9); H().icon(c, 'i_gold', bx + cw - 30, yy + 9); G.text(c, it.cost, bx + cw - 25, yy + 7, 13, 1); }
+            if (inV(yy + 3)) { G.cn(c, it.n, bx + 24, yy + 3, 9); G.text(c, 'LV1-3', bx + cw - 6, yy + 7, 5, 1, null, 1); }
             ls.forEach((l, k) => { if (inV(yy + 17 + k * 13)) G.cnRich(c, l, bx + 24, yy + 17 + k * 13, 6); });
           }
           yy += rh + 4;
@@ -1027,8 +1028,12 @@ G.Menus = (() => {
     c.globalAlpha = a; c.drawImage(src, px, py); c.globalAlpha = 1;
   }
   function unitA(c, name, x, gy, a, mv, face) { c.globalAlpha = a; unit(c, name, x, gy, mv, face); c.globalAlpha = 1; }
+  // v3.14 圓形技能鈕（教學用，和戰鬥中同一套畫法）
+  const cBtn = (c, cx, cy, r, ic, pr, bd = 5, lv = 0) => { G.UI.circBtn(c, cx, cy, r, 1, bd, pr ? 1 : 0); H().icon(c, ic, cx, cy + (pr ? 1 : 0)); if (lv) { const lx = Math.round(cx - 5), ly = Math.round(cy - r + 3 + (pr ? 1 : 0)); for (let k = 0; k < 3; k++) { c.fillStyle = P[0]; c.fillRect(lx + k * 3, ly, 4, 3); c.fillStyle = P[k < lv ? 13 : 3]; c.fillRect(lx + 1 + k * 3, ly + 1, 2, 1); } } };
+  // 教學用：簡化搖桿
+  const joyDraw = (c, cx, cy, r, kx, ky, on) => { c.globalAlpha = on ? 0.9 : 0.5; G.pxDisc(c, cx, cy, r, r, 0, 0.4); G.pxEllipse(c, cx, cy, r, r, on ? 7 : 5); const kr = Math.round(r * 0.45); G.pxDisc(c, kx, ky, kr, kr, on ? 8 : 6, 1); G.pxEllipse(c, kx, ky, kr, kr, 0); c.globalAlpha = 1; };
   function skBtn(c, x, y, w, ic, cdF, cdN, on) {
-    H().key(c, x, y + (on ? 1 : 0), w, w, on, 5); H().icon(c, ic, x + w / 2, y + w / 2 + (on ? 1 : 0), cdF > 0);
+    G.UI.circBtn(c, x + w / 2, y + w / 2, w / 2, 1, 5, on ? 1 : 0); H().icon(c, ic, x + w / 2, y + w / 2 + (on ? 1 : 0), cdF > 0);   // v3.14 圓形
     if (cdF > 0) { H().dither(c, x + 1, y + 1 + Math.round((w - 2) * (1 - cdF)), w - 2, Math.round((w - 2) * cdF), 0, 0.7); G.text(c, cdN, x + w / 2, y + w / 2 - 2, 9, 1, 0, 0.5); }
   }
   const lerp = G.lerp, ss = t => t * t * (3 - 2 * t), seg = (t, a, b) => G.clamp((t - a) / (b - a), 0, 1);
@@ -1079,13 +1084,41 @@ G.Menus = (() => {
     {
       name: '操作', pages: [
         {
-          z: 1, t: '移動', m: '{點地面}，英雄就走過去', d: '{左鍵點地面}，英雄就走過去',
+          z: 1, t: '移動', m: '拖曳左下的{搖桿}移動；在「{設定}」可以改成{點地面}', d: '{左鍵點地面}，英雄就走過去',
           draw(c, x, y, w, h, t, dk) {
+            if (!dk) {                                       // v3.14 手機：搖桿
+              const T = t % 3.4, gy = y + Math.round(h * 0.62), jx = x + 26, jy = y + h - 26, on = T > 0.4 && T < 2.6, a = (T - 0.4) * 1.6, dx = on ? Math.cos(a) : 0, dy = on ? Math.sin(a) * 0.6 : 0;
+              unit(c, 'leafy', x + w * 0.62 + Math.sin(T * 1.6) * 0 + (on ? Math.cos(a) * 18 : 0), gy + (on ? Math.sin(a) * 8 : 0), on, dx < 0 ? -1 : 1);
+              joyDraw(c, jx, jy, 16, Math.round(jx + dx * 9), Math.round(jy + dy * 9), on);
+              if (on) hand(c, Math.round(jx + dx * 9), Math.round(jy + dy * 9), true);
+              return;
+            }
             const T = t % 3.4, gy = y + Math.round(h * 0.7), x0 = x + w * 0.24, x1 = x + w * 0.7, k = ss(seg(T, 0.95, 2.4)), hx = lerp(x0, x1, k);
             if (T > 0.8 && T < 2.6) moveMark(c, Math.round(x1), gy, T - 0.8);
             unit(c, 'leafy', hx, gy, k > 0 && k < 1);
             const pk = ss(seg(T, 0.15, 0.7));
             if (T < 1.4) ptr(dk)(c, Math.round(lerp(x + w * 0.92, x1, pk)), Math.round(lerp(y + h * 0.98, gy, pk)), T > 0.7 && T < 0.9);
+          }
+        },
+        {
+          t: '點地面移動', only: 'm', m: '選「{點地面}」時：{點地面}，英雄就走過去',
+          draw(c, x, y, w, h, t) {
+            const T = t % 3.4, gy = y + Math.round(h * 0.7), x0 = x + w * 0.24, x1 = x + w * 0.7, k = ss(seg(T, 0.95, 2.4)), hx = lerp(x0, x1, k);
+            if (T > 0.8 && T < 2.6) moveMark(c, Math.round(x1), gy, T - 0.8);
+            unit(c, 'leafy', hx, gy, k > 0 && k < 1);
+            const pk = ss(seg(T, 0.15, 0.7));
+            if (T < 1.4) hand(c, Math.round(lerp(x + w * 0.92, x1, pk)), Math.round(lerp(y + h * 0.98, gy, pk)), T > 0.7 && T < 0.9);
+          }
+        },
+        {
+          t: '自訂按鈕', only: 'm', m: '暫停 →「{設定}」→「{自訂按鈕位置}」，拖曳搖桿和技能到順手的位置',
+          draw(c, x, y, w, h, t) {
+            const T = t % 4, f = ss(seg(T, 0.8, 2.2)), bx = Math.round(lerp(x + w - 22, x + w - 52, f)), by = Math.round(lerp(y + h - 22, y + h - 40, f)), hold = T > 0.5 && T < 2.4;
+            joyDraw(c, x + 24, y + h - 24, 14, x + 24, y + h - 24, false);
+            cBtn(c, x + w - 56, y + h - 14, 9, 'i_mistic', false); cBtn(c, x + w - 30, y + h - 46, 9, 'i_slam', false);
+            G.UI.circBtn(c, bx, by, 11, 1, hold ? 13 : 5); H().icon(c, 'i_meteor', bx, by);
+            if (hold) { c.fillStyle = P[13]; for (const [qx, qy] of [[-14, -14], [12, -14], [-14, 12], [12, 12]]) c.fillRect(bx + qx, by + qy, 2, 2); hand(c, bx, by, true); }
+            G.cn(c, '拖曳', x + w / 2, y + 4, 13, 0.5);
           }
         },
         {
@@ -1119,7 +1152,7 @@ G.Menus = (() => {
           }
         },
         {
-          t: '回到英雄', m: '點大招上方的{準心}，鏡頭回到英雄', d: '按 {C} 或點大招上方的{準心}，鏡頭回到英雄',
+          t: '回到英雄', m: '點{準心}，鏡頭回到英雄', d: '按 {C} 或點{準心}，鏡頭回到英雄',
           draw(c, x, y, w, h, t, dk) {
             const T = t % 3, k = T < 1.2 ? 1 : 1 - ss(seg(T, 1.2, 1.7)), hx = x + w / 2 - k * w * 0.45;
             unit(c, 'leafy', hx, y + h * 0.55, false);
@@ -1203,59 +1236,51 @@ G.Menus = (() => {
           }
         },
         {
-          t: '施放技能', m: '{點技能按鈕}施放，{最右邊是大招}', d: '按 {Q／E／R} 施放技能',
+          t: '施放技能', m: '{點技能按鈕}施放；右下弧形從左到右是技能 1、2、{右上是大招}', d: '按 {Q／E／R} 施放技能',
           draw(c, x, y, w, h, t, dk) {
-            const T = t % 3.6, gy = y + Math.round(h * 0.68), hx = x + w * 0.16, bx = x + w * 0.52;
+            const T = t % 3.6, gy = y + Math.round(h * 0.6), hx = x + w * 0.16, bx = x + w * 0.46;
             unit(c, 'leafy', hx, gy, false);
             const f = seg(T, 1.0, 1.45), hit = T > 1.45 && T < 1.8;
             unit(c, 'babybear', bx, gy, false, -1, hit);
             if (f > 0 && f < 1) { const s = G.SPR.mistic[0]; c.drawImage(s.n, Math.round(lerp(hx + 8, bx, f) - s.w / 2), gy - 12); }
             if (hit) { const k = (T - 1.45) / 0.35; G.pxEllipse(c, bx, gy - 6, 4 + k * 16, 4 + k * 16, 9); }
-            const bw = 22, gap = 5, bx0 = x + w - 6 - 3 * bw - 2 * gap, by = y + h - bw - 6, press = T > 0.75 && T < 0.95;
-            ['i_mistic', 'i_slam', 'i_meteor'].forEach((ic, i) => { skBtn(c, bx0 + i * (bw + gap), by, bw, ic, 0, 0, i === 0 && press); if (dk) key(c, 'QER'[i], bx0 + i * (bw + gap) + 5, by - 17, i === 0 && press); });
-            if (!dk && T < 1.2) hand(c, bx0 + bw / 2, Math.round(lerp(y + h + 6, by + bw / 2, ss(seg(T, 0.2, 0.75)))), press);
+            const press = T > 0.75 && T < 0.95, cx0 = x + w - 10, cy0 = y + h - 10;   // 弧形：技能 1（左下）→ 技能 2 → 大招（右上），被動在角落
+            const pos = [[cx0 - 38, cy0 - 4, 'i_mistic', 9], [cx0 - 27, cy0 - 26, 'i_slam', 9], [cx0 - 4, cy0 - 38, 'i_meteor', 10]];
+            H().box(c, cx0 - 8, cy0 - 8, 12, 12, 0, 4); H().icon(c, 'i_crit', cx0 - 2, cy0 - 2);
+            pos.forEach(([px, py, ic, r], i) => { cBtn(c, px, py, r, ic, i === 0 && press); if (dk) key(c, 'QER'[i], px - 18, py - 6, i === 0 && press); });
+            if (!dk && T < 1.2) hand(c, pos[0][0], Math.round(lerp(y + h + 6, pos[0][1], ss(seg(T, 0.2, 0.75)))), press);
           }
         },
         {
-          t: '魔力 MP', m: '按鈕右下是 {g:MP 消耗}，不夠時按鈕會變暗',
+          t: '魔力 MP', m: '按鈕下方是 {g:MP 消耗}，不夠時按鈕會變暗',
           draw(c, x, y, w, h, t) {
             const T = t % 4, mp = T < 2 ? 0.25 : Math.min(1, 0.25 + (T - 2) * 0.5), ok = mp * 150 >= 120, bw = 30, bx = Math.round(x + w / 2 + 10), by = Math.round(y + h / 2 - bw / 2);
             G.cn(c, 'MP', x + w * 0.12, y + h / 2 - 6, 11); c.fillStyle = P[0]; c.fillRect(Math.round(x + w * 0.12) + 22, Math.round(y + h / 2 - 2), 52, 5); c.fillStyle = P[11]; c.fillRect(Math.round(x + w * 0.12) + 23, Math.round(y + h / 2 - 1), Math.round(50 * mp), 3);
-            H().box(c, bx, by, bw, bw, 1, ok ? 9 : 5); H().icon(c, 'i_meteor', bx + bw / 2, by + bw / 2, !ok); G.text(c, '120', bx + bw - 2, by + bw - 7, ok ? 11 : 4, 1, 0, 1);
+            G.UI.circBtn(c, bx + bw / 2, by + bw / 2, bw / 2, 1, ok ? 9 : 5); H().icon(c, 'i_meteor', bx + bw / 2, by + bw / 2, !ok); G.text(c, '120', bx + bw / 2, by + bw - 8, ok ? 11 : 4, 1, 0, 0.5);
           }
         },
         {
-          t: '金幣與商店', m: '金幣會自動增加，{擊殺和推塔}拿更多；點左下{商店}買藥水', d: '金幣會自動增加，{擊殺和推塔}拿更多；按 {B} 開商店買藥水',
+          t: '升級選擇', m: '升級時{戰鬥暫停}，每次得到{技能點}和{藥水點}各 1 點，慢慢選要升什麼',
           draw(c, x, y, w, h, t, dk) {
-            const T = t % 4.4, bx = x + 8, by = y + h - 28, gold = Math.floor(120 + T * 30), open = T > 1 && T < 2.6, bought = T > 2.2;
-            H().box(c, bx, by + (T > 0.8 && T < 1 ? 1 : 0), 24, 22, 1, open ? 13 : 5); H().icon(c, 'i_shop', bx + 12, by + 8); G.text(c, bought ? gold - 150 : gold, bx + 12, by + 15, 13, 1, null, 0.5);
-            if (bought) { H().box(c, bx + 27, by + 2, 18, 18, 1, 4); H().icon(c, 'p_pow', bx + 36, by + 10); }
-            if (open) {
-              const pw = Math.min(w - 16, 130), px = Math.round(x + w - pw - 8), py = y + 6, iz = Math.min(26, Math.floor((pw - 10 - 9) / 4));   // 格子大小依面板寬度
-              H().box(c, px, py, pw, iz + 24, 1, 7); G.cn(c, '商店', px + 5, py + 3, 9);
-              ['i_hp', 'i_mp', 'p_spd', 'p_pow'].forEach((ic, i) => { const on = i === 3, xx = px + 5 + i * (iz + 3); H().box(c, xx, py + 18, iz, iz, on ? 2 : 1, on ? 13 : 4); H().icon(c, ic, xx + iz / 2, py + 18 + iz / 2); });
-            }
-            if (dk) key(c, 'B', bx + 6, by - 16, T > 0.8 && T < 1);
-            else if (T < 1.1) hand(c, bx + 12, Math.round(lerp(y + h + 8, by + 11, ss(seg(T, 0.1, 0.7)))), T > 0.8 && T < 1);
+            const T = t % 4.4, pw = Math.min(w - 12, 132), px = Math.round(x + w / 2 - pw / 2), py = y + 4, cw = 22, open = T > 0.6;
+            if (!open) { unit(c, 'leafy', x + w / 2, y + h * 0.7, false); G.text(c, 'LV UP', x + w / 2, y + h * 0.7 - 30 - T * 10, 13, 1, 0, 0.5); return; }
+            H().box(c, px, py, pw, h - 10, 1, 13); H().icon(c, 'i_up', px + 8, py + 8); G.cn(c, '升級！', px + 15, py + 2, 13);
+            ['i_mistic', 'i_slam', 'i_meteor'].forEach((ic, i) => { const xx = px + 5 + i * (cw + 3), on = i === 1 && T > 1.6; H().box(c, xx, py + 17, cw, 24, on && T < 1.8 ? 9 : 1, i === 1 ? 13 : 4); H().icon(c, ic, xx + cw / 2, py + 26); for (let k = 0; k < 3; k++) { c.fillStyle = P[k < (on ? 2 : 1) ? 13 : 3]; c.fillRect(xx + 6 + k * 4, py + 35, 2, 1); } });
+            ['i_hp', 'p_pow', 'p_spd'].forEach((ic, i) => { const xx = px + pw - 5 - (3 - i) * (cw + 3) + 3, on = i === 1 && T > 2.8; H().box(c, xx, py + 17, cw, 24, on && T < 3 ? 9 : 1, i === 1 ? 6 : 4); H().icon(c, ic, xx + cw / 2, py + 25); for (let k = 0; k < 3; k++) { c.fillStyle = P[k < (on ? 1 : 0) ? 17 : 3]; c.fillRect(xx + 6 + k * 4, py + 35, 2, 1); } });
+            if (T > 1.1 && T < 1.8) ptr(dk)(c, px + 5 + cw + 3 + cw / 2, py + 30, T > 1.5);
+            else if (T > 2.3 && T < 3) ptr(dk)(c, px + pw - 5 - 2 * (cw + 3) + 3 + cw / 2, py + 30, T > 2.7);
           }
         },
         {
-          t: '使用道具', m: '藥水在{左側滾輪}，轉到中間後{點亮黃那格}使用', d: '藥水在{左側滾輪}，用滾輪轉到中間後{點亮黃那格}使用',
+          t: '藥水強化', m: '每種藥水{最高 3 級}，效果{整場有效}；點右上的{升級}鈕隨時打開（戰鬥會暫停）',
           draw(c, x, y, w, h, t, dk) {
-            const T = t % 4, gy = y + Math.round(h * 0.62), hx = x + w * 0.7, used = T > 2.3, f = !used ? 0.3 : lerp(0.3, 1, ss(seg(T, 2.3, 2.7)));
-            unit(c, 'leafy', hx, gy, false); hpBar(c, hx - 12, gy - 23, 24, f, 10);
-            const items = [['i_mp', '+MP'], ['i_hp', '+HP'], ['p_spd', '+攻速']], pos = ss(seg(T, 0.6, 1.4)), bx = x + 8, cy = y + h / 2 - 2, pw = 52;
-            c.save(); c.beginPath(); c.rect(bx - 3, cy - 28, pw + 10, 56); c.clip();
-            items.forEach(([ic, n], i) => {
-              const d = i - pos, ad = Math.abs(d); if (ad > 1.6) return;
-              const ctr = ad < 0.5, yy = Math.round(cy - 8 + d * 18), o = ctr && T > 2.1 && T < 2.3 ? 1 : 0, xx = bx + Math.round(Math.min(1, ad) * 3);
-              H().box(c, xx, yy + o, pw - Math.round(Math.min(1, ad) * 3), 16, ctr ? 1 : 0, ctr ? 13 : 3, ctr); H().icon(c, ic, xx + 8, yy + 7 + o); G.cn(c, n, xx + 18, yy + 2 + o, ctr ? 9 : 7);
-              if (!ctr) { c.fillStyle = 'rgba(12,12,12,' + Math.min(0.42, ad * 0.3).toFixed(3) + ')'; c.fillRect(xx, yy, pw, 16); }
-            });
-            c.restore();
-            c.fillStyle = P[13]; for (let k = 0; k < 3; k++) c.fillRect(bx + pw + 2 + k, cy - 3 + k, 1, 5 - k * 2);
-            if (T > 0.3 && T < 1.5) { const fy = Math.round(lerp(cy + 18, cy - 8, ss(seg(T, 0.6, 1.4)))); dk ? cursor(c, bx + 30, fy, true) : hand(c, bx + 30, fy, true); }
-            else if (T > 1.7 && T < 2.4) ptr(dk)(c, bx + 22, Math.round(cy + 2), T > 2.1 && T < 2.3);
+            const T = t % 4, gy = y + Math.round(h * 0.68), hx = x + w * 0.3, lv = Math.min(3, Math.floor(T / 1.1) + 1);
+            unit(c, 'leafy', hx, gy, false);
+            for (let i = 0; i < lv; i++) { const a = t * 2 + i * 2.1, px = Math.round(hx + Math.cos(a) * 12), py = Math.round(gy + 1 + Math.sin(a) * 4); c.fillStyle = P[[17, 13, 10][i]]; c.fillRect(px, py, 2, 2); }
+            const bx = Math.round(x + w * 0.62), by = y + 8, cw = 30;
+            H().box(c, bx, by, cw, 34, 1, lv >= 3 ? 13 : 6); H().icon(c, 'p_pow', bx + cw / 2, by + 8); G.cn(c, '攻擊', bx + cw / 2, by + 13, 9, 0.5);
+            for (let k = 0; k < 3; k++) { c.fillStyle = P[0]; c.fillRect(bx + 10 + k * 3, by + 26, 4, 3); c.fillStyle = P[k < lv ? 17 : 3]; c.fillRect(bx + 11 + k * 3, by + 27, 2, 1); }
+            G.text(c, '+' + [8, 18, 30][lv - 1] + '%', bx + cw / 2, by + 38, 9, 1, null, 0.5);
           }
         },
         {
@@ -1274,22 +1299,29 @@ G.Menus = (() => {
           }
         },
         {
-          t: '技能升級', m: '升級得到{技能點}，點技能上方的{黃色＋}升級，{最高 3 級}', d: '升級得到{技能點}，點技能上方的{黃色＋}升級，{最高 3 級}',
+          t: '技能升級', m: '主動技在{升級頁}用技能點升，{最高 3 級}；{被動}會隨英雄等級{自動升級}',
           draw(c, x, y, w, h, t, dk) {
-            const T = t % 3.6, bw = 30, bx = Math.round(x + w / 2 - bw / 2), by = Math.round(y + h / 2 - bw / 2 + 6), lv = T > 1.4 ? 2 : 1;
-            H().box(c, bx, by, bw, bw, 1, 5); H().icon(c, 'i_mistic', bx + bw / 2, by + bw / 2);
-            for (let k = 0; k < 3; k++) { c.fillStyle = P[0]; c.fillRect(bx + 2 + k * 3, by + 2, 3, 3); c.fillStyle = P[k < lv ? 13 : 3]; c.fillRect(bx + 3 + k * 3, by + 3, 2, 1); }
-            if (T < 1.4) { const ux = bx + bw / 2 - 5, uy = by - 13 + Math.round(Math.sin(gt * 6)); c.fillStyle = P[0]; c.fillRect(ux - 1, uy - 1, 12, 12); c.fillStyle = P[13]; c.fillRect(ux, uy, 10, 10); c.fillStyle = P[0]; c.fillRect(ux + 4, uy + 2, 2, 6); c.fillRect(ux + 2, uy + 4, 6, 2); }
-            else G.cn(c, '傷害 70 → 95', x + w / 2, by + bw + 6, 13, 0.5);
-            if (!dk && T < 1.5) ptr(dk)(c, bx + bw / 2, Math.round(lerp(y + h + 6, by - 8, ss(seg(T, 0.2, 1)))), T > 1.1 && T < 1.4);
-            if (dk) key(c, 'U', bx - 22, by + 8, T > 1.1 && T < 1.4);
+            const T = t % 3.6, r = 14, cx = Math.round(x + w * 0.38), cy = Math.round(y + h / 2 + 2), lv = T > 1.4 ? (T > 2.6 ? 3 : 2) : 1;
+            cBtn(c, cx, cy, r, 'i_mistic', false, lv >= 3 ? 13 : 5, lv);
+            const px = Math.round(x + w * 0.68), py = cy - 10, plv = T > 2 ? 2 : 1;
+            H().box(c, px, py, 20, 20, 0, 17); H().icon(c, 'i_crit', px + 10, py + 10); for (let k = 0; k < 3; k++) { c.fillStyle = P[0]; c.fillRect(px + 5 + k * 3, py + 2, 4, 3); c.fillStyle = P[k < plv ? 17 : 3]; c.fillRect(px + 6 + k * 3, py + 3, 2, 1); }
+            G.cn(c, lv >= 3 ? '滿級' : 'Lv' + lv, cx, cy + r + 4, lv >= 3 ? 13 : 9, 0.5); G.cn(c, '自動', px + 10, py + 24, 17, 0.5);
+          }
+        },
+        {
+          t: '英雄進階', m: '英雄 {Lv4、7、10、13} 進階，腳下光環變成{g:綠}、{b:藍}、{p:紫}、{o:橘}，升級特效也跟著變',
+          draw(c, x, y, w, h, t) {
+            const T = t % 4, k = Math.min(3, Math.floor(T)), col = [11, 12, 17, 14][k], gy = Math.round(y + h * 0.66), hx = Math.round(x + w / 2);
+            G.glow(c, hx, gy + 1, 14 + k, col, 0.25 + k * 0.05, 0.45); G.pxEllipse(c, hx, gy + 1, 10, 4, col, 5, t * 12);
+            unit(c, 'leafy', hx, gy, false);
+            G.text(c, 'LV' + [4, 7, 10, 13][k], hx, y + 6, col, 1, 0, 0.5);
           }
         },
         {
           t: '技能說明', m: '{長按}技能或增益圖示，看說明和數值', d: '{按住}技能或增益圖示，看說明和數值',
           draw(c, x, y, w, h, t, dk) {
             const T = t % 3.6, bw = 22, bx = Math.round(x + w - bw - 8), by = Math.round(y + h - bw - 6), hold = T > 0.6 && T < 3.0;
-            H().box(c, bx, by + (hold ? 1 : 0), bw, bw, 0, 5); H().icon(c, 'i_mistic', bx + bw / 2, by + bw / 2 + (hold ? 1 : 0));
+            G.UI.circBtn(c, bx + bw / 2, by + bw / 2, bw / 2, 1, 5, hold ? 1 : 0); H().icon(c, 'i_mistic', bx + bw / 2, by + bw / 2 + (hold ? 1 : 0));
             if (hold && T > 0.95) {
               const cw = Math.min(w - 20, 110), ch = 72, cx = Math.max(x + 4, bx - cw + 12), cy = Math.max(y + 2, by - ch - 4);
               H().dither(c, x, y, w, h, 0, 0.5);
@@ -1327,7 +1359,7 @@ G.Menus = (() => {
             unit(c, 'leafy', hx, gy, false);
             [[0.62, -6], [0.72, 4], [0.66, 10]].forEach(([fx, dy], i) => unit(c, i ? 'babybear' : 'bear', Math.round(x + w * fx), gy + dy - 4, false, -1, boom));
             if (boom) { const f = (T - 1.9) / 0.6; G.pxEllipse(c, ax, ay, 4 + f * 18, 2 + f * 8, f < 0.3 ? 9 : 14); G.pxDisc(c, ax, ay - 2, 10 * (1 - f) + 2, 5 * (1 - f) + 1, 14, 1 - f); }
-            H().key(c, bx, by, 20, 20, aiming, aiming ? 13 : 5); H().icon(c, 'i_fire', bx + 10, by + 10);
+            G.UI.circBtn(c, bx + 10, by + 10, 10, 1, aiming ? 13 : 5, aiming ? 1 : 0); H().icon(c, 'i_fire', bx + 10, by + 10 + (aiming ? 1 : 0));
             const hxp = aiming ? Math.round(bx + 10 + (ax - (hx + 14)) * 0.25) : bx + 10, hyp = aiming ? Math.round(by + 10 - k * 10) : by + 10;
             if (T < 2.2) ptr(dk)(c, hxp, hyp, aiming);
             G.cn(c, aiming ? '拖曳選落點' : boom ? '放開＝施放' : '按住技能', x + w / 2, y + 4, aiming ? 13 : 9, 0.5);
@@ -1341,7 +1373,7 @@ G.Menus = (() => {
             if (on) { c.globalAlpha = 0.18; c.fillStyle = P[hot ? 10 : 13]; c.beginPath(); c.ellipse(hx + 40, gy, 16, 7, 0, 0, 6.2832); c.fill(); c.globalAlpha = 1; G.pxEllipse(c, hx + 40, gy, 16, 7, hot ? 10 : 13);
               c.fillStyle = P[hot ? 10 : 2]; c.beginPath(); c.arc(cx0, cy0, 9, 0, 6.2832); c.fill(); c.fillStyle = P[9]; for (let q = -3; q <= 3; q++) { c.fillRect(cx0 + q, cy0 + q, 1, 1); c.fillRect(cx0 + q, cy0 - q, 1, 1); } G.cn(c, '取消', cx0, cy0 + 11, hot ? 10 : 7, 0.5); }
             unit(c, 'leafy', hx, gy, false);
-            H().key(c, bx, by, 20, 20, on, 5); H().icon(c, 'i_fire', bx + 10, by + 10);
+            G.UI.circBtn(c, bx + 10, by + 10, 10, 1, 5, on ? 1 : 0); H().icon(c, 'i_fire', bx + 10, by + 10 + (on ? 1 : 0));
             if (T < 2.3) ptr(dk)(c, Math.round(lerp(bx + 6, cx0, k)), Math.round(lerp(by + 6, cy0, k)), on);
             G.cn(c, T >= 2.0 ? '已取消' : hot ? '放開＝取消' : '拖到「取消」', x + w / 2, y + 4, hot || T >= 2.0 ? 10 : 9, 0.5);
           }
@@ -1359,13 +1391,14 @@ G.Menus = (() => {
           }
         },
         {
-          t: '特殊藥水', m: '{無敵藥水}：2.5 秒不受傷。{復活藥水}：帶在身上，陣亡時{原地復活}並無敵 2 秒',
+          t: '復活藥水', m: '{復活藥水}每升 1 級存 {1 次復活}：陣亡時{原地復活}並無敵 2 秒',
           draw(c, x, y, w, h, t) {
-            const T = t % 4, gy = Math.round(y + h * 0.72), hx = Math.round(x + w * 0.4), inv = T < 2;
-            unit(c, 'leafy', hx, gy, false);
-            if (inv) { G.pxEllipse(c, hx, gy - 8, 10, 11, 13, 5, t * 14); const f = (T * 2) % 1; G.pxDisc(c, Math.round(lerp(x + w - 10, hx + 10, f)), gy - 10, 2, 2, 10, 1); if (f > 0.85) G.pxEllipse(c, hx + 9, gy - 10, 3, 3, 13); H().icon(c, 'p_inv', x + 14, y + 22); G.cn(c, '無敵藥水', x + 24, y + 16, 13); }
-            else { const f = (T - 2) / 2; H().icon(c, 'p_rev', x + 14, y + 22); G.cn(c, '復活藥水', x + 24, y + 16, 19); c.fillStyle = P[9]; c.globalAlpha = Math.max(0, 1 - f * 2); c.fillRect(hx - 1, y, 3, gy - y); c.globalAlpha = 1; G.pxEllipse(c, hx, gy, 6 + f * 26, 3 + f * 10, 19); }
-            G.cn(c, inv ? '不受傷害' : '原地復活！', x + w - 6, y + 4, inv ? 13 : 19, 1);
+            const T = t % 4, gy = Math.round(y + h * 0.72), hx = Math.round(x + w * 0.4), dead = T > 0.8 && T < 2;
+            H().icon(c, 'p_rev', x + 14, y + 22); G.cn(c, '復活藥水', x + 24, y + 16, 19); G.text(c, 'X' + (T < 2 ? 2 : 1), x + 24 + G.cnW('復活藥水') + 4, y + 19, 9, 1);
+            if (dead) { c.globalAlpha = 0.5; unit(c, 'leafy', hx, gy, false); c.globalAlpha = 1; }
+            else unit(c, 'leafy', hx, gy, false);
+            if (T >= 2) { const f = (T - 2) / 2; c.fillStyle = P[9]; c.globalAlpha = Math.max(0, 1 - f * 2); c.fillRect(hx - 1, y, 3, gy - y); c.globalAlpha = 1; G.pxEllipse(c, hx, gy, 6 + f * 26, 3 + f * 10, 19); }
+            G.cn(c, T < 0.8 ? '' : dead ? '陣亡…' : '原地復活！', x + w - 6, y + 4, dead ? 7 : 19, 1);
           }
         },
         {

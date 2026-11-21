@@ -175,18 +175,28 @@ G.FX = {
     });
     W.flashScreen = Math.max(W.flashScreen, 0.12);
   },
-  // 升級光柱
-  levelUp(W, u) {
+  // 升級光柱（v3.14 加強：依英雄階級換色、地面雙衝擊波、星芒、數字跳出、能力成長字；進階時更大）
+  levelUp(W, u, o2) {
+    o2 = o2 || {}; const tc = G.HERO_TIER ? G.HERO_TIER[G.heroTier(u.level || 1)].c : 13, col = tc === 9 ? 13 : tc, big = !!o2.tier, H = big ? 120 : 90;
     W.effects.push({
-      t: 0, dur: 1.0, layer: 1, draw(ctx, o) {
-        const p = this.t / this.dur, cx = u.x * G.AX - o.x, cy = u.y * G.AY - o.y, w = Math.round(10 * (1 - p)) + 1;
-        ctx.fillStyle = G.PAL[13];
-        for (let yy = 0; yy < 80; yy++) for (let xx = -w; xx <= w; xx++) if (G.bayer(cx + xx, cy - yy) < (1 - p) * (1 - yy / 80) * (1 - Math.abs(xx) / (w + 1)) * 1.6) ctx.fillRect(Math.round(cx + xx), Math.round(cy - yy), 1, 1);
+      t: 0, dur: big ? 1.3 : 1.0, layer: 1, draw(ctx, o) {
+        const p = this.t / this.dur, cx = u.x * G.AX - o.x, cy = u.y * G.AY - o.y, w = Math.round((big ? 14 : 10) * (1 - p)) + 1;
+        for (let yy = 0; yy < H; yy++) for (let xx = -w; xx <= w; xx++) { const f = (1 - p) * (1 - yy / H) * (1 - Math.abs(xx) / (w + 1)) * 1.6, b = G.bayer(cx + xx, cy - yy); if (b < f) { ctx.fillStyle = G.PAL[b < f * 0.35 ? 9 : col]; ctx.fillRect(Math.round(cx + xx), Math.round(cy - yy), 1, 1); } }
       }
     });
-    G.FX.ring(W, u.x, u.y, 6, 70, 0.5, 13, 2);
-    for (let i = 0; i < 30; i++) { const a = Math.random() * 6.28; W.parts.add(u.x + Math.cos(a) * 14, u.y + Math.sin(a) * 10, G.rr(0, 10), 0, 0, G.rr(60, 160), G.rr(0.6, 1.2), 13, 9, 1, -20, 1); }
-    G.FX.popText(W, u.x, u.y, 40, 'LV UP', 13);
+    G.FX.ring(W, u.x, u.y, 6, big ? 110 : 76, 0.5, col, 2); G.FX.ring(W, u.x, u.y, 2, big ? 70 : 46, 0.35, 9, 1);
+    if (G.VFX) { G.VFX.groundLight(W, u.x, u.y, big ? 44 : 30, col, 0.7, 0.7); G.VFX.light(W, u.x, u.y, 14, big ? 40 : 28, col, 0.6, 0.8); G.VFX.spark(W, u.x, u.y, 34, big ? 18 : 12, col, 0.3); if (big) G.VFX.later(W, 0.12, () => G.VFX.ringAir(W, u.x, u.y, 18, 6, 50, 0.45, col, 2)); }
+    for (let i = 0; i < (big ? 50 : 30); i++) { const a = Math.random() * 6.28; W.parts.add(u.x + Math.cos(a) * 14, u.y + Math.sin(a) * 10, G.rr(0, 10), 0, 0, G.rr(60, 160), G.rr(0.6, 1.2), i % 3 ? col : 9, 9, 1, -20, 1); }
+    if (big) { W.flashScreen = Math.max(W.flashScreen, 0.1); W.shake(0.35); }
+    // 等級數字：放大跳出、停一下再往上飄
+    const lv = 'LV ' + (u.level || 1);
+    W.effects.push({ t: 0, dur: 1.4, layer: 2, draw(ctx, o) {
+      const p = this.t, k = p < 0.12 ? p / 0.12 : 1, sc = p < 0.12 ? 1 + k : p < 0.22 ? 3 - (p - 0.12) * 10 : 2, z = 58 + Math.max(0, p - 0.5) * 30;
+      ctx.globalAlpha = p > 1.1 ? Math.max(0, (1.4 - p) / 0.3) : 1; G.text(ctx, lv, u.x * G.AX - o.x, u.y * G.AY - z * G.AZ - o.y - (sc - 1) * 3, col, Math.round(sc), 0, 0.5); ctx.globalAlpha = 1;
+    } });
+    // 能力成長：HP／攻擊增加量，一個接一個從身上冒出
+    const gains = [o2.hp > 0 && ['HP+' + o2.hp, 10], o2.pow > 0 && ['ATK+' + o2.pow, 14]].filter(Boolean);
+    gains.forEach(([t2, c2], i) => { const fn = () => G.FX.popText(W, u.x + (i ? 30 : -30), u.y, 14, t2, c2); G.VFX ? G.VFX.later(W, 0.25 + i * 0.18, fn) : fn(); });
   },
   // 英雄重生：天上一道細光落下 → 地面綠色光圈擴散 → 葉片與光點往上飄（不用升級特效，避免誤會成升級）
   respawn(W, u) {

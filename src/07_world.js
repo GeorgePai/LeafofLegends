@@ -140,7 +140,7 @@ G.World = class {
     h.skills = hd.skills.map(id => G.skillSlot(id));
     h.pskills = hd.passives.map(id => Object.assign(G.skillSlot(id), { passive: true }));
     h.passives = null; h.calc(); h.hp = h.st.hp; h.mp = h.st.mp;
-    h.cmd = null; h.path = null; h.pending = null; h.hold = false; h.repath = 0; h.dead = 0; h.sp = 0;
+    h.cmd = null; h.path = null; h.pending = null; h.hold = false; h.repath = 0; h.dead = 0; h.sp = 0; h.pp = 0;
     this.hero = this.add(h);
     G.FX.spawn(this, h);
   }
@@ -157,6 +157,8 @@ G.World = class {
   update(dt) {
     this.frame++;
     if (this.hitstop > 0) { this.hitstop -= dt; return; }
+    if (this.slowT > 0 && !this.over) { this.slowT -= dt; this.timeScale = this.slowT > 0 ? 0.35 : 1; }   // v3.14 升級慢動作
+    if (this.lvT > 0) { this.lvT -= dt; if (this.lvT <= 0 && !this.over && this.lvChoices()) this.lvOpen = true; }   // v3.14 升級頁（UI 看到 lvOpen 就打開並暫停）
     dt *= this.timeScale;
     this.time += dt; if (!this.over) this.stats.time += dt;
     if (!this.attract && ((this.tgT = (this.tgT || 0) - dt) <= 0)) { this.tgT = 1; this.towerGrow(); }
@@ -170,7 +172,7 @@ G.World = class {
     if (this.stageI && !this.attract) { G.SoloW.tick(this, dt); G.SoloW.weather(this, dt); }   // v3.0 關卡特殊規則＋天氣
     if (G.Ach && !this.attract) G.Ach.tick(this, dt);
     // 廣播：最多同時顯示 4 則（上下堆疊），其餘排隊；顯示中的才計時
-    if (this.notices.length) { for (let i = 0; i < Math.min(4, this.notices.length); i++) this.notices[i].age += dt; this.notices = this.notices.filter(n => n.age < n.t + G.NOTICE_OUT); }
+    if (this.notices.length) { for (let i = 0; i < Math.min(G.NOTICE_N || 2, this.notices.length); i++) this.notices[i].age += dt; this.notices = this.notices.filter(n => n.age < n.t + G.NOTICE_OUT); }
     for (const u of this.units) { u.px = u.x; u.py = u.y; }
     for (const u of this.units) if (u.alive) this.updateUnit(u, dt);
     this.separate();
@@ -267,9 +269,26 @@ G.World = class {
   // ---------- 移動 ----------
   moveDir(u, dx, dy, dt, mul = 1) {
     const sp = u.st.speed * mul * (u.slow > 0 ? 0.5 : 1) * (u.iSpd || 1) * G.TUNE.moveMul * (this.wind > 0 ? G.SOLO_HZ.wind.k : 1) * (this.bliz > 0 ? G.SOLO_HZ.blizzard.k : 1);
+    if (!u.static && !(u.vis && u.vis.fly)) { const v = this.steer(u, dx, dy); dx = v[0]; dy = v[1]; }   // v3.14 繞過塔／聖樹，不再卡在塔後面
     const k = G.damp(u.kind === 'hero' ? 20 : 9, dt);
     u.vx += (dx * sp - u.vx) * k; u.vy += (dy * sp - u.vy) * k;
     this.step(u, dt);
+  }
+  // v3.14 繞障：前方有建築（塔、聖樹）擋路時，沿著建築外緣的切線方向走（優先往原本的橫向位置那側繞）
+  steer(u, dx, dy) {
+    for (const t of this.units) {
+      if (!t.static || !t.alive || t === u.target) continue;
+      if (u.kind === 'hero' && t.side !== u.side) continue;   // 英雄要打敵方建築時直接走過去
+      const rx = u.x - t.x, ry = u.y - t.y, d = Math.hypot(rx, ry), R = t.r + u.r + 6, F = 34;
+      if (d > R + F || d < 0.01) continue;
+      const toward = -(dx * rx + dy * ry) / d; if (toward <= 0.05) continue;   // 沒有朝建築走
+      let px = -ry / d, py = rx / d, dp = px * dx + py * dy;
+      if (Math.abs(dp) < 0.15) { const sd = (u.lo != null ? u.lo : (u.id || 0) % 2 ? 1 : -1) >= 0 ? 1 : -1; if (sd * (px * -dy + py * dx) < 0) { px = -px; py = -py; } }
+      else if (dp < 0) { px = -px; py = -py; }
+      const w = G.clamp((R + F - d) / F, 0, 1) * toward, nx = dx * (1 - w) + px * w * 1.15 + (rx / d) * w * 0.25, ny = dy * (1 - w) + py * w * 1.15 + (ry / d) * w * 0.25, l = Math.hypot(nx, ny) || 1;
+      dx = nx / l; dy = ny / l;
+    }
+    return [dx, dy];
   }
   brake(u, dt) { const k = G.damp(16, dt); u.vx -= u.vx * k; u.vy -= u.vy * k; this.step(u, dt); }
   step(u, dt) {
@@ -296,9 +315,11 @@ G.World = class {
       const T = G.TILE, tx = u.x / T, ty = u.y / T, q = this.M.laneNear(li, tx, ty);
       if (q && q.d < q.r + 0.6) {
         let ux = q.ux, uy = q.uy; if (ux * d[0] + uy * d[1] < 0) { ux = -ux; uy = -uy; }
-        const W = Math.max(0, q.r - G.TUNE.laneEdge) * u.lo, gx = q.cx + ux * 1.6 - uy * W, gy = q.cy + uy * 1.6 + ux * W;
+        // v3.14 往前看的距離跟著橫向偏差加長：慢慢切回自己的橫向位置，不會橫著走、也不會在「沿路走」和「流場」之間來回抖而卡住
+        const W = Math.max(0, q.r - G.TUNE.laneEdge) * u.lo, lat = (tx - q.cx) * -uy + (ty - q.cy) * ux, L = 1.6 + Math.abs(lat - W) * 1.3;
+        const gx = q.cx + ux * L - uy * W, gy = q.cy + uy * L + ux * W;
         const vx = gx - tx, vy = gy - ty, l = Math.hypot(vx, vy);
-        if (l > 0.01 && vx * d[0] + vy * d[1] > 0) { this.moveDir(u, vx / l, vy / l, dt); return; }
+        if (l > 0.01 && (vx * d[0] + vy * d[1]) / l > -0.4) { this.moveDir(u, vx / l, vy / l, dt); return; }
       }
     }
     this.moveDir(u, d[0], d[1], dt);
@@ -511,7 +532,6 @@ G.World = class {
     const t = this.nearestEnemy(h, 360); if (!t) return false;
     this.cmdAttack(t); return true;
   }
-  usePotion(i) { return this.useItem(i ? 'mp' : 'hp'); }
 
   // v3.12 拿掉玩家召集／解散（Pai：戰鬥回歸英雄操作）；跟隨只剩死靈召喚物（技能本身的效果）
   clearFollow() { let n = 0; for (const u of this.units) if (u.follow) { u.follow = false; u.path = null; u.target = null; n++; } return n; }
@@ -600,7 +620,7 @@ G.World = class {
     const ult = i === h.skills.length - 1 && s.s.lv1 >= 5;
     return this.beginCharge(h, s.s, t, s.lv, ult ? G.TUNE.chgUlt : G.TUNE.chgSkill, () => { s.cd = 0; h.mp = Math.min(h.st.mp, h.mp + cost); });
   }
-  say(n) { if (this.attract) return; n.age = 0; n.t = Math.max(2.2, n.t || 2.4); this.notices.push(n); }
+  say(n) { if (this.attract) return; n.age = 0; n.t = Math.max(2, Math.min(2.6, n.t || 2.2)); this.notices.push(n); if (this.notices.length > 5) this.notices.splice(G.NOTICE_N || 2, 1); }   // v3.14 排隊太多就丟掉最舊的等待中廣播
   kill(t, src) {
     t.alive = false; t.hp = 0;
     if (t.static || !this.corpses || !t.spr) G.FX.shatter(this, t);
@@ -624,10 +644,9 @@ G.World = class {
     if (t.side === 1 && src === h) { this.killT.push(this.time); this.killT = this.killT.filter(v => this.time - v <= 4); this.stats.streak = Math.max(this.stats.streak, this.killT.length); }   // 4 秒內連續擊倒
     this.tryKey(t, src);
     if (this.stageI) G.SoloW.died(this, t);
-    if (t.side === 1) this.killGold(t, src);
     if (t.side === 2) { if (h && h.alive && src && src.side === 0) this.gainExp(h, t.st.exp); this.wildReward(t, src); }
     if (t === h) { h.dead = Math.min(G.TUNE.heroRespawnMax, G.TUNE.heroRespawnBase + G.TUNE.heroRespawnPer * h.level + G.TUNE.heroRespawnMin * Math.max(0, this.time / 60 - 5)); h.cmd = null; h.pending = null; this.shake(0.5); this.clearFollow();
-      if (this.bag && this.bag.some(b => b.id === 'rev') && !this.over && !this.attract) { h.dead = 2; h.revPend = true; }   // v3.2.2 有復活藥水：先倒地，2 秒後原地站起來
+      if (this.rev > 0 && !this.over && !this.attract) { h.dead = 2; h.revPend = true; }   // v3.2.2 有復活藥水：先倒地，2 秒後原地站起來
     }
     if (t.kind === 'holy' && !this.over) {
       this.over = { win: t.side === 1, t: 0 }; this.timeScale = 0.3; this.shake(1);
@@ -642,9 +661,16 @@ G.World = class {
     h.exp += Math.round(n * (1 + (h.iXp || 0) / 100));   // 經驗藥水
     const need = () => G.ORIG.units[h.name].exp * h.level;
     while (h.exp >= need()) {
-      h.exp -= need(); h.level++; h.sp = (h.sp || 0) + 1; h.calc();
+      const old = { hp: h.st.hp, power: h.st.power, armor: h.st.armor }, t0 = G.heroTier(h.level);
+      h.exp -= need(); h.level++; h.sp = (h.sp || 0) + 1; h.pp = (h.pp || 0) + 1; h.calc(); this.autoPassive(this.attract); this.applyBuffs(h);   // v3.14 每升 1 級：技能點、藥水點各 1
       h.hp = h.st.hp; h.mp = h.st.mp;
-      G.FX.levelUp(this, h); this.sfx('level'); this.hitstop = 0.05;
+      const tier = G.heroTier(h.level) > t0;
+      G.FX.levelUp(this, h, { hp: Math.round(h.st.hp - old.hp), pow: Math.round(h.st.power - old.power), tier }); this.sfx('level'); this.hitstop = 0.05;
+      if (!this.attract && h === this.hero) {
+        this.slowT = tier ? 0.6 : 0.4;                       // v3.14 升級瞬間短暫慢動作
+        if (tier) { const T = G.HERO_TIER[G.heroTier(h.level)]; this.say({ s: '英雄進階：' + T.n, ic: 'i_trophy', col: T.c, t: 2.6 }); }
+        this.lvT = tier ? 1.05 : 0.8;                        // 等升級特效播完，再暫停打開升級頁
+      }
     }
   }
   expNeed(h) { return G.ORIG.units[h.name].exp * h.level; }

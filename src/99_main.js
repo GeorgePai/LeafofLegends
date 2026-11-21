@@ -26,7 +26,7 @@ G.boot = function () {
     if (fpsT >= 0.5) { const U = G.UI, f = fpsN / fpsT; U.fps = f; fpsT = 0; fpsN = 0;
       if (U.screen === 'battle' && !U.paused && !document.hidden) { U.fpsA = U.fpsA ? U.fpsA * 0.9 + f * 0.1 : f; U.fpsLo = Math.min(f, (U.fpsLo || f) + 0.5); } }   // v3.4 戰鬥幀數（約 5 秒平均、最低值慢慢回升）→ 管理玩家監測
     const W = G.W, U = G.UI;
-    if (!U.paused && !(G.Menus && G.Menus.covers(U.screen)) && !(G.StageGo && G.StageGo.hold())) {
+    if (!U.paused && !U.lvUp && !(G.Menus && G.Menus.covers(U.screen)) && !(G.StageGo && G.StageGo.hold())) {
       W.keyDir = U.screen === 'battle' ? U.keyDir() : null;
       if (W.keyDir) G.Render.cam.follow = true;
       acc += dt;
@@ -35,7 +35,7 @@ G.boot = function () {
       if (n >= 6) acc = 0;
     }
     G.Render.updateCam(W, dt);
-    if (!(G.Menus && G.Menus.covers(U.screen))) G.Render.draw(W, U.paused ? 1 : acc / STEP, now / 1000);
+    if (!(G.Menus && G.Menus.covers(U.screen))) G.Render.draw(W, U.paused || U.lvUp ? 1 : acc / STEP, now / 1000);
     // 背景音樂：依目前畫面選曲（開場動畫無音樂；多人、存檔、教學沿用首頁曲；從戰鬥暫停打開教學則維持戰場曲；結算時戰場曲降低音量）
     { const sc = U.screen, M = sc === 'intro' || sc === 'tap' ? null : sc === 'battle' ? 'battle' : (sc === 'team' || sc === 'book') ? 'team' : sc === 'store' ? 'shop' : sc === 'ach' || sc === 'rank' ? 'ach' : sc === 'guide' && U.guideBack ? 'battle' : 'menu';
       G.Audio.music(M, sc === 'battle' && W.over ? 0.45 : 1); G.Audio.musicUpdate(dt); }

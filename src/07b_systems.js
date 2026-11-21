@@ -13,28 +13,32 @@ G.skillVal = (sd, lv) => {
 };
 G.skillReq = (sd, lv) => sd['lv' + lv] || 1;
 
-// ---------- 商店 ----------
-// k：效果種類；v：數值；t：持續秒數（0 = 立即）
-G.SHOP = [
-  // e：道具欄顯示的效果短標（比名稱直覺）
-  { id: 'hp', n: 'HP藥水', e: '+HP', ic: 'i_hp', cost: 60, k: 'hp', v: 150, t: 0, d: '立即回復 {r:150 HP}' },
-  { id: 'mp', n: 'MP藥水', e: '+MP', ic: 'i_mp', cost: 60, k: 'mp', v: 150, t: 0, d: '立即回復 {g:150 MP}' },
-  { id: 'spd', n: '攻速藥水', e: '+攻速', ic: 'p_spd', cost: 150, k: 'del', v: 30, t: 60, d: '{攻速 +30%}，60 秒' },
-  { id: 'crit', n: '爆擊藥水', e: '+爆擊', ic: 'p_crit', cost: 150, k: 'crit', v: 15, t: 60, d: '{o:爆擊率 +15%}，60 秒' },
-  { id: 'arm', n: '防禦藥水', e: '+防禦', ic: 'p_arm', cost: 150, k: 'arm', v: 6, t: 60, d: '{防禦 +6}，60 秒' },
-  { id: 'pow', n: '攻擊藥水', e: '+攻擊', ic: 'p_pow', cost: 180, k: 'pow', v: 25, t: 60, d: '{攻擊力 +25%}，60 秒' },
-  { id: 'move', n: '跑速藥水', e: '+跑速', ic: 'p_move', cost: 100, k: 'spd', v: 25, t: 60, d: '{跑速 +25%}，60 秒' },
-  // v2.4 新藥水（暫定數值）
-  { id: 'cdr', n: '冷卻藥水', e: '−冷卻', ic: 'p_cdr', cost: 160, k: 'cdr', v: 20, t: 60, d: '{技能冷卻 −20%}，60 秒' },
-  { id: 'xp', n: '經驗藥水', e: '+經驗', ic: 'p_xp', cost: 120, k: 'xp', v: 50, t: 60, d: '{獲得經驗 +50%}，60 秒' },
-  { id: 'wave', n: '小兵藥水', e: '+出兵', ic: 'p_wave', cost: 200, k: 'wave', v: 50, t: 60, d: '我方{出兵速度 +50%}，60 秒' },
-  { id: 'inv', n: '無敵藥水', e: '無敵', ic: 'p_inv', cost: 280, k: 'inv', v: 0, t: 2.5, d: '{無敵}：不受傷害與控制，2.5 秒' },
-  { id: 'rev', n: '復活藥水', e: '復活', ic: 'p_rev', cost: 350, k: 'rev', v: 50, t: 0, d: '帶在背包，陣亡時{自動使用}：原地復活、{r:回復 50% HP}，{無敵 2 秒}' }
+// ---------- v3.14 藥水強化（取代戰鬥中的商店與金幣）----------
+// 每升 1 級得 1 點藥水點；每種藥水最高 3 級，效果整場有效（不會消失）。lv：1～3 級的「累計」效果，越後面加越多（鼓勵專精）
+// k：效果種類（hpPct 最大 HP%、mpPct MP 回復%，其餘與計時增益共用：pow del crit arm spd cdr xp wave）；rev＝每級存 1 次復活
+G.POT_MAX = 3;
+// v3.14 英雄階級：等級到了腳下光環換色、升級特效跟著變色（視覺上看得出變強）
+G.HERO_TIER = [{ lv: 1, n: '', c: 9 }, { lv: 4, n: '覺醒', c: 11 }, { lv: 7, n: '精英', c: 12 }, { lv: 10, n: '英傑', c: 17 }, { lv: 13, n: '傳奇', c: 14 }];
+G.heroTier = lv => { let t = 0; G.HERO_TIER.forEach((q, i) => { if (lv >= q.lv) t = i; }); return t; };
+G.POT = [
+  { id: 'hp', n: '生命藥水', e: '生命', ic: 'i_hp', k: 'hpPct', lv: [10, 22, 36], u: '%', col: 10, d: '最大 {r:HP} +' },
+  { id: 'mp', n: '魔力藥水', e: '魔力', ic: 'i_mp', k: 'mpPct', lv: [30, 65, 100], u: '%', col: 11, d: '{g:MP} 回復速度 +' },
+  { id: 'pow', n: '攻擊藥水', e: '攻擊', ic: 'p_pow', k: 'pow', lv: [8, 18, 30], u: '%', col: 17, d: '{攻擊力} +' },
+  { id: 'spd', n: '攻速藥水', e: '攻速', ic: 'p_spd', k: 'del', lv: [8, 18, 30], u: '%', col: 13, d: '{攻速} +' },
+  { id: 'crit', n: '爆擊藥水', e: '爆擊', ic: 'p_crit', k: 'crit', lv: [5, 11, 18], u: '%', col: 14, d: '{o:爆擊率} +' },
+  { id: 'arm', n: '防禦藥水', e: '防禦', ic: 'p_arm', k: 'arm', lv: [3, 7, 12], u: '', col: 12, d: '{防禦} +' },
+  { id: 'move', n: '跑速藥水', e: '跑速', ic: 'p_move', k: 'spd', lv: [6, 13, 20], u: '%', col: 9, d: '{跑速} +' },
+  { id: 'cdr', n: '冷卻藥水', e: '冷卻', ic: 'p_cdr', k: 'cdr', lv: [6, 13, 20], u: '%', col: 18, d: '{技能冷卻} −' },
+  { id: 'xp', n: '經驗藥水', e: '經驗', ic: 'p_xp', k: 'xp', lv: [12, 26, 40], u: '%', col: 20, d: '{獲得經驗} +' },
+  { id: 'wave', n: '小兵藥水', e: '出兵', ic: 'p_wave', k: 'wave', lv: [12, 26, 40], u: '%', col: 11, d: '我方{出兵速度} +' },
+  { id: 'rev', n: '復活藥水', e: '復活', ic: 'p_rev', k: 'rev', lv: [1, 2, 3], u: '', col: 19, d: '', rev: 50 }
 ];
-G.SHOP_BY = Object.fromEntries(G.SHOP.map(s => [s.id, s]));
-G.TUNE.gold = { start: 150, perSec: 2, last: 16, near: 5, boss: 120, tower: 150, camp: 60, wild: 250 };
-G.TUNE.bagMax = 6;
-G.TUNE.bagIdle = 1.5;                               // 道具欄沒碰幾秒後自動縮小
+G.POT_BY = Object.fromEntries(G.POT.map(s => [s.id, s]));
+// 某一級的效果文字（給資訊卡、升級頁）；lv 0 回傳空字串
+G.potTxt = (it, lv) => lv <= 0 ? '' : it.k === 'rev' ? '陣亡時{自動使用}：原地復活、{r:回復 50% HP}、{無敵 2 秒}' : it.d + it.lv[lv - 1] + it.u;
+G.potVal = (it, lv) => lv <= 0 ? '' : (it.k === 'cdr' ? '−' : '+') + it.lv[lv - 1] + it.u;
+// 舊名稱相容（圖鑑、特效、增益卡還會用到）
+G.SHOP = G.POT; G.SHOP_BY = G.POT_BY;
 
 // ---------- 野區 ----------
 // kind: 'wboss'（野生首領，打死變成我方戰友去推塔）；v3.12 拿掉小怪營地（紅／藍／鱷魚）
@@ -47,7 +51,7 @@ G.WILD = {
 G.ORIG.units.hunter = Object.assign({}, G.ORIG.units.madwolf, { id: 9001, type: 'enemy', jungler: true, hp: 280, grow_hp: 30, power: 24, grow_power: 3, armor: 3, grow_armor: 0.6, speed: 95, delay: 700, critical: 8, exp: 300, weapon_name: 'return_body', weapon_option: 10 });
 G.BESTIARY.hunter = { w: 19, h: 14, draw(P, f) { G.quad(P, f, { bx: 8, by: 8, brx: 6.5, bry: 3.5, hx: 14, hy: 6, hr: 3, legs: [4, 11, 5, 12], ly: 10, ll: 4, ear: 'p', snout: 3, tail: [4, 4], eye: 14 }); P.l(11, 8, 13, 10, 10); P.px(12, 11, 10); P.px(13, 11, 15); P.l(13, 3, 15, 5, 6); for (let x = 4; x < 11; x += 3) P.px(x, 5, 3); } };
 G.TUNE.jungle = { first: 90, respawn: 75, bossLv: 7, bossTime: 300, maxLv: 10, gold: 100, lvEvery: 40, guard: 110 };   // v3.12 lvEvery：獵手活著每 40 秒 +1 級；guard：沒事時守在首領坑往敵方退 110
-G.HUNTER_INFO = '・開場 {90 秒}出動，倒下 {75 秒}後再來\n・守在野生首領旁，活著每 {40 秒}升 1 級\n・開場 {5 分鐘}後、{Lv7} 以上會搶野生首領\n・擊倒可得 {100 金幣}';
+G.HUNTER_INFO = '・開場 {90 秒}出動，倒下 {75 秒}後再來\n・守在野生首領旁，活著每 {40 秒}升 1 級\n・開場 {5 分鐘}後、{Lv7} 以上會搶野生首領\n・擊倒可得{大量經驗}';
 // ---------- 鑰匙掉落（%：英雄親手擊倒；友軍擊倒減半）----------
 G.KEY_RATE = { creep: 1, camp: 4, boss: 8, hunter: 12, towerOut: 15, wboss: 18, towerMid: 20, towerIn: 25, towerMain: 30, holy: 100 };   // v3.5 掉落機率減半（聖所維持 100%）
 // 主塔數值（原著要塞太強，改成合理值；雙方共用）
@@ -69,7 +73,7 @@ G.TUNE.tp = { channel: 3, cd: 30, minDist: 110, ask: 2.2 };   // ask：第一下
 Object.assign(G.World.prototype, {
   // ----- 初始化（建構完成後呼叫） -----
   initSystems() {
-    this.gold = G.TUNE.gold.start; this.bag = [];
+    this.gold = 0; this.bag = []; this.pot = {}; this.rev = 0; this.revMax = 0;   // v3.14 拿掉金幣與背包；pot＝藥水等級、rev＝儲存的復活次數
     this.camps = [];
     const md = G.MAPS[this.stage.map], T = G.TILE;
     if (md.wild && !this.attract) for (const [key, p] of md.wild) this.camps.push({ key, def: G.WILD[key], x: p[0] * T, y: p[1] * T, u: null, t: 1.5 });
@@ -87,18 +91,18 @@ Object.assign(G.World.prototype, {
       const all = [...h.skills, ...h.pskills];
       if (G.Team.dev && !this.attract) {          // v2.6 開發者模式：開局直接滿級（所有技能都能升到 LV3 的等級），全部技能點自己分配
         h.level = Math.max(1, ...all.flatMap(s => [1, 2, 3].map(k => G.skillReq(s.s, k)))); h.exp = 0; h.calc(); h.hp = h.st.hp; h.mp = h.st.mp;
-        h.sp = all.length * G.SKILL_MAX;
+        h.sp = h.skills.length * G.SKILL_MAX; h.pp = h.level - 1;
       } else {
-        h.sp = 1;                                  // 1 級時有 1 點，自動學第一個可學技能
-        const first = all.find(s => G.skillReq(s.s, 1) <= 1);
+        h.sp = 1; h.pp = 0;                        // 1 級時有 1 點，自動學第一個可學的主動技
+        const first = h.skills.find(s => G.skillReq(s.s, 1) <= 1);
         if (first) this.levelSkill(first, true);
       }
+      this.autoPassive(true);                      // v3.14 英雄被動：等級到了自動升級，不花點數
     }
   },
   // ----- 每幀 -----
   updateSystems(dt) {
     if (this.over) return;
-    if (this.hero && !this.attract) { this.gold += G.TUNE.gold.perSec * dt; this.stats.gold += G.TUNE.gold.perSec * dt; }
     // 敵方獵手：同時最多 1 隻，死亡後倒數再出動
     if (!this.attract && this.camps.length) for (const jg of this.jgs) if (!(jg.u && jg.u.alive)) { if (jg.u) { jg.u = null; jg.t = this.jgRe; } jg.t -= dt; if (jg.t <= 0) this.spawnHunter(jg); }
     this.updateTeleport(dt);
@@ -253,11 +257,10 @@ Object.assign(G.World.prototype, {
   },
   // 野怪被擊殺 → 獎勵
   wildReward(t, src) {
-    const d = t.wild, h = this.hero, G0 = G.TUNE.gold;
+    const d = t.wild, h = this.hero;
     if (src && src.kind === 'jungler') return this.hunterReward(src, t);
     if (!src || src.side !== 0 || !h) return;
     if (d.kind === 'wboss') {
-      this.addGold(G0.wild, t.x, t.y);
       // 轉生為我方首領：沿最近的路線推塔
       const ally = this.add(new G.Unit(this, t.name, 0, t.x, t.y, d.lv, 'boss'));
       ally.st.hp = Math.round(ally.st.hp * 2); ally.hp = ally.st.hp; ally.skillCd = 3; ally.allyBoss = true;
@@ -269,47 +272,28 @@ Object.assign(G.World.prototype, {
     }
   },
 
-  // ----- 金錢 -----
-  addGold(n, x, y) {
-    n = Math.round(n); if (n <= 0 || this.attract) return;
-    this.gold += n; this.stats.gold += n;
-    if (x != null) G.FX.popText(this, x, y, 30, '+' + n, 13);
+  // ----- v3.14 藥水強化 -----
+  canPot(id) { const h = this.hero, it = G.POT_BY[id]; return !!(h && it && (h.pp || 0) > 0 && (this.pot[id] || 0) < G.POT_MAX); },
+  upPot(id) {
+    const h = this.hero; if (!this.canPot(id)) return false;
+    const it = G.POT_BY[id], lv = this.pot[id] = (this.pot[id] || 0) + 1; h.pp--;
+    if (it.k === 'rev') { this.rev++; this.revMax = Math.max(this.revMax, this.rev); }
+    else this.applyPots(h);
+    const st = this.stats; st.potUp = (st.potUp || 0) + 1; st.potions = (st.potions || 0) + 1;
+    st.potKinds = Object.keys(this.pot).filter(k => this.pot[k] > 0).length; st.potMax = Object.keys(this.pot).filter(k => this.pot[k] >= G.POT_MAX).length; st.revMax = this.revMax;
+    (this.lvFx = this.lvFx || []).push({ pot: it, lv });
+    return true;
   },
-  killGold(t, src) {
-    const h = this.hero, G0 = G.TUNE.gold; if (!h || t.side !== 1) return;
-    if (t.static) { this.addGold(G0.tower, t.x, t.y); return; }
-    if (t.kind === 'jungler') { if (src === h) this.addGold(G.TUNE.jungle.gold, t.x, t.y); else if (h.alive && G.d2(h.x, h.y, t.x, t.y) < 300 * 300) this.addGold(G.TUNE.jungle.gold / 2, t.x, t.y); return; }
-    if (src === h) this.addGold(t.kind === 'boss' ? G0.boss : G0.last, t.x, t.y);
-    else if (h.alive && G.d2(h.x, h.y, t.x, t.y) < 300 * 300) this.addGold(G0.near);
+  // 藥水效果併進英雄能力：HP 上限、MP 回復直接改 st；其他效果走增益加總（applyBuffs）
+  applyPots(h) {
+    if (!h) return; const hp = h.hp / h.st.hp; h.calc(); h.hp = Math.min(h.st.hp, Math.max(1, Math.round(h.st.hp * hp))); h.mp = Math.min(h.mp, h.st.mp); this.applyBuffs(h);
   },
-  buy(id) {
-    const it = G.SHOP_BY[id]; if (!it || this.gold < it.cost) return 'gold';
-    const slot = this.bag.find(b => b.id === id);
-    if (!slot && this.bag.length >= G.TUNE.bagMax) return 'full';
-    this.gold -= it.cost; if (this.stats) this.stats.spent = (this.stats.spent || 0) + it.cost;
-    if (slot) slot.n++; else this.bag.push({ id, n: 1 });
-    if (id === 'rev' && this.hero && !this.hero.alive && G.UI) G.UI.toastMsg('復活藥水要先放在背包，下次陣亡才會自動使用', 19);   // v2.5
-    G.Audio.play('coin'); return 'ok';
-  },
-  useItem(id) {
-    const h = this.hero, slot = this.bag.find(b => b.id === id), it = G.SHOP_BY[id];
-    if (!h || !h.alive || !slot || !it) return false;
-    if (it.k === 'rev') return 'rev';                    // 復活藥水：陣亡時自動使用
-    if (it.k === 'hp') { if (h.hp >= h.st.hp) return false; h.hot = { k: 'hp', left: it.v, rate: it.v / 0.6 }; }   // v2.4 0.6 秒內補滿（看得到血條往上長）
-    else if (it.k === 'mp') { if (h.mp >= h.st.mp) return false; h.hot = { k: 'mp', left: it.v, rate: it.v / 0.6 }; }
-    else if (it.k === 'inv') { if (h.inv > 0) return false; h.inv = it.t; h.stun = 0; h.slow = 0; this.addBuff(h, 'i_' + id, {}, it.t, it.ic, null); }
-    else this.addBuff(h, 'i_' + id, { [it.k]: it.v }, it.t, it.ic, null);
-    if (--slot.n <= 0) this.bag.splice(this.bag.indexOf(slot), 1);
-    G.VFX.potion(this, h, it);
-    this.stats.potions++; return true;
-  },
-
   // 復活藥水（v2.4）：英雄陣亡瞬間自動使用 → 原地復活、回復 50% HP/MP、無敵 2 秒（v3.2）
   tryRevive(h) {
-    const slot = this.bag.find(b => b.id === 'rev'); if (!slot || this.over || this.attract) return false;
-    if (--slot.n <= 0) this.bag.splice(this.bag.indexOf(slot), 1);
-    const it = G.SHOP_BY.rev; h.alive = true; h.hp = Math.round(h.st.hp * it.v / 100); h.mp = Math.max(h.mp, Math.round(h.st.mp * it.v / 100)); h.inv = 2; h.stun = 0; h.slow = 0; h.poison = null; this.addBuff(h, 'i_inv', {}, 2, 'p_inv', null);   // v3.2 無敵 2 秒（顯示增益圖示）
-    G.VFX.potion(this, h, it); this.say({ s: '復活藥水生效！', ic: 'p_rev', col: 19, t: 2.2 }); this.stats.potions++;
+    if (!(this.rev > 0) || this.over || this.attract) return false;
+    this.rev--;
+    const it = G.POT_BY.rev; it.v = it.rev; h.alive = true; h.hp = Math.round(h.st.hp * it.v / 100); h.mp = Math.max(h.mp, Math.round(h.st.mp * it.v / 100)); h.inv = 2; h.stun = 0; h.slow = 0; h.poison = null; this.addBuff(h, 'i_inv', {}, 2, 'p_inv', null);   // v3.2 無敵 2 秒（顯示增益圖示）
+    G.VFX.potion(this, h, it); this.say({ s: '復活！剩 ' + this.rev + ' 次', ic: 'p_rev', col: 19, t: 2.2 });
     return true;
   },
   // ----- 計時增益（藥水、野怪 buff）-----
@@ -322,6 +306,7 @@ Object.assign(G.World.prototype, {
   applyBuffs(u) {
     const a = { pow: 0, del: 0, crit: 0, arm: 0, spd: 0, mpReg: 0, cdr: 0, xp: 0, wave: 0 };
     for (const k in u.tb || {}) for (const f in u.tb[k].fx) a[f] += u.tb[k].fx[f];
+    if (u === this.hero && this.pot) for (const id in this.pot) { const it = G.POT_BY[id], lv = this.pot[id]; if (it && lv > 0 && a[it.k] != null) a[it.k] += it.lv[lv - 1]; }   // v3.14 藥水強化（整場有效）
     u.iPow = 1 + a.pow / 100; u.iDel = 1 / (1 + a.del / 100); u.iCrit = a.crit; u.iArm = a.arm; u.iSpd = 1 + a.spd / 100; u.iMp = a.mpReg; u.iCdr = a.cdr; u.iXp = a.xp; u.iWave = a.wave;
   },
   tickBuffs(u, dt) {
@@ -332,7 +317,7 @@ Object.assign(G.World.prototype, {
 
   // ----- 技能升級 -----
   canLevel(s) {
-    const h = this.hero; if (!h || !s || s.lv >= G.SKILL_MAX || (h.sp || 0) <= 0) return false;
+    const h = this.hero; if (!h || !s || s.passive || s.lv >= G.SKILL_MAX || (h.sp || 0) <= 0) return false;   // v3.14 被動自動升級，不能花點數
     return h.level >= G.skillReq(s.s, s.lv + 1);
   },
   levelSkill(s, quiet) {
@@ -343,6 +328,19 @@ Object.assign(G.World.prototype, {
     if (!quiet) this.skillNotice(s);
     if (!quiet) { this.sfx('level'); G.FX.ring(this, h.x, h.y, 3, 22, 0.35, 13); for (let k = 0; k < 10; k++) this.parts.add(h.x + G.rr(-8, 8), h.y, G.rr(4, 20), 0, 0, G.rr(40, 80), 0.6, 13, 9, 1, -10, 0); }
     return true;
+  },
+  // v3.14 英雄被動：英雄等級到了就自動升級（回傳這次升了的被動）
+  autoPassive(quiet) {
+    const h = this.hero, up = []; if (!h) return up;
+    for (const s of h.pskills) while (s.lv < G.SKILL_MAX && h.level >= G.skillReq(s.s, s.lv + 1)) { s.lv++; up.push(s); }
+    if (up.length) { const hp = h.hp / h.st.hp, mp = h.st.mp ? h.mp / h.st.mp : 0; h.calc(); h.hp = h.st.hp * hp; h.mp = h.st.mp * mp; this.applyBuffs(h); }
+    if (!quiet) for (const s of up) (this.lvFx = this.lvFx || []).push({ sk: s, lv: s.lv });
+    return up;
+  },
+  // 升級頁有沒有東西可以選（技能點能用、或藥水點能用）
+  lvChoices() {
+    const h = this.hero; if (!h) return 0;
+    return (h.sp > 0 && h.skills.some(s => this.canLevel(s)) ? 1 : 0) + (h.pp > 0 && G.POT.some(it => (this.pot[it.id] || 0) < G.POT_MAX) ? 2 : 0);
   },
   // 升級回饋：廣播這一級多了什麼（例：火球 Lv2　傷害 100→140）
   skillNotice(s) {
