@@ -73,7 +73,7 @@ G.World = class {
     if (this.theme && this.theme.nat) { const gk = this.stage.map + '|' + this.themeId; if (!G.mapCache[gk]) G.mapCache[gk] = G.withTheme(this.themeId, () => G.renderGround(this.M)); this.ground = G.mapCache[gk]; }
     this.units = []; this.projs = []; this.effects = []; this.decals = []; this.parts = new G.Particles(2600);
     this.spawnQ = []; this.time = 0; this.trauma = 0; this.flashScreen = 0; this.hitstop = 0; this.timeScale = 1;
-    this.notices = []; this.stats = { kills: 0, time: 0, deaths: 0, assists: 0, camps: 0, towers: 0, gold: 0, dmg: 0, taken: 0, tower: 0, bosses: 0, hunters: 0, wboss: 0, potions: 0, tps: 0, maxFollow: 0, streak: 0, minHoly: 1, spent: 0 }; this.killT = [];   // 即時戰鬥數據
+    this.notices = []; this.stats = { kills: 0, time: 0, deaths: 0, assists: 0, camps: 0, towers: 0, gold: 0, dmg: 0, taken: 0, tower: 0, bosses: 0, hunters: 0, wboss: 0, potions: 0, tps: 0, streak: 0, minHoly: 1, spent: 0 }; this.killT = [];   // 即時戰鬥數據
     this.over = null; this.attract = !!opt.attract; this.frame = 0;
     // 聖所與塔
     this.holy = [
@@ -87,7 +87,7 @@ G.World = class {
       // 外塔(0) → 中塔(1) → 內塔(2) → 主塔(9)
       const name = side === 0 ? 'player_tower' : ['enemy_tower', 'enemy_tower2', 'enemy_tower3'][tier] || 'enemy_tower4';
       const u = this.add(new G.Unit(this, name, side, p[0] * T, p[1] * T, 1, 'tower')); u.lane = lane; u.tier = tier; this.towers[side].push(u);
-      if (side === 0 && G.TOWER_VIS && G.TOWER_VIS[tier]) { const sp = G.TOWER_VIS[tier], big = tier === 9; u.vis = Object.assign({}, u.vis, { spr: sp, r: big ? 30 : 22, shadow: big ? 30 : 21 }); u.spr = G.SPR[sp]; }   // v3.8 我方塔依層級換大圖
+      if (side === 0 && G.TOWER_VIS && G.TOWER_VIS[tier]) { const sp = G.TOWER_VIS[tier], big = tier === 9; u.vis = Object.assign({}, u.vis, { spr: sp, r: big ? 30 : 19, shadow: big ? 30 : 18 }); u.spr = G.SPR[sp]; }   // v3.8 我方塔依層級換大圖
       if (tier === 9) { const m = G.ORIG.towers.enemy_tower4; Object.assign(u.st, { hp: m.hp, power: m.power, armor: m.armor, range: m.range, delay: m.delay / 1000 }); u.hp = u.st.hp; u.main = true; }
       if (side === 1 && this.dif) { u.st.hp = Math.round(u.st.hp * this.dif.tower); u.hp = u.st.hp; }   // v3.0 敵塔血量倍率
       if (md.one && G.TUNE.towerOne) { u.st.hp = Math.round(u.st.hp * G.TUNE.towerOne); u.hp = u.st.hp; }   // v3.7 單路地圖塔變少 → 塔血加厚（雙方都加）
@@ -511,24 +511,9 @@ G.World = class {
   }
   usePotion(i) { return this.useItem(i ? 'mp' : 'hp'); }
 
-  // ---------- 召集：點友方小兵 → 跟隨英雄（一起移動、打同一個目標）；再點一次解除 ----------
-  toggleFollow(u) {
-    const h = this.hero; if (!h || !h.alive || !u.alive) return;
-    u.follow = !u.follow; u.path = null; u.target = null; u.repath = 0; if (u.summoner) u.noRe = !u.follow;   // 玩家親手解除的召喚物不會自動跟回來
-    if (u.follow) {
-      const n = this.units.filter(v => v.follow && v.alive).length, a = n * 2.4;
-      this.stats.maxFollow = Math.max(this.stats.maxFollow, n);
-      u.fOff = [Math.cos(a) * (18 + (n % 3) * 8), Math.sin(a) * (12 + (n % 3) * 5)];
-      G.FX.ring(this, u.x, u.y, 3, u.r + 14, 0.4, 13, 2); G.Audio.play('lock');
-      if (G.UI) G.UI.toastMsg('跟隨英雄（' + n + '）', 13);
-    } else {
-      G.FX.ring(this, u.x, u.y, u.r + 14, 3, 0.3, 6, 1); G.Audio.play('click');
-      if (G.UI) G.UI.toastMsg('解除跟隨，回到兵線', 7);
-    }
-  }
-  clearFollow(msg = '英雄倒下，跟隨解除') { let n = 0; for (const u of this.units) if (u.follow) { u.follow = false; if (u.summoner && !msg.includes('倒下')) u.noRe = true; u.path = null; u.target = null; G.FX.ring(this, u.x, u.y, u.r + 12, 3, 0.3, 6, 1); n++; } if (n && G.UI && msg) G.UI.toastMsg(msg, n && msg.includes('倒下') ? 10 : 7); return n; }
-  followCount() { let n = 0; for (const u of this.units) if (u.follow && u.alive) n++; return n; }
-  // v2.5 傘型隊形：跟隨的小兵依射程分三圈（近戰內圈、中距離、遠程外圈），在英雄行進方向的後方展開成扇形，不擋路也不擠成一團
+  // v3.12 拿掉玩家召集／解散（Pai：戰鬥回歸英雄操作）；跟隨只剩死靈召喚物（技能本身的效果）
+  clearFollow() { let n = 0; for (const u of this.units) if (u.follow) { u.follow = false; u.path = null; u.target = null; n++; } return n; }
+  // v2.5 傘型隊形：跟隨的召喚物依射程分三圈（近戰內圈、中距離、遠程外圈），在英雄行進方向的後方展開成扇形，不擋路也不擠成一團
   followSlots() {
     const h = this.hero; if (this.fSlotT != null && this.time - this.fSlotT < 0.3) return; this.fSlotT = this.time;
     const sp = Math.hypot(h.vx, h.vy), dir = sp > 10 ? Math.atan2(h.vy / 0.7, h.vx) : (h.face > 0 ? 0 : Math.PI), back = dir + Math.PI;

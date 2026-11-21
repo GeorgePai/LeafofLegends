@@ -401,3 +401,11 @@ Pai 回報 V2.6 更新後背景音樂、音效都沒聲音。V2.6 沒動到音�
 
 ## v3.11（2026-11-21）
 - 暫停選單拿掉「不計入排行」那行；按「重新開始／回首頁」才跳確認（09_ui `leaveAsk`，`U.leaveAsk='retry'|'home'`，Esc＝取消；開發者模式／已結算不跳）；文字檢查加 pause-ask 三個場景
+
+## v3.12（2026-11-21）
+- 拿掉玩家召集／解散：`toggleFollow`、點友軍跟隨（09_ui `worldTap` 不再找友軍）、右下解散鈕 `unf`、黃旗、`followCount`、`stats.maxFollow`、教學「召集小兵」、成就「召集令 army」。`followAI/followSlots/clearFollow` 保留給死靈召喚物（技能本身會跟著英雄；clearFollow 不再跳提示）。傳送教學拿掉「跟隨的小兵一起走」
+- 拿掉野區小怪：`G.WILD` 只剩 frost/blaze；五張地圖 `camps` 拿掉（`laneMap` 的 `spec.camps` 可省略）；`G.JBUFF`、wildReward 小怪分支、hunterReward 紅藍增益刪除；成就「野區常客 camp100」「野區霸主 jungle12」、結算亮點「野區霸主」刪除；戰鬥數據／結算「擊殺野怪／清野怪營」改「野生首領」（`st.wboss`）；教學「野怪增益」刪除、「河道與野區」改「河道」；圖鑑野怪分頁只剩兩隻首領；獵手標籤「打野」→「遊走」
+- 敵方獵手：沒有小怪可清 → 活著每 `jungle.lvEvery` 40 秒 +1 級（到 maxLv 10），沒目標時守在最近的野生首領坑往敵方聖所退 `guard` 110 的位置；搶首領條件不變（5 分鐘、Lv7）。HUNTER_INFO、教學「敵方獵手」動畫改成搶首領
+- 塔 ×0.85：`tw_e*/tw_p*` 用小尺寸重畫（36×48／38×56／40×64，原 42×57／44×66／46×75），r 22→19、影 21→18
+- 成就 68 → 65；存檔碼固定清單（FA/FB/FG）照規則不刪
+- tools/towersheet.py：沒有的精靈（主塔 tw_em/tw_pm）自動跳過

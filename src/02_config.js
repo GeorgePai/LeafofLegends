@@ -240,7 +240,7 @@ G.laneMap = spec => {
   const sdist = (p, pts) => { let m = 1e9; for (let i = 0; i < pts.length - 1; i++) { const a = pts[i], b = pts[i + 1], dx = b[0] - a[0], dy = b[1] - a[1], L = dx * dx + dy * dy, t = L ? Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L)) : 0; m = Math.min(m, Math.hypot(p[0] - a[0] - dx * t, p[1] - a[1] - dy * t)); } return m; };
   const ok = (c, r) => { if (Math.min(c[0], c[1], W - c[0], H - c[1]) < r + 1.5) return false; if (sdist(c, lane) < R + r + 1.5) return false; if (sdist(c, river.pts) < 2.4 + r + 0.8) return false;
     const m = mir(c); if (Math.hypot(c[0] - m[0], c[1] - m[1]) < 2 * r + 2) return false; return clears.every(q => Math.hypot(c[0] - q[0], c[1] - q[1]) >= r + q[2] + 2 && Math.hypot(m[0] - q[0], m[1] - q[1]) >= r + q[2] + 2); };
-  for (const [k, f, sd, d] of spec.camps) {
+  for (const [k, f, sd, d] of spec.camps || []) {   // v3.12 Pai：拿掉中立小野怪，五張地圖都不放營地（只剩河邊兩隻野生首領）
     let pick = null, best = 1e9;                                     // 交戰區（半路 55%～100%）網格搜尋，挑最接近指定位置的合法點
     for (const lo of [0.55, 0.4, 0.25]) { if (pick) break; for (let ff = lo; ff <= 1.0001; ff += 0.02) for (let dd = 8.5; dd <= 21; dd += 0.5) for (const side of [1, -1]) {
       const sc = Math.abs(ff - f) * 30 + Math.abs(dd - d) + (side !== sd ? 3 : 0); if (sc >= best) continue;
@@ -253,11 +253,11 @@ G.laneMap = spec => {
   return { w: W, h: H, seed: spec.seed, holy: { player: hp, enemy: mir(hp) }, towers3: { player: pt, enemy: et }, bossHome: mir(along(lane, 12).p),
     lanes: [{ r: R, pts: lane }].concat(necks), laneCount: 1, river, wild, clear: [[...hp, 8], [...mir(hp), 8], [...C, 4], ...clears], one: 1 };
 };
-G.MAPS.l1 = G.laneMap({ seed: 31, half: [[10, 44], [17, 40.5], [22.5, 35], [29, 31.5]], camps: [['red', 0.84, 1, 11], ['blue', 0.76, -1, 12], ['exp', 0.68, 1, 11]] });   // 翠葉森林：左下 → 右上，緩 S 彎
-G.MAPS.l2 = G.laneMap({ seed: 37, half: [[10, 10], [18.5, 10.5], [24, 16], [28, 23.5]], camps: [['red', 0.84, 1, 11], ['blue', 0.76, -1, 12], ['exp', 0.68, 1, 11]] });         // 楓紅山谷：左上 → 右下，長長的山谷彎
-G.MAPS.l3 = G.laneMap({ seed: 41, half: [[62, 10], [57.5, 16], [50.5, 18], [43, 20.5]], camps: [['red', 0.84, 1, 11], ['blue', 0.76, -1, 12], ['exp', 0.68, 1, 11]] });       // 霜雪凍原：右上 → 左下，冰原上的折線
-G.MAPS.l4 = G.laneMap({ seed: 43, half: [[62, 44], [61, 36], [55, 31], [46, 30]], camps: [['red', 0.84, 1, 11], ['blue', 0.76, -1, 12], ['exp', 0.68, 1, 11]] });        // 熔岩火山：右下 → 左上，繞過火山口的大弧
-G.MAPS.l5 = G.laneMap({ seed: 47, half: [[10, 44], [19, 44.5], [26.5, 40], [29.5, 33]], camps: [['red', 0.84, 1, 11], ['blue', 0.76, -1, 12], ['exp', 0.68, 1, 11]] });          // 幽冥深淵：左下 → 右上，Z 字折返
+G.MAPS.l1 = G.laneMap({ seed: 31, half: [[10, 44], [17, 40.5], [22.5, 35], [29, 31.5]] });   // 翠葉森林：左下 → 右上，緩 S 彎
+G.MAPS.l2 = G.laneMap({ seed: 37, half: [[10, 10], [18.5, 10.5], [24, 16], [28, 23.5]] });         // 楓紅山谷：左上 → 右下，長長的山谷彎
+G.MAPS.l3 = G.laneMap({ seed: 41, half: [[62, 10], [57.5, 16], [50.5, 18], [43, 20.5]] });       // 霜雪凍原：右上 → 左下，冰原上的折線
+G.MAPS.l4 = G.laneMap({ seed: 43, half: [[62, 44], [61, 36], [55, 31], [46, 30]] });        // 熔岩火山：右下 → 左上，繞過火山口的大弧
+G.MAPS.l5 = G.laneMap({ seed: 47, half: [[10, 44], [19, 44.5], [26.5, 40], [29.5, 33]] });          // 幽冥深淵：左下 → 右上，Z 字折返
 
 // ---------- 關卡 ----------
 // enemies 取原著 stage_001 第 3 難度；boss 為雛形展示用（原著第 1 關沒有）

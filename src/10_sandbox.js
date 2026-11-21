@@ -65,7 +65,7 @@ G.kindOf = n => G.ORIG.towers[n] ? 'tower' : G.HEROES.some(h => h.name === n) ? 
 G.tagsOf = n => {
   const k = G.kindOf(n), st = G.stats(n, 1, 0, k === 'boss' ? 'creep' : k), w = G.ORIG.weapons[st.weapon] || {}, u = G.ORIG.units[n] || {}, t = [];
   if (k === 'boss') t.push(['首領', 12]); if (k === 'tower') t.push(['建築', 7]);
-  if (u.jungler) t.push(['打野', 14]);
+  if (u.jungler) t.push(['遊走', 14]);
   if (G.VIS[n] && G.VIS[n].fly) t.push(['飛行', 7]);
   if (n === 'twinflower') t.push(['一次兩隻', 7]);
   if (n === 'necroleafy') t.push(['召喚', 17]);

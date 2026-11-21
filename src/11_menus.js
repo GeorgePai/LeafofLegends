@@ -1,5 +1,5 @@
 'use strict';
-G.VERSION = 'V3.11';                                  // 版本號（唯一來源；setup.sh 也從這行讀）
+G.VERSION = 'V3.12';                                  // 版本號（唯一來源；setup.sh 也從這行讀）
 /* =========================================================
    選單：首頁 / 隊伍 / 圖鑑 / 教學
    版面：直屏上下堆疊，橫屏左右分欄
@@ -972,7 +972,7 @@ G.Menus = (() => {
     const wd = btab === 3 ? WILD_OF(nm) : btab === 4 ? { n: '敵方獵手', d: G.HUNTER_INFO, ic: 'i_attack', col: 14, kind: 'hunter', respawn: G.TUNE.jungle.respawn } : null;
     // 野怪：獎勵說明卡
     const cta = wd ? (c, x, cy, w) => {
-      const kind = wd.kind === 'wboss' ? '野生首領' : wd.kind === 'hunter' ? '打野' : '野區小怪', two = G.cnW(wd.n) + G.cnW(kind) + 32 > w, ex = two ? 13 : 0;   // 名稱與類別放不下 → 類別換到下一行
+      const kind = wd.kind === 'wboss' ? '野生首領' : wd.kind === 'hunter' ? '遊走' : '野區小怪', two = G.cnW(wd.n) + G.cnW(kind) + 32 > w, ex = two ? 13 : 0;   // 名稱與類別放不下 → 類別換到下一行
       const lines = G.cnWrapRich(wd.d, w - 26), hh = 18 + ex + lines.length * 13 + (wd.kind === 'hunter' ? 4 : 15);
       H().box(c, x, cy, w, hh, 0, wd.col, false);
       H().icon(c, wd.ic, x + 10, cy + 10);
@@ -1132,16 +1132,15 @@ G.Menus = (() => {
           }
         },
         {
-          z: 1, t: '傳送', m: '{連點我方塔兩下}，3 秒後傳送過去，跟隨的小兵一起走。冷卻 {30 秒}', d: '{左鍵連點我方塔兩下}，3 秒後傳送過去，跟隨的小兵一起走。冷卻 {30 秒}',
+          z: 1, t: '傳送', m: '{連點我方塔兩下}，3 秒後傳送過去。冷卻 {30 秒}', d: '{左鍵連點我方塔兩下}，3 秒後傳送過去。冷卻 {30 秒}',
           draw(c, x, y, w, h, t, dk) {
             const T = t % 5, gy = y + Math.round(h * 0.78), tx = x + w * 0.78, done = T > 3.6;
             if (T > 0.55 && T < 0.95) { const pr2 = (T * 2) % 1; G.pxEllipse(c, tx, gy - 6, 12 + pr2 * 5, 4 + pr2 * 2, 13); }   // 第一下：提示再點一下
             tower(c, 'player_tower', tx, gy - 6, false);
-            const hx = done ? tx - 22 : x + w * 0.2, mx = done ? tx - 36 : x + w * 0.12;
+            const hx = done ? tx - 22 : x + w * 0.2;
             if (T > 0.8 && T < 3.6) { const k = (T - 0.8) / 2.8; G.pxEllipse(c, tx, gy - 6, 20 - k * 10, 7 - k * 3, 13); for (let i2 = 0; i2 < 4; i2++) { c.fillStyle = P[13]; c.fillRect(Math.round(hx - 6 + ((t * 40 + i2 * 9) % 12)), Math.round(gy - 4 - ((t * 30 + i2 * 7) % 16)), 1, 1); } zdraw(c, g => { const X = Math.round((x + w / 2) * 2); H().box(g, X - 30, y * 2 + 4, 60, 14, 0, 13); G.cn(g, '傳送中', X - 25, y * 2 + 4, 13); hpBar(g, X + 12, y * 2 + 10, 14, k, 9); }); }
             if (T > 3.6 && T < 4.1) G.pxEllipse(c, hx, gy, 6 + (T - 3.6) * 40, 3 + (T - 3.6) * 14, 13);
-            unit(c, 'leafy', hx, gy, false); unit(c, 'leafblower', mx, gy + 4, false);
-            const fx = Math.round(mx), fy = Math.round(gy + 4 - 22); c.fillStyle = P[0]; c.fillRect(fx - 2, fy - 8, 7, 5); c.fillRect(fx - 2, fy - 8, 3, 10); c.fillStyle = P[9]; c.fillRect(fx - 1, fy - 7, 1, 8); c.fillStyle = P[13]; c.fillRect(fx, fy - 7, 4, 3);
+            unit(c, 'leafy', hx, gy, false);
             if (T < 1) ptr(dk)(c, Math.round(lerp(x + w * 0.5, tx, ss(seg(T, 0.1, 0.45)))), Math.round(lerp(y + h, gy - 18, ss(seg(T, 0.1, 0.45)))), (T > 0.45 && T < 0.55) || (T > 0.75 && T < 0.85));
             if (done) ztext(c, '30', x + 6, y + 4, 13, 1, 0);
           }
@@ -1201,22 +1200,6 @@ G.Menus = (() => {
             if (T > 0.75) zdraw(c, g => { const px2 = (x + w) * 2 - 50, Y = y * 2; H().box(g, px2, Y + 4, 46, 16, 0, 10); const ts = G.SPR.etower[0]; g.save(); g.beginPath(); g.rect(px2 + 1, Y + 5, 14, 14); g.clip(); g.drawImage(ts.n, px2 + 1, Y + 5, Math.round(ts.w * 14 / ts.h), 14); g.restore(); hpBar(g, px2 + 18, Y + 11, 24, T > 2.2 ? 1 - (T - 2.2) * 0.3 : 1, 10); });
             if (T < 1.1) ptr(dk)(c, Math.round(lerp(x + w * 0.95, tx, ss(seg(T, 0.1, 0.6)))), Math.round(lerp(y + h, gy - 18, ss(seg(T, 0.1, 0.6)))), T > 0.6 && T < 0.8);
             if (T > 2.2 && ((T - 2.2) % 0.7) > 0.3) { const q = ((T - 2.2) % 0.7 - 0.3) / 0.4, s = G.SPR.magicball; c.drawImage(s.n, Math.round(lerp(hx + 6, tx, q) - 3), Math.round(lerp(y + h * 0.75 - 8, gy - 20, q) - Math.sin(q * Math.PI) * 8)); }
-          }
-        },
-        {
-          z: 1, t: '召集小兵', m: '{點我方小兵}，牠會跟著英雄作戰；{再點一次}放開，{黃旗鈕}全部解散', d: '{左鍵點我方小兵}，牠會跟著英雄作戰；{再點一次}放開，{黃旗鈕}全部解散',
-          draw(c, x, y, w, h, t, dk) {
-            const T = t % 5, gy = y + Math.round(h * 0.68), on = T > 0.9 && T < 4.3, k = ss(seg(T, 1.4, 2.6));
-            const hx = lerp(x + w * 0.22, x + w * 0.5, k), mx = lerp(x + w * 0.34, x + w * 0.62, ss(seg(T, 1.55, 2.8))) - (T < 0.9 ? 0 : 0), ex = x + w * 0.86;
-            unit(c, 'babybear', ex, gy, false, -1, T > 3 && ((t * 10) | 0) % 3 === 0);
-            unit(c, 'leafy', hx, gy - 6, k > 0 && k < 1);
-            unit(c, 'leafblower', mx, gy + 6, T > 1.55 && T < 2.8);
-            if (on) { const fx = Math.round(mx), fy = Math.round(gy + 6 - 22 - (((t * 3) | 0) % 2)); c.fillStyle = P[0]; c.fillRect(fx - 2, fy - 8, 7, 5); c.fillRect(fx - 2, fy - 8, 3, 10); c.fillStyle = P[9]; c.fillRect(fx - 1, fy - 7, 1, 8); c.fillStyle = P[13]; c.fillRect(fx, fy - 7, 4, 3); }
-            if (T > 0.9 && T < 1.3) G.pxEllipse(c, mx, gy + 6, 6 + (T - 0.9) * 30, 3 + (T - 0.9) * 12, 13);
-            if (T > 3 && T < 4.3 && ((T * 3) % 1) > 0.4) { const q = ((T * 3) % 1 - 0.4) / 0.6, s2 = G.SPR.magicball; c.drawImage(s2.n, Math.round(lerp(hx + 6, ex, q) - 3), Math.round(gy - 14 - Math.sin(q * Math.PI) * 6)); c.fillStyle = P[9]; c.fillRect(Math.round(lerp(mx + 6, ex - 6, q)), gy, 2, 1); }
-            zcn(c, T > 4.3 ? '解除跟隨' : on ? '跟隨中' : '', x + w / 2, y + 2, on ? 13 : 7, 0.5);
-            const tp = T < 0.9 ? [lerp(x + w * 0.5, mx, ss(seg(T, 0.1, 0.7))), lerp(y + h, gy + 2, ss(seg(T, 0.1, 0.7)))] : T > 3.7 && T < 4.4 ? [mx, gy + 2] : null;
-            if (tp) ptr(dk)(c, Math.round(tp[0]), Math.round(tp[1]), (T > 0.7 && T < 0.9) || (T > 4.1 && T < 4.3));
           }
         },
         {
@@ -1396,7 +1379,7 @@ G.Menus = (() => {
               const pw = Math.min(w - 12, 150), px = Math.round(x + w / 2 - pw / 2), py = Math.round(y + Math.max(4, h / 2 - 50)), kw2 = Math.floor((pw - 16) / 3);
               H().box(c, px, py, pw, Math.min(h - 8, 100), 1, 7); G.cn(c, '戰鬥數據', px + 5, py + 3, 9);
               [['擊殺', 3, 13], ['陣亡', 0, 10], ['助攻', 2, 18]].forEach(([lab, v, col], i) => { const bx = px + 5 + i * (kw2 + 3); H().box(c, bx, py + 18, kw2, 28, 0, 4, false); G.text(c, v, bx + kw2 / 2, py + 21, col, 2, null, 0.5); G.cn(c, lab, bx + kw2 / 2, py + 32, 6, 0.5); });
-              [['擊殺野怪', 4], ['累積金幣', 1260], ['造成傷害', 5321]].forEach(([lab, v], i) => { const yy = py + 50 + i * 13; if (yy + 14 > py + Math.min(h - 8, 100)) return; G.cn(c, lab, px + 5, yy, 6); G.cn(c, String(v), px + pw - 5, yy, 9, 1); });
+              [['野生首領', 1], ['累積金幣', 1260], ['造成傷害', 5321]].forEach(([lab, v], i) => { const yy = py + 50 + i * 13; if (yy + 14 > py + Math.min(h - 8, 100)) return; G.cn(c, lab, px + 5, yy, 6); G.cn(c, String(v), px + pw - 5, yy, 9, 1); });
             }
             if (T < 1.2) ptr(dk)(c, kx + kw / 2, Math.round(lerp(y + h, ky + 6, ss(seg(T, 0.2, 0.8)))), T > 0.85 && T < 1.1);
           }
@@ -1464,7 +1447,7 @@ G.Menus = (() => {
           }
         },
         {
-          t: '河道與野區', m: '野怪都在{地圖中間}，{野生首領}待在河道旁，常常打起團戰',
+          t: '河道', m: '{野生首領}待在{河道旁}，雙方常在這裡打起團戰',
           draw(c, x, y, w, h, t) { const mw = Math.min(w - 20, (h - 12) * 1.33), mh = mw * 0.75; miniMap(c, Math.round(x + w / 2 - mw / 2), Math.round(y + h / 2 - mh / 2), Math.round(mw), Math.round(mh), ((t * 1.2) | 0) % 2 ? 'river' : 'wild'); }
         },
         {
@@ -1483,16 +1466,6 @@ G.Menus = (() => {
           }
         },
         {
-          z: 1, t: '野怪增益', m: '{r:紅營}給攻擊增益，{b:藍營}給 MP 與冷卻增益，{鱷魚營}給大量經驗',
-          draw(c, x, y, w, h, t) {
-            const k = ((t / 2.2) | 0) % 3, T = t % 2.2, gy = y + h * 0.7, d = G.WILD[['red', 'blue', 'exp'][k]];
-            if (T < 1.2) { unit(c, d.unit, x + w * 0.65, gy, false, -1, ((t * 12) | 0) % 3 === 0); hpBar(c, x + w * 0.65 - 10, gy - 26, 20, 1 - T / 1.2, 13); }
-            else { const ic = d.ic; H().box(c, Math.round(x + w * 0.65 - 8), Math.round(gy - 28 - (T - 1.2) * 8), 16, 16, 0, d.col); H().icon(c, ic, x + w * 0.65, gy - 20 - (T - 1.2) * 8); }
-            unit(c, 'leafy', x + w * 0.3, gy, false);
-            zcn(c, d.n, x + 3, y + 2, d.col);
-          }
-        },
-        {
           z: 1, t: '野生首領', m: '河道的野生首領很強，{打倒後加入我方}幫忙推塔',
           draw(c, x, y, w, h, t) {
             const T = t % 4, gy = y + h * 0.72, ally = T > 1.6, bx = ally ? lerp(x + w * 0.55, x + w + 30, ss(seg(T, 2.2, 4))) : x + w * 0.6;
@@ -1504,13 +1477,13 @@ G.Menus = (() => {
           }
         },
         {
-          z: 1, t: '敵方獵手', m: '敵方{獵手}會清野怪變強，還會{搶野生首領}，記得去阻止',
+          z: 1, t: '敵方獵手', m: '敵方{獵手}會越打越強，還會{搶野生首領}，記得去阻止',
           draw(c, x, y, w, h, t) {
-            const T = t % 4.4, gy = y + h * 0.72, wx = x + w * 0.62, hx = lerp(x + w * 0.2, x + w * 0.45, ss(seg(T, 0, 1.2))), dead = T > 2.4;
-            if (!dead) { unit(c, 'gorilla', wx, gy, false, -1, ((t * 10) | 0) % 3 === 0 && T > 1.2); hpBar(c, wx - 10, gy - 26, 20, 1 - G.clamp((T - 1.2) / 1.2, 0, 1), 13); }
+            const T = t % 4.4, gy = y + h * 0.72, wx = x + w * 0.7, hx = lerp(x + w * 0.12, x + w * 0.36, ss(seg(T, 0, 1.2))), dead = T > 2.4;
+            if (!dead) { unit(c, 'polarbear', wx, gy, false, -1, ((t * 10) | 0) % 3 === 0 && T > 1.2); hpBar(c, wx - 10, gy - 17, 20, 1 - G.clamp((T - 1.2) / 1.2, 0, 1), 13); }
             unit(c, 'hunter', hx, gy + 2, T < 1.2);
             ztext(c, 'HUNTER', hx, gy - 20, 14, 1, 0, 0.5);
-            if (dead) { H().box(c, Math.round(hx - 8), Math.round(gy - 44 - (T - 2.4) * 5), 16, 16, 0, 10); H().icon(c, 'i_rage', hx, gy - 36 - (T - 2.4) * 5); zcn(c, '變強了！', x + 3, y + 2, 10); }
+            if (dead) { unit(c, 'polarbear', wx, gy, false, -1); hpBar(c, wx - 10, gy - 17, 20, 1, 10); zcn(c, '被搶走了！', x + 3, y + 2, 10); }
           }
         },
         {

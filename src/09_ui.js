@@ -261,7 +261,6 @@ G.UI = (() => {
   // 增益資訊卡（長按左上狀態圖示）：名稱、效果、剩餘時間
   G.buffInfo = key => {
     if (key.startsWith('i_')) { const it = G.SHOP_BY[key.slice(2)]; return it ? { n: it.n, d: it.d.replace(/，\s*[\d.]+\s*秒$/, '') } : { n: key, d: '' }; }
-    if (key.startsWith('j_')) { const b = G.JBUFF[key.slice(2)]; return b ? { n: b.n, d: b.d } : { n: key, d: '' }; }
     return { n: key, d: '' };
   };
   function buffCard(c, key, ax, ay) {
@@ -367,7 +366,7 @@ G.UI = (() => {
     dim(c, 0.75);
     U.btns = []; btn('stBg', 0, 0, uw, uh, () => { U.statP = false; G.Audio.play('click'); });
     const w = Math.min(uw - I.l - I.r - 12, 260), cols = w >= 250 ? 2 : 1, t = st.time | 0;
-    const rows = [['擊殺野怪', st.camps], ['推倒敵塔', st.towers], ['累積金幣', Math.floor(st.gold)], ['取得鑰匙', W.keysGot || 0], ['造成傷害', Math.round(st.dmg)], ['承受傷害', Math.round(st.taken)], ['對塔傷害', Math.round(st.tower)], ['英雄等級', 'Lv' + h.level]];
+    const rows = [['野生首領', st.wboss], ['推倒敵塔', st.towers], ['累積金幣', Math.floor(st.gold)], ['取得鑰匙', W.keysGot || 0], ['造成傷害', Math.round(st.dmg)], ['承受傷害', Math.round(st.taken)], ['對塔傷害', Math.round(st.tower)], ['英雄等級', 'Lv' + h.level]];
     const nr = Math.ceil(rows.length / cols), hh = 22 + 34 + nr * 14 + 8, x = Math.round(uw / 2 - w / 2), y = Math.round(G.clamp(uh / 2 - hh / 2, I.t + 2, uh - hh - 2));
     box(c, x, y, w, hh, 1, 7);
     G.cn(c, '戰鬥數據', x + 6, y + 3, 9); G.text(c, String((t / 60) | 0) + ':' + String(t % 60).padStart(2, '0'), x + w - 24, y + 6, 7, 1, null, 1);
@@ -456,17 +455,10 @@ G.UI = (() => {
       c.globalAlpha = 1;
       btn(id, zx, cy2, 16, 16, () => { U.press[id] = 0.12; }, () => { if (R.zoomBy(dir)) G.Audio.play('tick'); else deny(id); });
     });
-    // 傳送冷卻、解散排在縮放鈕左邊；左邊道具欄展開會太擠時（窄手機直屏）改排到縮放鈕正上方一列
+    // 傳送冷卻排在縮放鈕左邊；左邊道具欄展開會太擠時（窄手機直屏）改排到縮放鈕正上方一列
     const tpOn = !!(W.tp && W.tp.cd > 0), bagR = W.bag.length ? L + 3 + 18 + Math.max(...G.SHOP.map(d => G.cnW(d.e || d.n))) + 6 + 8 : L + 24;
-    const up = cx2 - 38 - 19 * ((tpOn ? 1 : 0) + (W.followCount() ? 1 : 0)) < bagR + 4;
-    const tpX = up ? cx2 - 38 : cx2 - 57, tpY = up ? cy2 - 19 : cy2, ufX = up ? cx2 - 38 + (tpOn ? 19 : 0) : cx2 - 57 - (tpOn ? 19 : 0);
-    // v2.5 一鍵解散跟隨：有跟隨小兵時才出現
-    { const nf = W.followCount(); if (nf) { const dx = ufX, cy2 = tpY, o = U.press.unf > 0 ? 1 : 0;
-      box(c, dx, cy2 + o, 16, 16, 0, 13);
-      c.fillStyle = P[6]; c.fillRect(dx + 5, cy2 + 3 + o, 1, 10); c.fillStyle = P[13]; c.fillRect(dx + 6, cy2 + 3 + o, 5, 4);   // 黃旗
-      c.fillStyle = P[10]; for (let k = 0; k < 9; k++) c.fillRect(dx + 3 + k, cy2 + 3 + k + o, 2, 1);                           // 紅色斜線
-      G.text(c, nf, dx + 15, cy2 + 10 + o, 9, 1, 0, 1);
-      btn('unf', dx, cy2, 16, 16, () => { U.press.unf = 0.12; }, () => { const n = W.clearFollow('全部解散，回到兵線'); if (n) G.Audio.play('click'); }); } }
+    const up = cx2 - 38 - 19 * (tpOn ? 1 : 0) < bagR + 4;
+    const tpX = up ? cx2 - 38 : cx2 - 57, tpY = up ? cy2 - 19 : cy2;
     // 傳送：冷卻中 → 準心鈕上方顯示塔圖示 + 秒數；引導中 → 畫面中下方進度條
     const tp = W.tp;
     if (tp && tp.cd > 0) {
@@ -712,14 +704,14 @@ G.UI = (() => {
     b2('lvYes', home ? '回首頁' : '重新開始', bx + w2 + g, 13, () => { U.leaveAsk = null; home ? U.goTitle() : U.start(U.hero); });
   }
   // ---------- 結算 ----------
-  // 評價：依擊殺、助攻、推塔、野怪、首領、陣亡、勝負計分（門檻暫定）
+  // 評價：依擊殺、助攻、推塔、野生首領、首領、陣亡、勝負計分（門檻暫定）
   U.grade = (st, win) => {
     const sc = st.kills * 2 + st.assists + st.towers * 6 + st.camps * 2 + (st.bosses || 0) * 5 - st.deaths * 4 + (win ? 25 : 0) + Math.min(20, st.dmg / 2000);
     const G2 = [[160, 'S', 14], [110, 'A', 13], [70, 'B', 11], [35, 'C', 12], [-1e9, 'D', 6]].find(q => sc >= q[0]);
     return { s: Math.round(sc), g: G2[1], col: G2[2] };
   };
   // 本場亮點（最多 2 個）
-  const highlights = st => [[st.deaths === 0 && st.time > 300, '不死之身', 11], [st.towers >= 5, '推塔王', 14], [st.kills >= 30, '收割者', 10], [st.assists >= 15, '神助攻', 18], [st.camps >= 8, '野區霸主', 13], [(st.bosses || 0) >= 3, '首領剋星', 12], [st.gold >= 3000, '小富翁', 13]].filter(q => q[0]).slice(0, 2);
+  const highlights = st => [[st.deaths === 0 && st.time > 300, '不死之身', 11], [st.towers >= 5, '推塔王', 14], [st.kills >= 30, '收割者', 10], [st.assists >= 15, '神助攻', 18], [(st.bosses || 0) >= 3, '首領剋星', 12], [st.gold >= 3000, '小富翁', 13]].filter(q => q[0]).slice(0, 2);
   function end(c) {
     // v2.4：數值用遊戲結束那一刻的快照（W.overSt），背景戰鬥繼續也不會再變；節奏放慢、一組一組出現；點畫面可跳到最後
     const uw = R.uw, uh = R.uh, I = R.ins, win = W.over.win, st = W.overSt || W.stats, h = W.hero;
@@ -785,8 +777,8 @@ G.UI = (() => {
       }); }
     yr += 32;
     // ── 其他數據（兩欄，數字跳動）
-    { const vals = [st.towers, st.bosses || 0, st.camps, Math.floor(st.gold), Math.round(st.dmg), Math.round(st.taken)], vw = Math.max(...vals.map(v => G.cnW(String(v))));
-      const long = ['推倒敵塔', '擊倒首領', '清野怪營', '累積金幣', '造成傷害', '承受傷害'], short = ['推塔', '首領', '野怪', '金幣', '輸出', '承傷'];
+    { const vals = [st.towers, st.bosses || 0, st.wboss || 0, Math.floor(st.gold), Math.round(st.dmg), Math.round(st.taken)], vw = Math.max(...vals.map(v => G.cnW(String(v))));
+      const long = ['推倒敵塔', '擊倒首領', '野生首領', '累積金幣', '造成傷害', '承受傷害'], short = ['推塔', '首領', '野王', '金幣', '輸出', '承傷'];
       const labs = LD && Math.floor((rw - 6) / 2) < 52 + vw + 4 ? short : long, rows = labs.map((l, i) => [l, vals[i]]);   // 橫屏放不下兩欄 → 用短標籤
       const need = Math.max(...rows.map(q => G.cnW(q[0]))) + Math.max(...rows.map(q => G.cnW(String(q[1])))) + 4, cols = Math.floor((rw - 6) / 2) >= need ? 2 : 1, nr = Math.ceil(rows.length / cols), cw = Math.floor((rw - (cols - 1) * 6) / cols);   // 兩欄放不下就改一欄
       rows.forEach(([lab, v], i) => {
@@ -907,7 +899,7 @@ G.UI = (() => {
   const ptrs = new Map(); let pinch = null;
   const toUI = (x, y) => [x / R.uiS, y / R.uiS];
   const evXY = e => [(e.clientX - (R.cssX || 0)) * R.dpr, (e.clientY - (R.cssY || 0)) * R.dpr];
-  // 點選單位：ally=false 找敵人（含中立）；ally=true 找可跟隨的友軍（小兵／我方首領）
+  // 點選單位：ally=false 找敵人（含中立）；ally='tower' 找我方塔／聖樹
   function pickUnit(sx, sy, ally, padX) {
     const [ax, ay] = R.scrToBuf(sx, sy);                             // 與 unitBox 同為緩衝區座標（v3.2.2 含透視）
     let best = null, bd = 1e9;
@@ -921,8 +913,7 @@ G.UI = (() => {
     return best ? [best, bd] : null;
   }
   function worldTap(sx, sy, quiet) {
-    const e = quiet ? null : pickUnit(sx, sy, false), a = quiet ? null : pickUnit(sx, sy, true);
-    if (a && (!e || a[1] < e[1])) { W.toggleFollow(a[0]); return 'follow'; }   // 點到友軍 → 跟隨／解除
+    const e = quiet ? null : pickUnit(sx, sy, false);
     const t = e && e[0];
     if (t) { W.cmdLock(t); return 'lock'; }                 // 點到敵人／塔／首領 → 鎖定
     const tw = quiet ? null : pickUnit(sx, sy, 'tower');    // 點到我方塔／聖樹 → 傳送（要點兩下確認）

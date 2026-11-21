@@ -240,10 +240,11 @@ G.towerArt = (W, H, tier, K) => P => {
   const E = { R: [1, 2, 3, 4, 5], AR: [15, 15, 10, 14], RR: [1, 15, 15, 10, 14], CR: [15, 10, 14, 13], w: 0 };                  // 敵方：暗石、深紅點綴、紅水晶
   const A = { R: [4, 5, 6, 7, 8], AR: [16, 22, 11, 20], RR: [16, 16, 22, 11, 20], CR: [16, 11, 20, 9], w: 1 };                    // 我方：淺石、綠葉點綴、綠水晶
   Object.assign(G.BESTIARY, {
-    tw_e0: { w: 42, h: 57, tower: 1, draw: G.towerArt(42, 57, 0, E) }, tw_e1: { w: 44, h: 66, tower: 1, draw: G.towerArt(44, 66, 1, E) },
-    tw_e2: { w: 46, h: 75, tower: 1, draw: G.towerArt(46, 75, 2, E) },
-    tw_p0: { w: 42, h: 57, tower: 1, draw: G.towerArt(42, 57, 0, A) }, tw_p1: { w: 44, h: 66, tower: 1, draw: G.towerArt(44, 66, 1, A) },
-    tw_p2: { w: 46, h: 75, tower: 1, draw: G.towerArt(46, 75, 2, A) }
+    // v3.12 Pai：塔縮成 0.85 倍（原 42×57／44×66／46×75）→ 直接用小尺寸重畫，像素保持乾淨；寬取偶數讓左右對稱
+    tw_e0: { w: 36, h: 48, tower: 1, draw: G.towerArt(36, 48, 0, E) }, tw_e1: { w: 38, h: 56, tower: 1, draw: G.towerArt(38, 56, 1, E) },
+    tw_e2: { w: 40, h: 64, tower: 1, draw: G.towerArt(40, 64, 2, E) },
+    tw_p0: { w: 36, h: 48, tower: 1, draw: G.towerArt(36, 48, 0, A) }, tw_p1: { w: 38, h: 56, tower: 1, draw: G.towerArt(38, 56, 1, A) },
+    tw_p2: { w: 40, h: 64, tower: 1, draw: G.towerArt(40, 64, 2, A) }
   });
 }
 
@@ -259,7 +260,7 @@ G.buildBestiary = function () {
     G.SPR[k] = frames;
   }
   const towerSpr = { player_tower: 'tw_p0', enemy_tower: 'tw_e0', enemy_tower2: 'tw_e1', enemy_tower3: 'tw_e2', enemy_tower4: 'tw_e2', mushroom_tower: 'mtower' };   // v3.8 大塔
-  for (const name in towerSpr) { const big = name === 'enemy_tower4'; G.VIS[name] = Object.assign({}, G.VIS[name] || {}, { spr: towerSpr[name], r: big ? 30 : name === 'mushroom_tower' ? 16 : 22, shadow: big ? 30 : name === 'mushroom_tower' ? 13 : 21 }); }
+  for (const name in towerSpr) { const big = name === 'enemy_tower4'; G.VIS[name] = Object.assign({}, G.VIS[name] || {}, { spr: towerSpr[name], r: big ? 30 : name === 'mushroom_tower' ? 16 : 19, shadow: big ? 30 : name === 'mushroom_tower' ? 13 : 18 }); }   // v3.12 塔 ×0.85：r 22→19、影 21→18
   // 我方塔依層級換圖（world 建塔時用）
   G.TOWER_VIS = { 0: 'tw_p0', 1: 'tw_p1', 2: 'tw_p2' };
   for (const name in G.ORIG.units) {

@@ -37,20 +37,17 @@ G.TUNE.bagMax = 6;
 G.TUNE.bagIdle = 1.5;                               // 道具欄沒碰幾秒後自動縮小
 
 // ---------- 野區 ----------
-// kind: 'camp'（小怪，打死給增益/經驗）或 'wboss'（野生首領，打死變成我方戰友去推塔）
+// kind: 'wboss'（野生首領，打死變成我方戰友去推塔）；v3.12 拿掉小怪營地（紅／藍／鱷魚）
 G.WILD = {
-  red: { unit: 'gorilla', kind: 'camp', lv: 3, hpMul: 0.65, pMul: 0.4, aMul: 0.5, respawn: 60, buff: 'red', n: '紅莓猩猩', d: '擊敗獲得「狂暴之力」：{攻擊力 +25%}，90 秒', ic: 'i_rage', col: 10 },
-  blue: { unit: 'hippo', kind: 'camp', lv: 3, hpMul: 0.65, pMul: 0.4, aMul: 0.5, respawn: 60, buff: 'blue', n: '藍泉河馬', d: '擊敗獲得「智慧之泉」：{g:MP 回復 +5/秒}、{冷卻 −20%}，90 秒', ic: 'i_mp', col: 12 },
-  exp: { unit: 'crocodile', kind: 'camp', lv: 3, hpMul: 0.6, pMul: 0.4, aMul: 0.5, respawn: 50, buff: 'exp', n: '沼澤鱷魚', d: '擊敗獲得{大量經驗值}與 {60 金幣}', ic: 'i_book', col: 13 },
   frost: { unit: 'polarbear', kind: 'wboss', lv: 6, hpMul: 2, pMul: 0.7, aMul: 0.6, respawn: 150, n: '冰原霸主', d: '擊敗後{加入我方}，沿著大路推塔', ic: 'i_ice', col: 12 },
   blaze: { unit: 'firebear', kind: 'wboss', lv: 6, hpMul: 2, pMul: 0.7, aMul: 0.6, respawn: 150, n: '熔岩霸主', d: '擊敗後{加入我方}，沿著大路推塔', ic: 'i_fire', col: 14 }
 };
 // ---------- 敵方獵手（打野）----------
-// 新角色「獵狼」：開場 90 秒從敵方聖所出發，專門清我方野區的怪變強；附近有我方單位就先打
+// 新角色「獵狼」：開場 90 秒從敵方聖所出發，守在野生首領坑旁、越活越強，夠強就搶首領；附近有我方單位就先打
 G.ORIG.units.hunter = Object.assign({}, G.ORIG.units.madwolf, { id: 9001, type: 'enemy', jungler: true, hp: 280, grow_hp: 30, power: 24, grow_power: 3, armor: 3, grow_armor: 0.6, speed: 95, delay: 700, critical: 8, exp: 300, weapon_name: 'return_body', weapon_option: 10 });
 G.BESTIARY.hunter = { w: 19, h: 14, draw(P, f) { G.quad(P, f, { bx: 8, by: 8, brx: 6.5, bry: 3.5, hx: 14, hy: 6, hr: 3, legs: [4, 11, 5, 12], ly: 10, ll: 4, ear: 'p', snout: 3, tail: [4, 4], eye: 14 }); P.l(11, 8, 13, 10, 10); P.px(12, 11, 10); P.px(13, 11, 15); P.l(13, 3, 15, 5, 6); for (let x = 4; x < 11; x += 3) P.px(x, 5, 3); } };
-G.TUNE.jungle = { first: 90, respawn: 75, bossLv: 7, bossTime: 300, maxLv: 10, gold: 100 };
-G.HUNTER_INFO = '・開場 {90 秒}出動，倒下 {75 秒}後再來\n・清野怪變強：紅營{加攻擊}、藍營{回血加防禦}、鱷魚營{升級}\n・開場 {5 分鐘}後、{Lv7} 以上會搶野生首領\n・擊倒可得 {100 金幣}';
+G.TUNE.jungle = { first: 90, respawn: 75, bossLv: 7, bossTime: 300, maxLv: 10, gold: 100, lvEvery: 40, guard: 110 };   // v3.12 lvEvery：獵手活著每 40 秒 +1 級；guard：沒事時守在首領坑往敵方退 110
+G.HUNTER_INFO = '・開場 {90 秒}出動，倒下 {75 秒}後再來\n・守在野生首領旁，活著每 {40 秒}升 1 級\n・開場 {5 分鐘}後、{Lv7} 以上會搶野生首領\n・擊倒可得 {100 金幣}';
 // ---------- 鑰匙掉落（%：英雄親手擊倒；友軍擊倒減半）----------
 G.KEY_RATE = { creep: 1, camp: 4, boss: 8, hunter: 12, towerOut: 15, wboss: 18, towerMid: 20, towerIn: 25, towerMain: 30, holy: 100 };   // v3.5 掉落機率減半（聖所維持 100%）
 // 主塔數值（原著要塞太強，改成合理值；雙方共用）
@@ -68,10 +65,6 @@ G.keyRateOf = (name, tab) => {
 G.TUNE.vision = { hero: 290, creep: 190, boss: 220, jungler: 220, tower: 300, holy: 360, cell: 48, every: 0.2 };
 // ---------- 友方塔傳送 ----------
 G.TUNE.tp = { channel: 3, cd: 30, minDist: 110, ask: 2.2 };   // ask：第一下之後幾秒內再點一下才傳送
-G.JBUFF = {
-  red: { n: '狂暴之力', d: '{攻擊力 +25%}', ic: 'i_rage', col: 10, t: 90, fx: { pow: 25 } },
-  blue: { n: '智慧之泉', d: '{g:MP 回復 +5/秒}、{技能冷卻 −20%}', ic: 'i_mp', col: 12, t: 90, fx: { mpReg: 5, cdr: 20 } }
-};
 
 Object.assign(G.World.prototype, {
   // ----- 初始化（建構完成後呼叫） -----
@@ -163,6 +156,9 @@ Object.assign(G.World.prototype, {
     this.say({ s: '敵方獵手出動了', ic: 'i_attack', col: 14, t: 2.4 });
   },
   junglerAI(u, dt) {
+    // v3.12 沒有小野怪了 → 獵手改成活著每 lvEvery 秒升 1 級（到 maxLv）
+    const JT = G.TUNE.jungle; u.jLvT = (u.jLvT || 0) + dt;
+    if (u.jLvT >= JT.lvEvery && u.level < JT.maxLv) { u.jLvT = 0; const f = u.hp / u.st.hp; u.level++; u.calc(); u.hp = u.st.hp * f; G.FX.levelUp(this, u); }
     u.retarget -= dt;
     if (u.retarget <= 0) {
       u.retarget = 0.4;
@@ -186,23 +182,18 @@ Object.assign(G.World.prototype, {
       if (this.inRange(u, t)) { this.brake(u, dt); this.tryAttack(u, t); } else this.chase(u, t, dt);
       return;
     }
-    const hm = u.jHome; if (Math.hypot(hm[0] - u.x, hm[1] - u.y) > 30) this.chase(u, { x: hm[0], y: hm[1] }, dt); else this.brake(u, dt);
+    // 沒事做：守在最近的野生首領坑旁（往敵方聖所那側退一點，不去碰首領）
+    let hm = u.jHome, pd = 1e9; const eh = this.holy[1];
+    for (const c of this.camps) { if (c.def.kind !== 'wboss') continue; const d = Math.hypot(c.x - u.jHome[0], c.y - u.jHome[1]); if (d < pd) { pd = d; const dx = eh.x - c.x, dy = eh.y - c.y, L = Math.hypot(dx, dy) || 1; hm = [c.x + dx / L * JT.guard, c.y + dy / L * JT.guard]; } }
+    if (!this.M.isWalk(hm[0], hm[1])) hm = u.jHome;
+    if (Math.hypot(hm[0] - u.x, hm[1] - u.y) > 30) this.chase(u, { x: hm[0], y: hm[1] }, dt); else this.brake(u, dt);
   },
   hunterReward(u, t) {
-    const d = t.wild, L = G.TUNE.jungle.maxLv;
-    const lvUp = n => { const f = u.hp / u.st.hp; u.level = Math.min(L, u.level + n); u.calc(); u.hp = u.st.hp * f; G.FX.levelUp(this, u); };
-    if (d.kind === 'wboss') {
-      const b = this.add(new G.Unit(this, t.name, 1, t.x, t.y, d.lv, 'boss'));
-      b.st.hp = Math.round(b.st.hp * 2); b.hp = b.st.hp; b.skillCd = 3;
-      let bl = 1, bd = 1e9; for (let li = 0; li < this.nLanes; li++) { const v = this.M.laneDist(li, t.x / G.TILE, t.y / G.TILE); if (v < bd) { bd = v; bl = li; } }
-      b.lane = bl; G.FX.spawn(this, b); this.say({ s: '敵方獵手收服了' + d.n, ic: d.ic, col: 10, t: 2.8 }); this.sfx('warn');
-      return;
-    }
-    if (d.buff === 'red') this.addBuff(u, 'j_red', G.JBUFF.red.fx, 90, 'i_rage', 10);
-    else if (d.buff === 'blue') { this.addBuff(u, 'j_blue', { arm: 3 }, 90, 'i_hold', 12); u.hp = u.st.hp; }
-    else lvUp(1);
-    const ours = G.d2(t.x, t.y, this.holy[0].x, this.holy[0].y) < G.d2(t.x, t.y, this.holy[1].x, this.holy[1].y);   // 只在偷我方野區時提醒
-    if (ours) this.say({ s: '敵方獵手搶走了' + d.n, ic: d.ic, col: 10, t: 2.2 });
+    const d = t.wild; if (!d || d.kind !== 'wboss') return;
+    const b = this.add(new G.Unit(this, t.name, 1, t.x, t.y, d.lv, 'boss'));
+    b.st.hp = Math.round(b.st.hp * 2); b.hp = b.st.hp; b.skillCd = 3;
+    let bl = 1, bd = 1e9; for (let li = 0; li < this.nLanes; li++) { const v = this.M.laneDist(li, t.x / G.TILE, t.y / G.TILE); if (v < bd) { bd = v; bl = li; } }
+    b.lane = bl; G.FX.spawn(this, b); this.say({ s: '敵方獵手收服了' + d.n, ic: d.ic, col: 10, t: 2.8 }); this.sfx('warn');
   },
   // ----- 視野 -----
   updateVision(dt) {
@@ -275,11 +266,6 @@ Object.assign(G.World.prototype, {
       this.stats.wboss++;
       G.FX.ring(this, t.x, t.y, 6, 80, 0.7, 13, 2); this.shake(0.5); this.sfx('level', t.x, t.y);
       this.say({ s: d.n + ' 加入我方', ic: d.ic, col: 13, t: 2.6 });
-    } else {
-      this.addGold(G0.camp, t.x, t.y);
-      if (d.buff === 'exp') { this.gainExp(h, Math.round(this.expNeed(h) * 0.55)); this.say({ s: '經驗大幅提升', ic: 'i_book', col: 13, t: 2 }); }
-      else { const b = G.JBUFF[d.buff]; this.addBuff(h, 'j_' + d.buff, b.fx, b.t, b.ic, b.col); this.say({ s: '獲得 ' + b.n, ic: b.ic, col: b.col, t: 2.2 }); G.FX.ring(this, h.x, h.y, 4, 40, 0.6, b.col, 2); }
-      this.sfx('level', t.x, t.y);
     }
   },
 

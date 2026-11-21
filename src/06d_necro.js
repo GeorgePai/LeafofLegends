@@ -92,7 +92,7 @@ Object.assign(G.Combat, {
   // 召喚物：安靜地加入跟隨（世界才有跟隨；沙盒不需要）
   makeSummon(h, u) {
     u.summoner = h; u.noRe = false;
-    if (this.followSlots && this.hero === h && h.alive && !this.attract) { u.follow = true; u.path = null; u.target = null; u.repath = 0; this.fSlotT = null; this.stats.maxFollow = Math.max(this.stats.maxFollow, this.followCount()); }
+    if (this.followSlots && this.hero === h && h.alive && !this.attract) { u.follow = true; u.path = null; u.target = null; u.repath = 0; this.fSlotT = null; }
     return u;
   },
   // 不能施放的原因（沒有就回傳 null）

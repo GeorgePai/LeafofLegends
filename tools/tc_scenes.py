@@ -104,13 +104,12 @@ S.append(['cardx',"G.UI.hold=null",100])
 S.append(['charge',"G.UI.hold=null; G.UI.screen='battle'; G.newWorld({hero:0}); var h=G.W.hero; h.skills.forEach(s=>s.lv=1); h.chg={sd:h.skills[0].s,t:null,lv:1,T:0.2,dur:0.5,el:'arcane',big:true};",200])
 for hi in range(11):
   S.append([f'skup-h{hi}',f"G.UI.hold=null; G.UI.screen='battle'; G.newWorld({{hero:{hi}}}); var W=G.W,h=W.hero; h.level=12; var A=[...h.skills,...h.pskills]; A.forEach(s=>s.lv=1); h.sp=9; W.notices=[]; A.forEach(s=>W.levelSkill(s)); W.notices.forEach(n=>n.age=1);",400])
-S.append(['end',"Object.assign(G.W.stats,{kills:134,deaths:0,assists:112,towers:16,camps:17,gold:123456,dmg:1234567,taken:234567,bosses:13,time:3812});G.W.keysGot=13;G.Ach.recent=['games1','win1','speed','tame','comeback','gamble5'];G.W.over={win:true,t:3}",3200])
+S.append(['end',"Object.assign(G.W.stats,{kills:134,deaths:0,assists:112,towers:16,camps:17,wboss:12,gold:123456,dmg:1234567,taken:234567,bosses:13,time:3812});G.W.keysGot=13;G.Ach.recent=['games1','win1','speed','tame','comeback','gamble5'];G.W.over={win:true,t:3}",3200])
 S.append(['end-full',"G.UI.endT=9",400])
 S.append(['end-lose',"G.UI.start();G.Ach.recent=[];G.W.over={win:false,t:3}",3200])
 S.append(['end-lose-full',"G.UI.endT=9",400])
 # v2.5 圖鑑藥水、解散跟隨鈕、英雄面板
 S.append(['book-pot',"G.UI.screen='book';G.Menus._btab(5)",400]); S.append(['book-pot2',"G.Menus.scroll(400,G.Render.uw/2,G.Render.uh/2)",300]); S.append(['book-pot-x',"G.Menus._btab(0)",200])
-S.append(['follow',"G.UI.start();var W=G.W,h=W.hero;for(var i=0;i<5;i++){var u=new G.Unit(W,'leafblower',0,h.x+10*i,h.y+20,1,'creep');W.units.push(u);W.toggleFollow(u);}",400])
 S.append(['hpanel',"G.UI.toast=null;G.UI.heroPanel=true",300]); S.append(['hpanel-x',"G.UI.heroPanel=false",100])
 # v2.4 技能瞄準＋取消區、被塔鎖定
 S.append(['aim',"G.UI.start();var h=G.W.hero;h.skills.forEach(s=>s.lv=1);h.mp=999;G.UI.aim={i:2,s:h.skills[2],on:true,pre:false,bx:G.Render.uw-20,by:G.Render.uh-20,dx:-40,dy:-24,ux:G.Render.uw-60,uy:G.Render.uh-44};",400])
@@ -175,8 +174,8 @@ S.append(['adm-dyn',"localStorage.setItem('leafwar_adm','k');G.Team.setDev(true)
 S.append(['adm-det',"G.RankUI._det('a')",300]); S.append(['adm-det2',"G.RankUI._det('b')",300])
 S.append(['adm-x',"G.RankUI._det(null);G.RankUI.adm(false);localStorage.removeItem('leafwar_adm');G.Team.setDev(false);G.UI.goTitle()",200])
 # v3.2.4 戰場縮放鈕、三路欄位固定高度、更新內容卡（捲動）、更新通知條
-S.append(['zoom-btn',"G.UI.start(0);G.W.followCount=()=>3;G.W.tp={cd:20};G.W.bag=G.SHOP.slice(0,4).map(d=>({id:d.id,n:2}))",600])
-S.append(['zoom-x',"G.W.followCount=()=>0;G.W.tp=null;G.W.bag=[];G.UI.goTitle()",200])
+S.append(['zoom-btn',"G.UI.start(0);G.W.tp={cd:20};G.W.bag=G.SHOP.slice(0,4).map(d=>({id:d.id,n:2}))",600])
+S.append(['zoom-x',"G.W.tp=null;G.W.bag=[];G.UI.goTitle()",200])
 S.append(['lane-full',"G.Team.setDev(true);const T=G.Team.get();T._bk=JSON.stringify(T.loadout);T.loadout=['leafblower','leafblower','leafblower','seedshooter','seedshooter','treeprotector','potatoblower','stemskewer','peasniper'].map(n=>({n,l:1}));G.Menus.focusTeam('leafblower')",500])
 S.append(['lane-x',"const T=G.Team.get();T.loadout=JSON.parse(T._bk);delete T._bk;G.Team.save();G.Team.setDev(false);G.UI.goTitle()",200])
 LONG="[{v:'V9.9.2',d:'12/2',n:['這是一條很長的更新說明，用來測試資訊卡在內容很多的時候會不會被裁切或顯示不完整','第二條','第三條比較長一點點的說明文字']},{v:'V9.9.1',d:'12/1',n:['這是一條很長的更新說明，用來測試資訊卡在內容很多的時候會不會被裁切或顯示不完整','第二條']}]"

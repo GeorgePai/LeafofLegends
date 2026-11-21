@@ -238,7 +238,7 @@ G.Render = (() => {
     for (const u of W.units) if (u.alive && inView(u.x, u.y) && W.seen(0, u)) list.push({ y: G.lerp(u.py, u.y, alpha), u });   // 迷霧中的敵人不畫
     for (const p of W.projs) if (p.side === 0 || W.seenXY(0, p.x, p.y)) list.push({ y: p.y, j: p });
     list.sort((a, c) => a.y - c.y);
-    const bars = [], arrows = [], reticles = [], flags = [];
+    const bars = [], arrows = [], reticles = [];
     for (const it of list) {
       if (it.p) {
         const p = it.p, s = p.s, ax = Math.round(p.x * G.AX - ox - s.w / 2), ay = Math.round(p.y * G.AY - oy - s.h + 2), sn = W.theme && W.theme.tree ? G.themeImg(s.n, W.themeId) : s.n;   // v3.0 主題換色
@@ -341,7 +341,6 @@ G.Render = (() => {
         // 血條
         const full = u.hp >= u.st.hp - 0.5;
         if (!full || u.kind !== 'creep') bars.push([u, q(gx), ayT - 3]);
-        if (u.follow) flags.push([q(gx), ayT - (full && u.kind === 'creep' ? 2 : 6)]);
         const locked = h0 && h0.alive && h0.cmd && h0.cmd.lock && h0.cmd.t === u;
         if (!locked && tgt) arrows.push([q(gx), ayT - 9 - Math.round(Math.abs(Math.sin(rt * 6)) * 2)]);
       } else if (it.j) {
@@ -396,13 +395,6 @@ G.Render = (() => {
       if (u.kind === 'jungler') G.text(b, 'HUNTER', cx, y - 7, 14, 1, 0, 0.5);
     }
     for (const [x, y, t] of campTxt) G.text(b, t, x, y, 5, 1, 0, 0.5);
-    // 召集中的小兵：頭上黃色小旗
-    for (const [x, y0] of flags) {
-      const y = y0 - (((rt * 3) | 0) % 2);
-      b.fillStyle = G.PAL[0]; b.fillRect(x - 2, y - 8, 7, 5); b.fillRect(x - 2, y - 8, 3, 10);
-      b.fillStyle = G.PAL[9]; b.fillRect(x - 1, y - 7, 1, 8);
-      b.fillStyle = G.PAL[13]; b.fillRect(x, y - 7, 4, 3); b.fillStyle = G.PAL[14]; b.fillRect(x, y - 5, 4, 1);
-    }
     // 落點箭頭（畫在最上層）
     if (mk && mk.ax != null && mk.fade > 0.3 && !W.attract) {
       const x = mk.ax, y = mk.ay;
