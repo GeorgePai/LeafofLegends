@@ -92,6 +92,7 @@ S.append(['heropanel',"G.UI.heroPanel=true",300]); S.append(['hpx',"G.UI.heroPan
 S.append(['skillcard',"const h=G.W.hero; G.UI.hold={id:'x',t:1,s:h.skills[0],fired:true,x:G.Render.uw-120,y:G.Render.uh-24,w:24};",300])
 S.append(['buffcard',"G.UI.hold={id:'bf_i_spd',t:1,buff:'i_spd',fired:true,x:G.Render.ins.l,y:G.Render.ins.t+53};",300])
 S.append(['pause',"G.UI.hold=null; G.UI.paused=true",300]); S.append(['unpause',"G.UI.paused=false",100])
+S.append(['pause-ask-retry',"G.UI.paused=true; G.UI.leaveAsk='retry'",300]); S.append(['pause-ask-home',"G.UI.leaveAsk='home'",300]); S.append(['pause-ask-x',"G.UI.leaveAsk=null; G.UI.paused=false",100])   # v3.10 離開確認
 S.append(['bigmap',"G.UI.bigMap=true",300]); S.append(['bigmapx',"G.UI.bigMap=false",100])
 S.append(['statp',"G.W.stats.kills=12;G.W.stats.deaths=3;G.W.stats.assists=27;G.W.stats.dmg=123456;G.W.stats.gold=98765;G.UI.statP=true",300]); S.append(['statpx',"G.UI.statP=false",100])
 S.append(['zoomout',"G.Render.setZoom(0.01)",400]); S.append(['zoomback',"G.Render.setZoom(1)",100])

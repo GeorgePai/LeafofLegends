@@ -82,8 +82,8 @@ G.UI = (() => {
 
   // ---------- 畫面切換 ----------
   const leaveBattle = () => { if (G.W && !G.W.attract && G.Ach) { G.Ach.commit(G.W); G.Ach.abandon(G.W); } };   // v3.8 沒打完就離開：這場不算進排行
-  U.goTitle = U.goMenu = () => { if (U.screen && U.screen !== 'menu' && U.screen !== 'tap' && U.screen !== 'intro' && G.Trans) G.Trans.reveal(); leaveBattle(); if (G.Menus) G.Menus.resetIntro(); U.screen = 'menu'; U.paused = false; if (!G.W || !G.W.attract) G.newWorld({ attract: true }); R.cam.zoom = 1; G.Audio.setMode('menu'); };
-  U.start = st => { if (typeof st === 'number') U.stageI = st; leaveBattle(); U.bagW = null; U.bagUse = null; U.bagEx = 1; U.tpAsk = null; G.Team.sanitize(); const T = G.Team.get(); U.screen = 'battle'; U.paused = false; G.newWorld({ hero: T.hero, loadout: T.loadout, stage: U.stageI || 0 }); R.cam.follow = true; R.cam.zoom = 1; G.Audio.musicRestart('battle'); G.Audio.setMode('battle'); G.Audio.play('level'); };
+  U.goTitle = U.goMenu = () => { U.leaveAsk = null; if (U.screen && U.screen !== 'menu' && U.screen !== 'tap' && U.screen !== 'intro' && G.Trans) G.Trans.reveal(); leaveBattle(); if (G.Menus) G.Menus.resetIntro(); U.screen = 'menu'; U.paused = false; if (!G.W || !G.W.attract) G.newWorld({ attract: true }); R.cam.zoom = 1; G.Audio.setMode('menu'); };
+  U.start = st => { if (typeof st === 'number') U.stageI = st; leaveBattle(); U.leaveAsk = null; U.bagW = null; U.bagUse = null; U.bagEx = 1; U.tpAsk = null; G.Team.sanitize(); const T = G.Team.get(); U.screen = 'battle'; U.paused = false; G.newWorld({ hero: T.hero, loadout: T.loadout, stage: U.stageI || 0 }); R.cam.follow = true; R.cam.zoom = 1; G.Audio.musicRestart('battle'); G.Audio.setMode('battle'); G.Audio.play('level'); };
   // 全畫面暗幕：純黑半透明（不用顆粒，眼睛比較舒服）
   const dim = (...a) => U.h.dim(...a);
   const _dim = (c, a) => { if (R.hi) for (const q of R.hi) q.cov = true; c.fillStyle = 'rgba(10,10,10,' + a + ')'; c.fillRect(0, 0, R.uw, R.uh); };
@@ -678,10 +678,13 @@ G.UI = (() => {
     const uw = R.uw, uh = R.uh;
     dim(c, 0.7);
     // 每個按鈕都有圖示＋名稱
-    const items = [['i_play', '繼續', () => { U.paused = false; }], ['i_guide', '教學', () => G.Menus.openGuide(true)], ['i_retry', '重新開始', () => U.start(U.hero)],
-      ['i_tree', '回首頁', () => U.goTitle()]];
+    // v3.10 「這場不計入排行」改成按了重新開始／回首頁之後才跳確認（Pai：直接寫在暫停裡很冗）
+    const ranked = !G.Team.dev && W && !W.over && !W.attract, leave = (k, fn) => () => { if (ranked) { U.leaveAsk = k; G.Audio.play('open'); } else fn(); };
+    if (U.leaveAsk) return leaveAsk(c);
+    const items = [['i_play', '繼續', () => { U.paused = false; }], ['i_guide', '教學', () => G.Menus.openGuide(true)], ['i_retry', '重新開始', leave('retry', () => U.start(U.hero))],
+      ['i_tree', '回首頁', leave('home', () => U.goTitle())]];
     const bw = Math.max(Math.max(...items.map(q => G.cnW(q[1]))) + 34, Math.min(150, uw - R.ins.l - R.ins.r - 16)), bh = 20, gap = 4;
-    const note = !G.Team.dev && W && !W.over ? G.cnWrap('重新開始或回首頁：這場不計入排行', bw) : [], tot = 18 + items.length * (bh + gap) + 4 + 44 + (note.length ? note.length * 13 + 4 : 0);   // v3.8
+    const tot = 18 + items.length * (bh + gap) + 4 + 44;
     const x = Math.round(uw / 2 - bw / 2); let y = Math.round(uh / 2 - tot / 2);
     G.cn(c, '暫停', uw / 2, y, 9, 0.5); y += 18;
     items.forEach(([ic, lab, fn], i) => {
@@ -690,9 +693,23 @@ G.UI = (() => {
       btn(id, x, y, bw, bh, () => { U.press[id] = 0.12; G.Audio.play('click'); }, fn);
       y += bh + gap;
     });
-    if (note.length) { note.forEach((l, i) => G.cn(c, l, uw / 2, y + i * 13, 6, 0.5)); y += note.length * 13 + 4; }
     // 音量
     y += 2; box(c, x, y, bw, 44, 1, 4, false); U.volPanel(c, x + 4, y + 2, bw - 8);
+  }
+  // 離開確認：這場還沒打完 → 不會計入排行
+  function leaveAsk(c) {
+    const uw = R.uw, uh = R.uh, k = U.leaveAsk, home = k === 'home';
+    const PW = Math.min(uw - R.ins.l - R.ins.r - 12, 190), iw = PW - 16, title = home ? '要回首頁嗎？' : '要重新開始嗎？';
+    const lines = ['這場還沒打完，', '成績不會計入排行榜。'].flatMap(t => G.cnWrap(t, iw)), bh = 20;   // 斷在逗號後，手機上不會斷在詞中間
+    const tot = 8 + 14 + 6 + lines.length * 13 + 8 + bh + 8, x = Math.round(uw / 2 - PW / 2); let y = Math.round(uh / 2 - tot / 2);
+    btn('lvBg', 0, 0, uw, uh, null, () => { });                                       // 擋住後面的按鈕
+    box(c, x, y, PW, tot, 1, 13); y += 8;
+    G.cn(c, title, uw / 2, y, 13, 0.5); y += 14 + 6;
+    lines.forEach((l, i) => G.cn(c, l, uw / 2, y + i * 13, 7, 0.5)); y += lines.length * 13 + 8;
+    const g = 6, w2 = Math.floor((iw - g) / 2), bx = x + 8;
+    const b2 = (id, lab, xx, col, fn) => { const o = U.press[id] > 0 ? 1 : 0; U.h.key(c, xx, y + o, w2, bh, o, col); G.cn(c, lab, xx + w2 / 2, y + 4 + o, col === 13 ? 13 : 9, 0.5); btn(id, xx, y, w2, bh, () => { U.press[id] = 0.12; G.Audio.play('click'); }, fn); };
+    b2('lvNo', '取消', bx, 7, () => { U.leaveAsk = null; });
+    b2('lvYes', home ? '回首頁' : '重新開始', bx + w2 + g, 13, () => { U.leaveAsk = null; home ? U.goTitle() : U.start(U.hero); });
   }
   // ---------- 結算 ----------
   // 評價：依擊殺、助攻、推塔、野怪、首領、陣亡、勝負計分（門檻暫定）
@@ -1013,7 +1030,8 @@ G.UI = (() => {
       if (U.screen !== 'battle') { if (G.Menus && G.Menus.key) G.Menus.key(k); return; }
       if (k === 'escape' && U.aim && U.aim.on) { U.aimCancel(); return; }
       if (k === 'escape' && U.shop) { U.shop = false; return; }
-      if (k === 'escape' || k === 'p') { U.paused = !U.paused; return; }
+      if (k === 'escape' && U.leaveAsk) { U.leaveAsk = null; return; }               // v3.10 離開確認：Esc＝取消
+      if (k === 'escape' || k === 'p') { U.paused = !U.paused; U.leaveAsk = null; return; }
       if (U.paused || !W || W.over) return;
       const sk = { q: 0, e: 1, r: 2, '1': 0, '2': 1, '3': 2 }[k];
       if (sk != null && U.mouse && W.hero && W.hero.alive && W.hero.skills[sk] && W.hero.skills[sk].lv && !W.hero.chg) { U.aim = { i: sk, s: W.hero.skills[sk], on: true, mouse: true, key: k }; U.aimUpdate(); }
