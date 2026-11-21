@@ -2,10 +2,10 @@
 
 > 新 session 只要讀這份。排行榜相關再看 `LEADERBOARD.md`。**做任何新設計前，先對照第 8 節「設計守則」**。
 > 各版完成內容在 `CHANGELOG.md`、暫定數值在 `VALUES.md`，需要時用 grep 找到段落再讀，不要整份讀。
-> 最後更新：2026-11-20，版本 **v3.2.5**
+> 最後更新：2026-11-21，版本 **V3.11**
 
 ## 1. 專案是什麼
-- Pai 的 HTML5 瀏覽器遊戲，仿 Gamevil《Plants War》（三路推塔＋英雄操作＋小兵兵線）
+- Pai 的 HTML5 瀏覽器遊戲，仿 Gamevil《Plants War》（推塔＋英雄操作＋小兵兵線）。**v3.7 起改成單路地圖**（每關一張、每邊內／中／外三座塔＋聖所，v3.10 拿掉主塔）
 - 美術：極簡黑白灰像素風，少量色彩點綴（紅 HP、綠 MP、黃 互動／金幣、藍 BOSS／護盾、橘 爆擊；敵方 v2.3～v3.0 赤紅、v3.1 起暗黑＋細紅邊）
 - 原著數值（英雄 10、小兵 19、敵人 35、塔 6、技能 60）已從 APK 解出，在 `src/01_data_orig.js`；平衡覆寫在 `src/02c_balance.js`
 - 和 Pai 溝通：**繁體中文、結論先講、精簡**；每次回覆都要附 **作品連結**
@@ -18,7 +18,7 @@
 | **原始碼（雲端接手來源）** | 同一個 repo 的 **source** 分支：`src/`、`assets/`、`audio/`、`build.py`、`shell.html`、`tools/`、`setup.sh`、本檔、`CHANGELOG.md`、`VALUES.md`。注意：repo 是公開的（遊戲本身已經包含全部 JS，所以沒有多公開什麼） |
 | Mac 備份 | `/Users/paiju/Desktop/Claude/LeafofLegends/`：`LeafofLegends.html`（可直接玩，旁邊的 `audio/` 是音樂）、`source/`、`versions/LeafofLegends_v*.zip`（舊版 `LeafWar_v*.zip`）、`bgm/`（Pai 給的原始 BGM）、本檔 |
 | **排行榜伺服器** | https://lol-rank.leafoflegends.workers.dev（Cloudflare Worker `lol-rank`＋D1 `lol-rank`，帳號用 Apple ID 登入）。程式在 source 分支的 `leaderboard/`；**推 source 就會由 Cloudflare Workers Builds 自動部署**（根目錄 /leaderboard、`npx wrangler deploy`），資料表由 Worker 自己建立／升級。細節見 `LEADERBOARD.md` |
-| 測試工具 | `tools/`：`tc_all.sh`（平行文字檢查＋摘要）、`textcheck.py`＋`tc_scenes.py`、`shot.py`（截圖）、`sheet.py`（多張截圖拼成一張）、`vfxsheet.py`（技能特效總覽）、`guideshot.py`（教學頁截圖） |
+| 測試工具 | `tools/`：`tc_all.sh`（平行文字檢查＋摘要）、`textcheck.py`＋`tc_scenes.py`、`shot.py`（截圖）、`sheet.py`（多張截圖拼成一張）、`vfxsheet.py`（技能特效總覽）、`guideshot.py`（教學頁截圖）；v3.10 新增 `ultshot.py`（英雄放大招連拍：`python3 tools/ultshot.py 英雄,... out.png 秒,秒,...`，查殘影）、`mapcheck.py`（五張地圖合法性＋預覽圖 /tmp/s/map_l*.png）、`towersheet.py`（塔精靈總覽）、`sbult.py`（隊伍技能展示大招連拍） |
 
 ## 3. 接手步驟（約 2 分鐘，不需要 Mac）
 1. `add_repo(GeorgePai, LeafofLegends, push)`
@@ -43,10 +43,10 @@
 |---|---|
 | 00_core | 色盤、工具、精靈生成、像素字、`G.glowOf`（剪影外框光暈）、`G.RARITY` 稀有度、`G.scaled` |
 | 01_data_orig | 原著資料 `G.ORIG`（units/towers/skills/weapons/items/heroSkills/stages） |
-| 02_config | `G.TUNE` 調整值、`G.HEROES`、地圖 `G.MAPS.lanes5`（104×78，現用；每路 3 層塔＋主塔、凹槽營地、河道旁首領坑；舊的 lanes4 保留）、`G.STAGES` |
+| 02_config | `G.TUNE` 調整值（`heroScale`、`chgUlt`、`foeMul`、`towerOne`…）、`G.HEROES`、**單路地圖產生器 `G.laneMap(spec)` → `G.MAPS.l1`～`l5`**（72×54 點對稱；只寫半條路控制點，自動平滑、放塔（半路 28／53／78%）、中心垂直河、河邊首領坑、交戰區營地）；舊三路 lanes3/4/5 沒在用、保留、`G.STAGES` |
 | 02b_text | 原著中文文字（已轉繁體，立斐→力夫） |
 | 02c_balance | **平衡調整層（v2.2）**：`G.BAL` 覆寫 G.ORIG 技能／英雄成長欄位（原值在註解）、狂戰士倍率 `G.RAGE` |
-| 03_sprites / 03b_bestiary | 手繪與程序生成的全部角色/圖示精靈 |
+| 03_sprites / 03b_bestiary | 手繪與程序生成的全部角色/圖示精靈；**塔 `G.towerArt(W,H,tier,K)`**（v3.9 立體圓柱：蘭伯特受光＋網點、弧形磚縫、橢圓頂面／城垛、圓錐瓦頂、多切面水晶），`tw_e0/e1/e2`、`tw_p0/p1/p2`，`G.TOWER_VIS` 我方依層級換圖 |
 | 04_audio | Web Audio 合成音效（含 tick/snap/coin/open）與 BGM；`G.Audio.raw()`／`cry()` |
 | 04b_cry | **角色專屬叫聲（v2.9）**：`G.Cry`（`BASE` 37 種基底、`ADD` 加料、`V` 每隻角色 [基底, 音高, 長度, 回聲, 加料]、`add` 登記新角色） |
 | 05_map | 地圖場域、可走網格、導航 Dijkstra 流場、河道渲染、小地圖 |
@@ -58,14 +58,14 @@
 | 07b_systems | 技能升級、金幣/商店/背包、計時增益、野區、技能數值表 `G.skillRows`、**敵方獵手 `hunter`（`spawnHunter/junglerAI/hunterReward`）、塔傳送 `startTeleport/updateTeleport`** |
 | 08b_hd | **HD-2D 鏡頭後製（v3.2.2）**：`G.HD`（WebGL 著色器：透視、景深、柔光、調色、光束；光塵），`on/P/active/over/render` |
 | 08_render | `R.resize`（固定比例＋整數倍）、`R.zoomMin`（可縮到全圖）、`R.hiQ/blitUI`、世界繪製（護盾光殼、稀有度外框、血條、準心、迷霧） |
-| 09_ui | 戰鬥 HUD：HP/MP/XP 三條等粗、鑰匙＋K/D/A 列、小地圖 `mapDraw`＋展開大地圖 `bigMap`、戰鬥數據 `statPanel`、廣播 `drawNotices`、技能水平列＋置中鈕（大招上方）、長按技能卡（動畫，`cardC`）、增益卡、商店、左側道具欄（效果短標）、暫停選單（有名稱）；所有輸入（`evXY` 已扣黑邊）|
-| 10_sandbox | 中文字工具 `G.cn/cnWrap`、標籤 `tagOf`、**技能展示沙盒 `G.Sandbox`（依技能類型的情境：`scBasic/scActive/scBuff/scPassive`，被動用對照演出）** |
-| 11_menus | 首頁（大標題 5×7 字形 `TITLE_GLYPH`）、隊伍／圖鑑（共用轉盤 `cars.team/book`，橫屏轉盤高度依 `nameplateH`）、技能展示彈窗 `demoPanel`（動畫＋數值表 `lvTable`：每列同一行，放不下就數值欄左右滑動 `TS`）、數值條 `G.statBars/G.statMax`、三欄陣容 `laneCols`、教學（5 類（v2.8.4 拿掉英雄），說明文字用 `{重點}` 上色；`G.Menus.openGuide(fromBattle)`、`M._gt(t)` 測試用跳時間）；捲動狀態 `SM`/`SD` 分開 |
+| 09_ui | 戰鬥 HUD（v3.8 大招橫幅 `ultBanner`；v3.11 暫停離開確認 `leaveAsk`；`leaveBattle` 會 `G.Ach.abandon`）：HP/MP/XP 三條等粗、鑰匙＋K/D/A 列、小地圖 `mapDraw`＋展開大地圖 `bigMap`、戰鬥數據 `statPanel`、廣播 `drawNotices`、技能水平列＋置中鈕（大招上方）、長按技能卡（動畫，`cardC`）、增益卡、商店、左側道具欄（效果短標）、暫停選單（有名稱）；所有輸入（`evXY` 已扣黑邊）|
+| 10_sandbox | 中文字工具 `G.cn/cnWrap`、標籤 `tagOf`、**技能展示沙盒 `G.Sandbox`（依技能類型的情境：`scBasic/scActive/scBuff/scPassive/scNecro`，被動用對照演出；v3.9 大招走 `cast()`→`beginCharge` 播大招儀式，借用 `G.Render.chgFloor/chgBody`）** |
+| 11_menus | 首頁（大標題 5×7 字形 `TITLE_GLYPH`）、隊伍／圖鑑（共用轉盤 `cars.team/book`，橫屏轉盤高度依 `nameplateH`）、技能展示彈窗 `demoPanel`（動畫＋數值表 `lvTable`：每列同一行，放不下就數值欄左右滑動 `TS`）、數值條 `G.statBars/G.statMax`、陣容 `teamBox`（v3.7 拿掉上中下路）、教學（5 類（v2.8.4 拿掉英雄），說明文字用 `{重點}` 上色；`G.Menus.openGuide(fromBattle)`、`M._gt(t)` 測試用跳時間）；捲動狀態 `SM`/`SD` 分開 |
 | 12_store | **商店／寶箱**：`G.CHESTS`（機率表）、`G.Store`（畫面、說明視窗、開箱動畫、寶箱像素圖 `drawChest`） |
 | 13_ach | **成就（v1.7）**：`G.ACH`（43 個定義：c 分類、t 等級 1～4、g 目標、v 取值、hint 隱藏提示）、`G.Ach`（`P()` 檔案、`check/commit/tick/final/on/claim`、`recent`、`banner`）、`G.AchUI` 成就畫面、`G.Ach.drawBanner` |
 | 14_save | **存檔碼（v1.7）**：`G.SaveCode`（`make/read/clean/apply/summary`）、`G.Dom`（疊在 canvas 上的 input/textarea，每幀 `place`，沒用到自動隱藏）、`G.SaveUI`（存檔畫面 home/name/code/load/confirm、`drawWelcome` 歡迎回來、`drawGreet` 開啟問候） |
 | 15_intro | **開場動畫（v1.7）**：`G.Intro`（`draw/skip/reset/drawFlash`），約 2.45 秒＋白光淡出 |
-| 16_rank | **線上排行榜（v3.2 玩家動態 `K.state`、管理玩家詳細 `det`／`_det`）（v2.8；v2.8.4 強制參加、跳至自己 `jmp`、`remove/forget/uid`、幽靈清除 `admPurge`）**：`G.RANK_URL`、`G.RANK_CATS`（9 分類）、`G.Rank`（poll/submit/join/leave/autoJoin、通知 diff/news、管理 admLoad/admAct、測試 `_mock/_set`）、`G.RankUI`（分類滾輪 `cw`、清單、底部名次列、管理玩家 `admin()`）。身分 `P.rk={id,tok}`、累積鑰匙 `P.keysTot` |
+| 16_rank | **線上排行榜（v3.2 玩家動態 `K.state`、管理玩家詳細 `det`／`_det`）（v2.8；v2.8.4 強制參加、跳至自己 `jmp`、`remove/forget/uid`、幽靈清除 `admPurge`）**：`G.RANK_URL`、`G.RANK_CATS`（v3.6 起 13 分類，`RANK_MIN`、`weekId`；排行數據用 `p.rs`＝打完才累加）、`G.Rank`（poll/submit/join/leave/autoJoin、通知 diff/news、管理 admLoad/admAct、測試 `_mock/_set`）、`G.RankUI`（分類滾輪 `cw`、清單、底部名次列、管理玩家 `admin()`）。身分 `P.rk={id,tok}`、累積鑰匙 `P.keysTot` |
 | 17_update | **版本更新通知（v2.8.5）**：`G.Update`（check/tick/corner/card、`show(mode,from)`：'new' 有新版／'done' 已更新的內容卡，內容可捲動；`_set/_open/_show/_sc/force` 測試用）、讀 `version.json`，離線用 build 打包的 `G.RELEASE`；更新後通知條 `G.Ach.drawUpd` |
 | 18_feedback | **反饋信箱（v2.8.6）**：`G.FbUI`（玩家寫信／看回覆；開發者模式＝玩家信箱）；連線在 16_rank 的 `K.fb*` |
 | 19_about | **關於（v2.8.6）**：`G.About` 片尾名單＋櫻花、結尾淡出回首頁（`post` 在首頁最後畫淡入）|
@@ -101,12 +101,19 @@
 - v3.2.1：拿掉側面厚度，改成 HD-2D 微縮景深＋柔光（`G.VOL`，現在只當不支援 WebGL 時的退路）
 - v3.2：等級數字改白字細黑邊、復活無敵 2 秒、2.5D 立體感（側面厚度，v3.2.1 已拿掉）、系統公告＋信箱、管理玩家動態
 - v3.1：出發過場動畫＋進關卡卡頓修正（地面色名快取）、等級徽章、敵人改回暗黑色調（場景生物各有色調＋細紅邊）、選關滑動重做、教學 72→51 頁全面改寫、爐石式文字守則
+- v3.2.6～v3.3：累積鑰匙真的累積、建帳號送鑰匙＋領取動畫＋邀請
+- v3.4～v3.6：敵方每波加倍、關卡解鎖動畫、拿掉經典戰場、畫質（原生解析＋2 倍緩衝）、鑰匙經濟下修、排行 13 類、建帳號送 10 把、存檔碼 LW2 精簡
+- v3.7：**單路地圖**（`G.laneMap`，五關各一張）、隊伍編輯拿掉上中下路
+- v3.8：大招儀式（蓄力聚光＋橫幅＋爆發）、塔變大、英雄放大、路寬 ×1.5、熔岩彈預警、排行只計打完的戰鬥
+- v3.9：立體圓柱塔、隊伍技能展示播大招、大地圖聖所改菱形
+- v3.10：拿掉主塔（三座塔等距重排）、英雄 ×1.25、大招殘影修正（穿透光帶改彗星尾巴、焦痕縮短）
+- v3.11：「不計入排行」改成按重新開始／回首頁才跳確認
 - v2.4：敵塔範圍＋鎖定警示、道路 ×1.5、結算放慢＋鎖值＋音效、新藥水 5 種＋全部藥水特效、DEV 密碼、技能範圍顯示＋指定施放（拖曳／取消）、LOGO 改版、塔射程 190/210
 
 ## 6. 待 Pai 決定
 - 畫質再提升：A＝高解析文字（像素角色＋平滑字體），B＝提高像素解析度（480×270，整套美術重畫）。尚未選擇
 - 圖鑑動畫重畫：Pai 說「有些動畫可以描繪得更好」，等他指定哪幾隻
-- 暫定數值全部在 `VALUES.md`（最新：6v v3.2.2 段）
+- 暫定數值全部在 `VALUES.md`（最新：6zh v3.11 段；v3.7 以後的 6zd～6zg 都還沒經 Pai 確認）
 - （v2.7）成就鑰匙過剩：全收集只要 90 把，成就給 138 把；「群英薈萃／森羅萬象」較晚完成的那個獎勵用不到。Pai 決定先保留，等鑰匙有新用途再說
 - （v2.4）首頁 RESET 要不要也加密碼鎖？隕石等範圍技仍可在塔射程外打到塔（目前視為合理技能消耗），要不要禁止？
 - （v2.5）重生時間、塔成長／升溫、野怪脫戰規則等暫定數值待確認（VALUES.md 6h）
@@ -122,17 +129,20 @@
 - （v2.9）角色叫聲：Pai 聽過後可指定哪幾隻要改（`04b_cry.js` 的 `V` 表調音高／長度／基底）
 - （v3.1）出發過場長度、選關甩動手感、敵人暗色調與細紅邊、等級徽章配色（VALUES.md 6s）待 Pai 實機確認
 - （v3.2.4）排行榜伺服器改了 /ann?a=（公告即時）與 ping 快取 10 秒，已推 source 自動部署，但**還沒用內建瀏覽器確認 Deployments 成功**；請 Pai 用開發者模式發測試公告、另一台停首頁看約 40 秒內會不會跳出
-- （v3.2.5）小兵分散強度 `G.TUNE.laneSpread` 0.85、路邊保留 `laneEdge` 1 格（VALUES 6y），待 Pai 實機看
+- （v3.2.5／v3.8）小兵分散強度 `G.TUNE.laneSpread` 0.85、路邊保留 `laneEdge` 1 格（VALUES 6y），v3.8 修好單路也生效，待 Pai 實機看
 - （v3.2.4）新暫定數值見 VALUES 6x（縮放每步 ×1.35、點數 24、欄位三列、ping 30 秒、通知條 10 秒）；點數 24 會讓我方兵線變多、遊戲變簡單（敵方波次不跟著加），等 Pai 實際玩再決定要不要調敵方
 - （v3.2.3）HD-2D 強度 Pai 已認可；效能優化後請 Pai 再實機確認縮小視角是否還卡、會不會發燙（VALUES 6w）；仍不行再加「省電畫面」開關（`G.HD.on`／降 `BUDGET`）
 - （v3.2）公告與動態數值（VALUES.md 6t）待 Pai 實機確認；公告／動態的伺服器功能要等 Cloudflare 自動部署完才會生效
 - （v3.2.2）「死亡後 2 秒才復活」目前做成：有復活藥水時倒地 2 秒再原地站起來；若 Pai 指的是一般回聖樹重生，要再改 `G.TUNE.heroRespawn*`
 - （v3.2.2）公告／信箱、管理玩家動態已上線但還沒實際用過：請 Pai 開發者模式發一則測試公告確認
+- （v3.10）少了主塔，整場可能變短；單路塔血 `towerOne 2` 先沒動，等 Pai 玩過再調。英雄 ×1.25、塔間距（半路 28／53／78%）待 Pai 實機看
+- （v3.9）立體塔造型 Pai 尚未回饋；（v3.8）大招儀式時長／特效強度待確認
+- （v3.0 起）單人五關聖樹、塔、野區營地沒有跟著主題換造型（塔目前所有關卡同一套）
 - DEV 密碼只有 Pai 知道（程式內只有雜湊）；要改密碼請 Pai 提供新密碼，重算 `DEV_H`
 
 ## 7. 工作規則
 **每次更新流程**：改 src → build → `bash /home/claude/tools/tc_all.sh`（背景跑，0 筆才可交付）→ 只截有改到的畫面，用 `sheet.py` 拼成一張看 → 發佈 artifact（先 `get_artifact` 取 version，再 `publish_files`，index.html＝dist/index.html）→ 推 GitHub main（遊戲）＋ source（原始碼）→ 備份 Mac（`LeafofLegends.html`、`versions/LeafofLegends_v版本.zip`、有改到的 `source/` 檔案）→ 升版號
-- 版本號在 `src/11_menus.js` 第 2 行 `G.VERSION = 'V3.2.2'`
+- 版本號在 `src/11_menus.js` 第 2 行 `G.VERSION = 'V3.11'`（比較是逐段數字，V3.10 > V3.9；版本號變長要留意首頁右下與文字檢查）
 - **更新內容（玩家看得到）**：每次發佈前在 `release.json` 的 list 最前面加一筆 `{v, d, n:[…]}`（短句、玩家口吻、不寫技術細節），版本號要和 G.VERSION 一樣。**v3.2.4 起 build 會把 release.json 打包成 `G.RELEASE`（「查看更新內容」用），所以要先改 release.json 再 build**
 - 推 main：clone 到 `/home/claude/leafoflegends` → `python3 /home/claude/leafwar/tools/release.py`（複製 index.html＋產生 version.json；保留 `.nojekyll`；音樂有改才更新 `audio/`）→ commit → `git -c push.negotiate=true push origin HEAD:main`，約 1～2 分鐘生效。備援：Pai 在 Mac Terminal 執行 `bash ~/Desktop/Claude/LeafofLegends/deploy_github.sh`
 - 推 source：在 `/home/claude/leafwar` commit（dist/ 已在 .gitignore）→ `git -c push.negotiate=true push origin HEAD:source`
@@ -144,6 +154,8 @@
 - 技能特效總覽：`python3 /home/claude/tools/vfxsheet.py "技能id,...|b=普攻" "時間點,..." out.png [角色名]`
 - 角色介紹與技能說明在 `02b_text.js` 的 `G.TXT.uinfo / sinfo`（JSON，用 Python 讀寫最安全）
 - 修改大檔用精準字串替換；**不要**用空字串當替換目標（曾把檔案炸成 18 萬行）
+- 用 `str.replace` 全域替換呼叫時，小心把新包裝函式自己裡面的那一行也換掉（v3.9 `cast()` 因此無限遞迴）；換完 grep 一次
+- 改特效後用 `tools/ultshot.py` 連拍到放完後 3～4 秒，確認沒有殘影（Pai 對殘影很敏感）
 
 **省 token 守則**
 - 讀程式先 `grep -n` 定位，再用 Read 的 offset/limit 只讀那幾十行；不要整份讀大檔（`11_menus.js` 143KB、`09_ui.js` 70KB）
