@@ -2,7 +2,7 @@
 
 > 新 session 只要讀這份。排行榜相關再看 `LEADERBOARD.md`。**做任何新設計前，先對照第 8 節「設計守則」**。
 > 各版完成內容在 `CHANGELOG.md`、暫定數值在 `VALUES.md`，需要時用 grep 找到段落再讀，不要整份讀。
-> 最後更新：2026-11-21，版本 **V3.13**
+> 最後更新：2026-11-22，版本 **V3.13**
 
 ## 1. 專案是什麼
 - Pai 的 HTML5 瀏覽器遊戲，仿 Gamevil《Plants War》（推塔＋英雄操作＋小兵兵線）。**v3.7 起改成單路地圖**（每關一張、每邊內／中／外三座塔＋聖所，v3.10 拿掉主塔）
@@ -126,7 +126,7 @@
 - （v2.8.4）**刪除帳號後舊存檔碼**：目前讀回舊存檔碼＝進度和排行回來（當成備份還原）；要不要讓伺服器記住已刪除帳號、讓舊碼失效？待 Pai 決定
 - （v2.8.6）排行榜伺服器 11/20 凌晨顯示 0 人（11/19 晚上還有 3 人）；這版只新增資料表沒動玩家資料，請 Pai 確認是不是自己清掉測試帳號
 - （v2.8.6）App 圖示（Leafy＋光芒＋草丘，`assets/icon-*.png`、`tools/icon_make.js`）與主畫面名稱「Leaf Legends」：Pai 可再要求改
-- （v3.0）單人關卡數值全部暫定（VALUES.md 6r）；只用「英雄不動」模擬過，需要 Pai 實際打打看調整難度。另外聖樹、塔、野區營地沒有跟著主題換造型
+- （v3.0）單人關卡數值全部暫定（VALUES.md 6r）；只用「英雄不動」模擬過，需要 Pai 實際打打看調整難度。另外聖樹、塔沒有跟著主題換造型（v3.12 起已無小怪營地）
 - （v2.8.7）一帳號同時一台：被別台登入的裝置會被登出，登出前顯示這台的存檔碼可複製；沒帶工作階段的舊版用戶端不擋。等 Pai 實機兩台測試
 - （v2.9）角色叫聲：Pai 聽過後可指定哪幾隻要改（`04b_cry.js` 的 `V` 表調音高／長度／基底）
 - （v3.1）出發過場長度、選關甩動手感、敵人暗色調與細紅邊、等級徽章配色（VALUES.md 6s）待 Pai 實機確認
@@ -141,12 +141,12 @@
 - （v3.12）獵手改成每 40 秒升級、守在首領坑旁，Pai 可決定要不要整個拿掉獵手；塔 ×0.85 待實機看；拿掉野區後金幣／經驗來源變少，節奏待 Pai 玩過再調
 - （v3.10）少了主塔，整場可能變短；單路塔血 `towerOne 2` 先沒動，等 Pai 玩過再調。英雄 ×1.25、塔間距（半路 28／53／78%）待 Pai 實機看
 - （v3.9）立體塔造型 Pai 尚未回饋；（v3.8）大招儀式時長／特效強度待確認
-- （v3.0 起）單人五關聖樹、塔、野區營地沒有跟著主題換造型（塔目前所有關卡同一套）
+- （v3.0 起）單人五關聖樹、塔沒有跟著主題換造型（塔目前所有關卡同一套）
 - DEV 密碼只有 Pai 知道（程式內只有雜湊）；要改密碼請 Pai 提供新密碼，重算 `DEV_H`
 
 ## 7. 工作規則
 **每次更新流程**：改 src → build → `bash /home/claude/tools/tc_all.sh`（背景跑，0 筆才可交付）→ 只截有改到的畫面，用 `sheet.py` 拼成一張看 → 發佈 artifact（先 `get_artifact` 取 version，再 `publish_files`，index.html＝dist/index.html）→ 推 GitHub main（遊戲）＋ source（原始碼）→ 備份 Mac（`LeafofLegends.html`、`versions/LeafofLegends_v版本.zip`、有改到的 `source/` 檔案）→ 升版號
-- 版本號在 `src/11_menus.js` 第 2 行 `G.VERSION = 'V3.11'`（比較是逐段數字，V3.10 > V3.9；版本號變長要留意首頁右下與文字檢查）
+- 版本號在 `src/11_menus.js` 第 2 行 `G.VERSION = 'V3.13'`（比較是逐段數字，V3.10 > V3.9；版本號變長要留意首頁右下與文字檢查）
 - **更新內容（玩家看得到）**：每次發佈前在 `release.json` 的 list 最前面加一筆 `{v, d, n:[…]}`（短句、玩家口吻、不寫技術細節），版本號要和 G.VERSION 一樣。**v3.2.4 起 build 會把 release.json 打包成 `G.RELEASE`（「查看更新內容」用），所以要先改 release.json 再 build**
 - 推 main：clone 到 `/home/claude/leafoflegends` → `python3 /home/claude/leafwar/tools/release.py`（複製 index.html＋產生 version.json；保留 `.nojekyll`；音樂有改才更新 `audio/`）→ commit → `git -c push.negotiate=true push origin HEAD:main`，約 1～2 分鐘生效。備援：Pai 在 Mac Terminal 執行 `bash ~/Desktop/Claude/LeafofLegends/deploy_github.sh`
 - 推 source：在 `/home/claude/leafwar` commit（dist/ 已在 .gitignore）→ `git -c push.negotiate=true push origin HEAD:source`
@@ -160,13 +160,14 @@
 - 修改大檔用精準字串替換；**不要**用空字串當替換目標（曾把檔案炸成 18 萬行）
 - 用 `str.replace` 全域替換呼叫時，小心把新包裝函式自己裡面的那一行也換掉（v3.9 `cast()` 因此無限遞迴）；換完 grep 一次
 - 改特效後用 `tools/ultshot.py` 連拍到放完後 3～4 秒，確認沒有殘影（Pai 對殘影很敏感）
+- 改角色動作／動畫：`python3 tools/animlab.py 舊.html 舊.gif 5` 和新版各拍一次，拼成左右對照動圖給 Pai（v3.13 做法；舊版用 `git stash` build 出來）
 
 **省 token 守則**
 - 讀程式先 `grep -n` 定位，再用 Read 的 offset/limit 只讀那幾十行；不要整份讀大檔（`11_menus.js` 143KB、`09_ui.js` 70KB）
 - 工具輸出一律接 `tail`／`grep`／`head`，只看摘要
 - 截圖只截改到的畫面，拼成一張再看；不要每個裝置每個畫面都單獨看
 - 一個對話大約 2～3 個版本就建議 Pai「交接」，避免對話太長、每一輪越來越貴
-- 回覆 Pai：繁中、結論先講、附作品連結、列出暫定數值
+- 回覆 Pai：**一律繁中**（v3.12 曾在長任務的最後總結不小心切成英文，Pai 很不滿；工具輸出、程式註解是英文也不能跟著切）、結論先講、附作品連結、列出暫定數值
 - 給 Pai 的東西要簡單：能自動就自動；真的需要他動手時只給「一個步驟」，不要設計需要他複製金鑰之類的流程（v2.8.2 教訓）
 
 ## 8. 設計守則（Pai 的要求，所有新設計都要遵守）
@@ -240,6 +241,6 @@ add_repo(GeorgePai, LeafofLegends, push) →
 git clone -q -b source --depth 1 https://github.com/GeorgePai/LeafofLegends /home/claude/leafwar && bash /home/claude/leafwar/setup.sh
 讀 /home/claude/leafwar/HANDOFF.md（只讀這份；CHANGELOG.md、VALUES.md 需要時再查）。
 作品：https://claude.ai/artifact/8vvJWeebvgfkNQDrYWXHAB（目前 V○○）；遊戲：https://georgepai.github.io/LeafofLegends/；排行榜伺服器：https://lol-rank.leafoflegends.workers.dev
-設計前對照第 8 節（含 16b 爐石式文字、13b 歧路旅人 HD-2D 美術方向）；更新照第 7 節（排行榜伺服器推 source 就自動部署，不要叫我跑指令；發佈前先更新 release.json 再 build）；我說「交接」照第 9 節。
+設計前對照第 8 節（含 16b 爐石式文字、13b 歧路旅人 HD-2D 美術方向）；更新照第 7 節（排行榜伺服器推 source 就自動部署，不要叫我跑指令；發佈前先更新 release.json 再 build；改特效後用 tools/ultshot.py 檢查殘影）；回覆一律繁中；我說「交接」照第 9 節。
 準備好後用一句話回報版本與狀態（含 Mac 資料夾是否已連上），提醒我改名，然後等我的新需求。
 ```
