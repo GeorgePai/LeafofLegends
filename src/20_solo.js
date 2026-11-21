@@ -7,19 +7,20 @@
 // ============================================================
 G.Solo = (() => {
   const S = {}, R = G.Render, P = G.PAL, H = () => G.UI.h, U = () => G.UI, ui = () => G.Menus.ui;
-  const ORDER = [1, 2, 3, 4, 5];                                     // 卡片順序：五個關卡（v3.4 拿掉經典戰場；G.STAGES[0] 留給首頁背景演示）
+  const ORDER = [0, 1, 2, 3, 4, 5];                                  // v4.0.1 最前面加「新手教學」（si 0）                                     // 卡片順序：五個關卡（v3.4 拿掉經典戰場；G.STAGES[0] 留給首頁背景演示）
   const DIFF = ['', '簡單', '普通', '困難', '極難', '超難'], DCOL = [0, 11, 13, 14, 10, 17];
   let pos = 0, tgt = 0, drag = null, cried = -1, t = 0, wx = [], bgK = 0, bgFrom = null;
-  const info = si => si ? G.SOLO[si - 1] : { theme: 'forest', n: '經典戰場', en: 'CLASSIC', d: 0, rule: '沒有特殊規則', rew: 0, roster: [['babybear', 'eagle', 'bear']], boss: 'bigbear' };
-  const open = si => G.SoloW.open(si);
+  const info = si => si ? G.SOLO[si - 1] : { theme: 'forest', n: '新手教學', en: 'TUTORIAL', d: 0, rule: '跟著提示學會{移動}、{普攻}、{技能}、{升級}和{推塔}，約 1 分鐘', rew: 5, roster: [['babybear']], boss: 'babybear' };
+  const open = si => si === 0 || G.SoloW.open(si);
   // ---- v3.4 新關卡解鎖動畫：滑到新關卡 → 鎖頭發光、越抖越快 → 碎掉、白光一閃、卡片亮起來 →「新關卡解鎖！」----
   let ul = null;                                                     // { si, t, ps, snd }
   const UL = { shake: 0.45, brk: 1.35, end: 3.2 };
   const locked = si => !open(si) || (ul && ul.si === si && ul.t < UL.brk);
   // 進入：停在「最新可以挑戰」的那一關
   S.open = () => {
-    let k = 0; for (let i = 0; i < 5; i++) if (open(ORDER[i])) k = i;
-    for (let i = 0; i < 5; i++) if (open(ORDER[i]) && !G.SoloW.best(ORDER[i]).c) { k = i; break; }
+    let k = 1; for (let i = 1; i < ORDER.length; i++) if (open(ORDER[i])) k = i;
+    for (let i = 1; i < ORDER.length; i++) if (open(ORDER[i]) && !G.SoloW.best(ORDER[i]).c) { k = i; break; }
+    if (!G.Ach.P().tutDone && !G.SoloW.best(1).c && !G.Team.dev) k = 0;   // v4.0.1 新玩家先停在新手教學
     ul = null;
     if (!G.Team.dev) {                                                 // v3.4 有新解鎖的關卡（還沒看過）→ 先停在上一關，再滑過去播解鎖動畫
       const P = G.Ach.P(), m = G.SoloW.maxOpen();
@@ -36,7 +37,7 @@ G.Solo = (() => {
     return false;
   };
   const step = d => { const n = G.clamp(Math.round(tgt) + d, 0, ORDER.length - 1); if (n !== tgt) { tgt = n; G.Audio.play('tick'); } };
-  const go = () => { const si = ORDER[Math.round(tgt)]; if (!open(si)) { G.Audio.play('deny'); return; } G.StageGo.go(si); };   // v3.1 出發過場（過場裡才建立戰場）
+  const go = () => { const si = ORDER[Math.round(tgt)]; if (!open(si)) { G.Audio.play('deny'); return; } if (si === 0) { G.Trans.start(() => G.Tut.start()); return; } G.StageGo.go(si); };   // v3.1 出發過場（過場裡才建立戰場）
   S.cur = () => ORDER[Math.round(tgt)];
   S._go = i => { pos = tgt = i; };                                   // 測試用
   // ---- 小圖示：星星、骷髏（像素點陣）----
@@ -114,7 +115,7 @@ G.Solo = (() => {
     // 難度
     G.cn(c, '難度', ix, iy, 6);
     if (si) { const sx = ix + G.cnW('難度') + 4; if (sx + 45 + 4 + G.cnW(DIFF[I.d]) <= ix + iw) { skulls(c, sx, iy + 4, I.d); G.cn(c, DIFF[I.d], sx + 49, iy, lock ? 4 : DCOL[I.d]); } else { G.cn(c, DIFF[I.d], sx, iy, lock ? 4 : DCOL[I.d]); iy += 13; skulls(c, ix, iy + 4, I.d); } }
-    else G.cn(c, '越打越強', ix + G.cnW('難度') + 4, iy, 7);
+    else G.cn(c, '入門', ix + G.cnW('難度') + 4, iy, 11);
     iy += 15;
     // 特殊規則（重點上色）
     if (lock) { const pv = info(si - 1); G.cnWrap('通關「' + pv.n + '」解鎖', iw).forEach(l => { G.cn(c, l, ix, iy, 6); iy += 13; }); }
@@ -129,7 +130,7 @@ G.Solo = (() => {
         for (const im of imgs) { if (rw + im.width > iw && rows[rows.length - 1].length) { rows.push([]); rw = 0; } rows[rows.length - 1].push(im); rw += im.width + 3; }
         for (const row of rows) { const rh = Math.max(...row.map(im => im.height)); if (iy + rh > foot - 14) break; let sx = ix; for (const im of row) { if (lock) c.drawImage(im, Math.round(sx), Math.round(iy + rh - im.height)); else rim(c, im, Math.round(sx), Math.round(iy + rh - im.height)); sx += im.width + 3; } iy += rh + 3; }
         iy += 2;
-        const hn = si ? I.hunt.n : 1;
+        const hn = si ? I.hunt.n : 0;
         if (iy + 13 <= foot) { H().icon(c, 'i_attack', ix + 4, iy + 6); G.cn(c, hn ? '敵方獵手 ×' + hn : '沒有敵方獵手', ix + 11, iy, hn ? 14 : 6); iy += 14; }
       }
     }
@@ -140,7 +141,7 @@ G.Solo = (() => {
       H().icon(c, 'i_key', ix + sw + 8, gap + 4);
       const rt = best.c ? '已通關 ' + best.c + ' 次' : '首通 +' + I.rew;
       if (G.cnW(rt) + sw + 18 <= iw) G.cn(c, rt, ix + sw + 15, gap - 2, best.c ? 6 : 13);
-    } else G.cnWrap('不計星等', iw).forEach(l => { G.cn(c, l, ix, iy, 5); iy += 13; });
+    } else { const done = G.Ach.P().tutDone, gy = LD ? y + h - 15 : Math.max(iy, y + h - 16); H().icon(c, done ? 'i_check' : 'i_key', ix + 4, gy + 4); G.cn(c, done ? '已完成' : '首次完成 +' + I.rew, ix + 11, gy - 2, done ? 6 : 13); }
   }
   // ---- 背景：選到的關卡場景顏色＋天氣（換關時淡入）----
   function bg(c, uw, uh) {
@@ -187,7 +188,7 @@ G.Solo = (() => {
     for (const i of order) {
       const d = i - pos, ad = Math.abs(d); if (ad > 1.6) continue;
       const act = ad < 0.5, sc = 1 - Math.min(ad, 1) * 0.12, w = Math.round(cw * sc), h = Math.round(ch * sc), x = Math.round(uw / 2 + d * sp * 0.92 - w / 2), y = Math.round(cy + (ch - h) / 2);
-      card(c, x, y, w, h, ORDER[i], act, LD);
+      card(c, x, y, w, h, ORDER[i], act, LD); if (act) (U().cR = U().cR || {}).soloCard = LD ? { x, y, w: Math.round(w * 0.42) + 8, h } : { x, y, w, h: Math.round(h * 0.45) };   // 新手引導框住卡片上半部
       if (!act) { c.fillStyle = 'rgba(10,10,10,' + Math.min(0.6, ad * 0.55).toFixed(3) + ')'; c.fillRect(x, y, w + 1, h + 1); }
     }
     if (ul && ul.px != null && ul.t >= UL.brk) unlockFx(c, dt);

@@ -104,6 +104,7 @@ Object.assign(G.World.prototype, {
   updateSystems(dt) {
     if (this.over) return;
     // 敵方獵手：同時最多 1 隻，死亡後倒數再出動
+    if (this.tut) { this.updateTeleport(dt); this.updateVision(dt); return; }   // v4.0.1 新手教學：不出獵手、不生野怪
     if (!this.attract && this.camps.length) for (const jg of this.jgs) if (!(jg.u && jg.u.alive)) { if (jg.u) { jg.u = null; jg.t = this.jgRe; } jg.t -= dt; if (jg.t <= 0) this.spawnHunter(jg); }
     this.updateTeleport(dt);
     if (!this.attract) this.updateVision(dt);

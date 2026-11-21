@@ -1,5 +1,5 @@
 'use strict';
-G.VERSION = 'V4.0';                                  // 版本號（唯一來源；setup.sh 也從這行讀）
+G.VERSION = 'V4.1';                                  // 版本號（唯一來源；setup.sh 也從這行讀）
 /* =========================================================
    選單：首頁 / 隊伍 / 圖鑑 / 教學
    版面：直屏上下堆疊，橫屏左右分欄
@@ -1039,7 +1039,7 @@ G.Menus = (() => {
   // v3.14 圓形技能鈕（教學用，和戰鬥中同一套畫法）
   const cBtn = (c, cx, cy, r, ic, pr, bd = 5, lv = 0) => { G.UI.circBtn(c, cx, cy, r, 1, bd, pr ? 1 : 0); H().icon(c, ic, cx, cy + (pr ? 1 : 0)); if (lv) { const lx = Math.round(cx - 5), ly = Math.round(cy - r + 3 + (pr ? 1 : 0)); for (let k = 0; k < 3; k++) { c.fillStyle = P[0]; c.fillRect(lx + k * 3, ly, 4, 3); c.fillStyle = P[k < lv ? 13 : 3]; c.fillRect(lx + 1 + k * 3, ly + 1, 2, 1); } } };
   // 教學用：簡化搖桿
-  const joyDraw = (c, cx, cy, r, kx, ky, on) => { c.globalAlpha = on ? 0.9 : 0.5; G.pxDisc(c, cx, cy, r, r, 0, 0.4); G.pxEllipse(c, cx, cy, r, r, on ? 7 : 5); const kr = Math.round(r * 0.45); G.pxDisc(c, kx, ky, kr, kr, on ? 8 : 6, 1); G.pxEllipse(c, kx, ky, kr, kr, 0); c.globalAlpha = 1; };
+  const joyDraw = (c, cx, cy, r, kx, ky, on) => G.Ctl.drawJoyAt(c, cx, cy, kx, ky, r, on);   // v4.0.1 和戰鬥中同一套搖桿美術
   function skBtn(c, x, y, w, ic, cdF, cdN, on) {
     G.UI.circBtn(c, x + w / 2, y + w / 2, w / 2, 1, 5, on ? 1 : 0); H().icon(c, ic, x + w / 2, y + w / 2 + (on ? 1 : 0), cdF > 0);   // v3.14 圓形
     if (cdF > 0) { H().dither(c, x + 1, y + 1 + Math.round((w - 2) * (1 - cdF)), w - 2, Math.round((w - 2) * cdF), 0, 0.7); G.text(c, cdN, x + w / 2, y + w / 2 - 2, 9, 1, 0, 0.5); }

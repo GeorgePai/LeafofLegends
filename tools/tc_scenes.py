@@ -3,6 +3,19 @@ F='localStorage.clear(); G.Team.v=null; G.Team.dev=false; G.Team.get();'
 up=lambda i:f"G.UI.btns.find(b=>b.id==='{i}')&&G.UI.btns.find(b=>b.id==='{i}').up()"
 S=[]
 S.append(['menu',F+"G.UI.goTitle(); G.Menus.resetIntro&&G.Menus.resetIntro();",2500])
+# v4.0.1 新手教學關＋頁面引導
+S.append(['tut0',"G.Tut.start()",600])
+S.append(['tut1',"var W=G.W,h=W.hero,s=G.Tut._st(); s.t=99",400])
+S.append(['tut2',"var W=G.W,h=W.hero,m=G.Tut._st().mark; h.x=m[0]; h.y=m[1]",500])
+S.append(['tut3',"var W=G.W,h=W.hero; for(const u of W.units) if(u.tutFoe&&u.alive) W.kill(u,h)",500])
+S.append(['tut4',"var W=G.W,h=W.hero; h.mp=999; h.skills[0].cd=0; W.castSkill(h,0,null); for(const u of W.units) if(u.tutFoe&&u.alive) W.kill(u,h)",1800])
+S.append(['tut5',"var W=G.W,h=W.hero; W.levelSkill(h.skills[0],true); G.UI.closeLv()",800])
+S.append(['tut6',"var W=G.W,h=W.hero; W.kill(G.Tut._st().tw,h)",800])
+S.append(['tut-x',"G.Tut.leave()",300])
+S.append(['coach-team',"G.UI.screen='team'",1200]); S.append(['coach-team2',"G.UI.btns.find(b=>b.id==='coBg').up()",400])
+S.append(['coach-rank',"G.UI.screen='rank'",1200]); S.append(['coach-save',"G.UI.screen='save'",1200]); S.append(['coach-save2',"G.UI.btns.find(b=>b.id==='coBg').up()",400])
+S.append(['coach-st',"G.UI.goTitle(); G.Solo.open()",1500]); S.append(['coach-st2',"G.UI.btns.find(b=>b.id==='coBg').up()",400])
+S.append(['coach-x',"localStorage.setItem('leafwar_coach',JSON.stringify({team:1,rank:1,save:1,stages:1})); G.UI.goTitle()",300])
 S.append(['settings',"G.Menus._set(true)",300]); S.append(['settings-x',"G.Menus._set(false)",100])
 S.append(['devpad',"G.Menus.devAsk(true)",300]); S.append(['devpad-x',"G.Menus.devAsk(false)",100])   # v2.4 開發者密碼
 S.append(['reset',up('rst'),300]); S.append(['reset-close',up('rsNo'),200])

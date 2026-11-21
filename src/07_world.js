@@ -74,7 +74,7 @@ G.World = class {
     this.units = []; this.projs = []; this.effects = []; this.decals = []; this.corpses = []; this.parts = new G.Particles(2600);
     this.spawnQ = []; this.time = 0; this.trauma = 0; this.flashScreen = 0; this.hitstop = 0; this.timeScale = 1;
     this.notices = []; this.stats = { kills: 0, time: 0, deaths: 0, assists: 0, camps: 0, towers: 0, gold: 0, dmg: 0, taken: 0, tower: 0, bosses: 0, hunters: 0, wboss: 0, potions: 0, tps: 0, streak: 0, minHoly: 1, spent: 0 }; this.killT = [];   // 即時戰鬥數據
-    this.over = null; this.attract = !!opt.attract; this.frame = 0;
+    this.over = null; this.attract = !!opt.attract; this.frame = 0; this.tut = !!opt.tut;   // v4.0.1 新手教學：不自動出兵、沒有獵手和野怪（由 G.Tut 安排）
     // 聖所與塔
     this.holy = [
       this.add(new G.Unit(this, 'player_holy', 0, md.holy.player[0] * T, md.holy.player[1] * T, 1, 'holy')),
@@ -209,6 +209,7 @@ G.World = class {
   updateWaves(dt) {
     if (this.over) return;
     for (let s = 0; s < 2; s++) {
+      if (this.tut) break;
       this.waveT[s] -= dt * (s === 0 && this.hero ? 1 + (this.hero.iWave || 0) / 100 : 1);   // 小兵藥水：我方出兵加速
       if (this.waveT[s] <= 0) { this.waveT[s] = G.TUNE.waveInterval * (this.attract ? 0.5 : 1) * (s === 1 && this.dif ? this.dif.wave : 1); this.spawnWave(s); }
     }
@@ -369,7 +370,7 @@ G.World = class {
     if (u.windup > 0) { u.windup -= dt; if (u.windup <= 0) this.fire(u, u.wTarget); return this.brake(u, dt); }
     if (u.stun > 0) { u.stun -= dt; return this.brake(u, dt); }
     if (u.kind === 'holy') return;
-    if (u.kind === 'tower') return this.towerAI(u, dt);
+    if (u.kind === 'tower') return u.tutOff ? null : this.towerAI(u, dt);   // v4.0.1 新手教學：我方塔先不打
     if (u.kind === 'hero') return this.heroAI(u, dt);
     if (u.side === 2) return this.wildAI(u, dt);
     if (u.kind === 'jungler') return this.junglerAI(u, dt);
@@ -440,16 +441,20 @@ G.World = class {
       h.hp = Math.min(h.st.hp, h.hp + h.st.hp * T.sanctuaryHeal * dt); h.mp = Math.min(h.st.mp, h.mp + h.st.mp * T.sanctuaryHeal * dt);
       if (Math.random() < dt * 8) this.parts.add(h.x + G.rr(-10, 10), h.y, 2, 0, 0, 40, 0.6, 9, 7, 1, -10, 0);
     }
-    // v4.0 普攻鈕：普攻優先於移動（行進間按普攻 → 停下來打完這一下再繼續走；按住＝連續普攻）
-    const ar = h.atkReq;
+    // v4.0.1 普攻鈕（仿傳說對決的「走 A」手感）：
+    //  冷卻好了且目標在射程內 → 立刻停下、轉身、出手（只停前搖那一下）；冷卻中 → 照搖桿繼續走；
+    //  點一下的普攻會「預約」0.6 秒，冷卻一好就打；按住＝一直預約；目標差一點點才到射程 → 自動踏上去打
+    const ar = h.atkReq, kd0 = this.keyDir;
     if (ar) {
+      ar.age = (ar.age || 0) + dt;
       if (!this.valid(h, ar.t) || this.dist(h, ar.t) > h.st.range + T.heroAggro * 1.6) ar.t = ar.held && !ar.fix ? this.autoTarget(h, h.st.range + T.heroAggro) : null;
-      if (!ar.t) h.atkReq = null;
-      else if (ar.sw && h.atkT > 0.05) { if (!ar.held) h.atkReq = null; else ar.sw = false; }   // 這一下打完了
+      if (!ar.t || (!ar.held && !ar.sw && ar.age > 0.6)) h.atkReq = null;
+      else if (ar.sw && h.atkT > 0.05) { if (!ar.held) h.atkReq = null; else { ar.sw = false; ar.age = 0; } }   // 這一下打完了
       if (h.atkReq) {
-        const t = ar.t; h.target = t; this.cancelTeleport(true); h.path = null;
-        if (this.inRange(h, t)) { this.brake(h, dt); if (h.atkT <= 0) { this.tryAttack(h, t); ar.sw = true; } return; }
-        return this.chase(h, t, dt);
+        const t = ar.t, inR = this.inRange(h, t); h.target = t; this.cancelTeleport(true);
+        if (h.atkT <= 0 && inR) { h.path = null; h.vx *= 0.15; h.vy *= 0.15; this.tryAttack(h, t); ar.sw = true; return; }
+        if (!inR && h.atkT <= 0.12 && (!kd0 || this.dist(h, t) <= h.st.range + 45)) { h.path = null; return this.chase(h, t, dt); }
+        if (!kd0) { h.path = null; return this.brake(h, dt); }
       }
     }
     // 鍵盤／搖桿直接移動（v4.0 移動中按技能：射程內有目標就直接放，不會被移動吃掉）
@@ -622,7 +627,8 @@ G.World = class {
     const T = G.TUNE, fix = !!t;
     if (!t || !this.valid(h, t)) t = this.autoTarget(h, h.st.range + T.heroAggro);
     if (!t) return 'none';
-    h.atkReq = { t, held: !!held, fix, sw: false };
+    const o = h.atkReq; if (o && o.t === t) { o.held = !!held; o.age = 0; o.fix = o.fix || fix; }   // 連點同一個目標：沿用這一下的進度，不重算
+    else h.atkReq = { t, held: !!held, fix, sw: false, age: 0 };
     if (fix) h.cmd = { type: 'attack', t, lock: true };      // 拖曳指定的目標：之後閒置時繼續打它
     return 'ok';
   }
@@ -641,6 +647,7 @@ G.World = class {
     return 'none';
   }
   castSkill(h, i, t) {
+    if (h === this.hero) h.castN = (h.castN || 0) + 1;   // v4.0.1 新手教學用：施放次數
     const s = h.skills[i], cost = Math.round(s.mp * (1 - (h.mpDisc || 0) / 100));
     if (h.mp < cost || s.cd > 0) { G.Audio.play('deny'); return false; }
     if (h.chg) return false;
@@ -648,7 +655,7 @@ G.World = class {
     const ult = i === h.skills.length - 1 && s.s.lv1 >= 5;
     return this.beginCharge(h, s.s, t, s.lv, ult ? G.TUNE.chgUlt : G.TUNE.chgSkill, () => { s.cd = 0; h.mp = Math.min(h.st.mp, h.mp + cost); });
   }
-  say(n) { if (this.attract) return; n.age = 0; n.t = Math.max(2, Math.min(2.6, n.t || 2.2)); this.notices.push(n); if (this.notices.length > 5) this.notices.splice(G.NOTICE_N || 2, 1); }   // v3.14 排隊太多就丟掉最舊的等待中廣播
+  say(n) { if (this.attract || this.tut) return; n.age = 0; n.t = Math.max(2, Math.min(2.6, n.t || 2.2)); this.notices.push(n); if (this.notices.length > 5) this.notices.splice(G.NOTICE_N || 2, 1); }   // v3.14 排隊太多就丟掉最舊的等待中廣播
   kill(t, src) {
     t.alive = false; t.hp = 0;
     if (t.static || !this.corpses || !t.spr) G.FX.shatter(this, t);

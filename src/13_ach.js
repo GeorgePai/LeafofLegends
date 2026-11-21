@@ -69,6 +69,7 @@ G.ACH = [
   { id: 'book', c: 3, t: 2, n: '博物學家', d: '在圖鑑看過每一種角色', g: () => G.Ach.bookTotal(), v: P => P.book.length },
   { id: 'demo', c: 3, t: 1, n: '招式研究員', d: '看過 20 種不同的技能展示', g: 20, v: P => P.demo.length },
   { id: 'save', c: 3, t: 1, n: '未雨綢繆', d: '第一次產生存檔碼', g: 1, v: P => P.codes },
+  { id: 'tut', c: 3, t: 1, n: '新手上路', d: '完成新手教學', g: 1, v: P => P.tutDone || 0 },   // v4.0.1
   { id: 'night', c: 3, t: 1, n: '夜貓子', d: '在凌晨 0～5 點打完一場戰鬥', hint: '月亮出來的時候……', g: 1, v: P => P.night },
   // v2.6 新增
   { id: 'early', c: 3, t: 1, n: '早起的鳥兒', d: '在早上 5～8 點打完一場戰鬥', hint: '太陽剛升起的時候……', g: 1, v: P => P.morning },

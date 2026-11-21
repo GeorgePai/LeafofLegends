@@ -83,7 +83,7 @@ G.UI = (() => {
   // ---------- 畫面切換 ----------
   const leaveBattle = () => { if (G.W && !G.W.attract && G.Ach) { G.Ach.commit(G.W); G.Ach.abandon(G.W); } };   // v3.8 沒打完就離開：這場不算進排行
   U.goTitle = U.goMenu = () => { U.leaveAsk = null; if (U.screen && U.screen !== 'menu' && U.screen !== 'tap' && U.screen !== 'intro' && G.Trans) G.Trans.reveal(); leaveBattle(); if (G.Menus) G.Menus.resetIntro(); U.screen = 'menu'; U.paused = false; if (!G.W || !G.W.attract) G.newWorld({ attract: true }); R.cam.zoom = 1; G.Audio.setMode('menu'); };
-  U.start = st => { if (typeof st === 'number') U.stageI = st; leaveBattle(); U.leaveAsk = null; U.lvUp = null; U.ctlOpen = false; if (G.Ctl) { G.Ctl.joyEnd(); G.Ctl.closeEd(); } U.tpAsk = null; G.Team.sanitize(); const T = G.Team.get(); U.screen = 'battle'; U.paused = false; G.newWorld({ hero: T.hero, loadout: T.loadout, stage: U.stageI || 0 }); R.cam.follow = true; R.cam.zoom = 1; G.Audio.musicRestart('battle'); G.Audio.setMode('battle'); G.Audio.play('level'); };
+  U.start = (st, o2) => { if (typeof st === 'number') U.stageI = st; if (G.Tut && !(o2 && o2.tut)) G.Tut.on = false; leaveBattle(); U.leaveAsk = null; U.lvUp = null; U.ctlOpen = false; if (G.Ctl) { G.Ctl.joyEnd(); G.Ctl.closeEd(); } U.tpAsk = null; G.Team.sanitize(); const T = G.Team.get(); U.screen = 'battle'; U.paused = false; G.newWorld({ hero: T.hero, loadout: T.loadout, stage: U.stageI || 0, tut: !!(o2 && o2.tut) }); R.cam.follow = true; R.cam.zoom = 1; G.Audio.musicRestart('battle'); G.Audio.setMode('battle'); G.Audio.play('level'); };
   // 全畫面暗幕：純黑半透明（不用顆粒，眼睛比較舒服）
   const dim = (...a) => U.h.dim(...a);
   const _dim = (c, a) => { if (R.hi) for (const q of R.hi) q.cov = true; c.fillStyle = 'rgba(10,10,10,' + a + ')'; c.fillRect(0, 0, R.uw, R.uh); };
@@ -111,19 +111,32 @@ G.UI = (() => {
   // ---------- 技能按鈕（主動：點擊施放；被動：只顯示；長按任一顆 → 資訊卡）----------
   const LP = 0.35;                                       // 長按秒數
   // v3.14 圓形按鈕（主動技）：落地影＋外框＋內面（上緣亮一點，看得出可以按）
-  // v4.0 效能：畫好的圓形按鈕存成小圖（每種大小／顏色只畫一次），之後每幀只貼圖
+  // v4.0.1 圓形按鈕美術：金屬感外環（左上受光、右下陰影）＋深色玻璃內面（上亮下暗、左上反光）＋落地影
+  //        每種大小／顏色只畫一次存成小圖（效能），之後每幀貼圖
+  const LT = { 0: 2, 1: 3, 2: 4, 3: 5, 4: 6, 5: 7, 6: 8, 7: 9, 8: 9, 9: 9, 10: 19, 11: 20, 12: 18, 13: 9, 14: 13, 17: 19, 19: 9 }, DK = { 0: 0, 1: 0, 2: 1, 3: 1, 4: 2, 5: 3, 6: 4, 7: 5, 8: 6, 9: 7, 10: 15, 11: 16, 12: 2, 13: 14, 14: 15, 17: 2, 19: 15 };
   const circC = new Map();
+  const btnArt = U.btnArt = (r, bg, bd, o) => {
+    const S = r * 2 + 4, cv = G.canvas(S, S + 1), q = cv.getContext('2d'), C0 = r + 1, gl = Math.max(2, Math.round(r / 7));
+    const put = (x, y, ci) => { q.fillStyle = P[ci]; q.fillRect(x, y, 1, 1); };
+    for (let py = 0; py < S + 1; py++) for (let px = 0; px < S; px++) {
+      const dx = px - C0, dy = py - C0 - o, d = Math.hypot(dx, dy);
+      if (d > r + 0.5) { if (Math.hypot(px - C0 - 1, py - C0 - 2) <= r + 0.5 && G.bayer(px, py) < 0.55) put(px, py, 0); continue; }
+      if (d > r - 0.5) { put(px, py, 0); continue; }
+      const l = (-dx * 0.6 - dy * 0.8) / Math.max(d, 1);
+      if (d > r - 0.5 - gl) { put(px, py, l > 0.86 && d > r - 1.5 ? 9 : l > 0.4 ? LT[bd] : l < -0.35 ? DK[bd] : bd); continue; }
+      if (d > r - 1.5 - gl) { put(px, py, 0); continue; }
+      const ir = r - 1.5 - gl, v = -dy / ir, b0 = G.bayer(px, py);
+      let ci = bg <= 1 ? 1 : bg;
+      if (v > 0.25 + b0 * 0.3) ci = bg <= 1 ? 2 : LT[bg];
+      else if (v < -0.55 - b0 * 0.3) ci = bg <= 1 ? 0 : DK[bg];
+      if (d > ir - 2.2 && d < ir - 0.8 && l > 0.72) ci = l > 0.9 ? 5 : 4;                   // 左上反光弧
+      put(px, py, ci);
+    }
+    return cv;
+  };
   const circBtn = U.circBtn = (c, cx, cy, r, bg, bd, o = 0) => {
     r = Math.round(r); const key = r + '|' + bg + '|' + bd + '|' + o; let cv = circC.get(key);
-    if (!cv) {
-      cv = G.canvas(r * 2 + 4, r * 2 + 5); const q = cv.getContext('2d'), X = r + 1, Y = r + 1;
-      G.pxDisc(q, X + 1, Y + 2, r, r, 0, 0.6);
-      G.pxDisc(q, X, Y + o, r, r, bd);
-      G.pxDisc(q, X, Y + o, r - 1, r - 1, 0);
-      G.pxDisc(q, X, Y + o, r - 2, r - 2, bg <= 1 ? 2 : bg);
-      G.pxDisc(q, X, Y + 1 + o, r - 3, r - 3, bg <= 1 ? 1 : G.clamp(bg - 1, 0, 9));
-      circC.set(key, cv);
-    }
+    if (!cv) { cv = btnArt(r, bg, bd, o); circC.set(key, cv); }
     c.drawImage(cv, Math.round(cx) - r - 1, Math.round(cy) - r - 1);
   };
   // 冷卻遮罩（扇形，48 段）也存成小圖
@@ -574,17 +587,17 @@ G.UI = (() => {
   }
   // 版面：直屏＝技能一列、分隔線、藥水 4 欄；橫屏＝左邊技能 2×2、直分隔線、右邊藥水 6 欄
   function lvLayout() {
-    const I = R.ins, uw = R.uw, uh = R.uh, h = W.hero, port = uh > uw, nS = h.skills.length + h.pskills.length, nP = G.POT.length, g = 3, TOP = 22, FOOT = 4 + 12 + 4 + 20 + 5;
+    const I = R.ins, uw = R.uw, uh = R.uh, h = W.hero, port = uh > uw, nS = h.skills.length + h.pskills.length, nP = G.POT.length, g = 3, TOP = 22, FOOT = 6 + 20 + 5 + (G.Tut && G.Tut.on ? 14 : 0);   // 新手教學：多一列提示   // v4.0.1 拿掉提示文字
     const aw = uw - I.l - I.r - 8, chS = 36, chP = 42;
     if (port) {
       const pw = Math.min(aw, 196), cw = Math.min(42, Math.floor((pw - 12 - (Math.max(4, nS) - 1) * g) / Math.max(4, nS))), pc = 4, prow = Math.ceil(nP / pc);
-      const ph = TOP + 13 + chS + 11 + 13 + prow * (chP + g) - g + FOOT;
-      return { port, pw, ph, cw, chS, chP, g, sc: nS, pc, sx: 6, sy: TOP + 13, px: 6, py: TOP + 13 + chS + 11 + 13, div: TOP + 13 + chS + 5 };
+      const ph = TOP + 17 + chS + 11 + 17 + prow * (chP + g) - g + FOOT;
+      return { port, pw, ph, cw, chS, chP, g, sc: nS, pc, sx: 6, sy: TOP + 17, px: 6, py: TOP + 17 + chS + 11 + 17, div: TOP + 17 + chS + 5 };
     }
     const pc = 6, sc = 2, cw = Math.min(36, Math.floor((aw - 12 - 9 - (sc - 1) * g - (pc - 1) * g) / (sc + pc)));
     const sw = sc * cw + (sc - 1) * g, pw = 12 + sw + 9 + pc * cw + (pc - 1) * g, prow = Math.ceil(nP / pc), srow = Math.ceil(nS / sc);
-    const bodyH = Math.max(srow * (chS + g) - g, prow * (chP + g) - g), ph = TOP + 13 + bodyH + FOOT;
-    return { port, pw, ph, cw, chS, chP, g, sc, pc, sx: 6, sy: TOP + 13, px: 6 + sw + 9, py: TOP + 13, divX: 6 + sw + 4, bodyH };
+    const bodyH = Math.max(srow * (chS + g) - g, prow * (chP + g) - g), ph = TOP + 17 + bodyH + FOOT;
+    return { port, pw, ph, cw, chS, chP, g, sc, pc, sx: 6, sy: TOP + 17, px: 6 + sw + 9, py: TOP + 17, divX: 6 + sw + 4, bodyH };
   }
   function lvCard(c, id, x, y, w, hh, bd, flash, fn, hold) {
     const o = U.press[id] > 0 ? 1 : 0, on = U.lvUp.sel && U.lvUp.sel.id === id;
@@ -654,6 +667,7 @@ G.UI = (() => {
     if (L.tab === 0) lvTabUp(c, x0, y0, Y);
     else if (L.tab === 1) lvTabStat(c, x0 + 6, cy, pw - 12, footY - cy - 4);
     else lvTabData(c, x0 + 6, cy, pw - 12, footY - cy - 4);
+    if (G.Tut && G.Tut.on && G.Tut.lvTip && L.tab === 0) { const tl = G.cnWrapRich(G.Tut.lvTip, pw - 12)[0]; c.globalAlpha = (0.75 + 0.25 * Math.sin(U.t * 6)) * fade; G.cnRich(c, tl, x0 + pw / 2, footY - 15, 13, 0.5); c.globalAlpha = fade; }   // v4.0.1 新手教學提示
     // 繼續戰鬥
     const bw = Math.min(120, pw - 12), bx = Math.round(x0 + pw / 2 - bw / 2), done = !W.lvChoices(), ob = U.press.lvGo > 0 ? 1 : 0;
     U.h.key(c, bx, footY + ob, bw, 20, ob, done ? 13 : 7, done ? 2 : 1); G.cn(c, '繼續戰鬥', bx + bw / 2, footY + 4 + ob, done ? 13 : 9, 0.5);
@@ -664,9 +678,15 @@ G.UI = (() => {
     if (U.hold && U.hold.fired) { if (U.hold.s) skillCard(c, U.hold.s, U.hold.x + U.hold.w, U.hold.y + 4); else if (U.hold.pot) potCard(c, U.hold.pot, U.hold.x, U.hold.y); }
   }
   function lvTabUp(c, x0, y0, Y) {
-    const L = U.lvUp, h = W.hero, labW = (t, n, ex) => G.cnW(t) + 5 + G.cnW('剩餘點數') + 4 + G.textW(String(n)) + (ex ? 6 + G.cnW(ex) : 0);
-    const lab = (t, n, x, y, ex) => { const w0 = G.cn(c, t, x, y, 9), w1 = G.cn(c, '剩餘點數', x + w0 + 5, y, 6); G.text(c, n, x + w0 + 5 + w1 + 4, y + 3, n > 0 ? 13 : 5, 1); if (ex) G.cn(c, ex, x + w0 + 5 + w1 + 4 + G.textW(String(n)) + 6, y, 5); };
-    lab('技能', h.sp || 0, x0 + Y.sx, y0 + 22);
+    // v4.0.1 剩餘點數：數字放大成黃色徽章，會呼吸＋擴散波紋（有點數沒花一眼看得到）；0 點時是灰色
+    const L = U.lvUp, h = W.hero, bdgW = n => G.textW(String(n)) * 2 + 8, labW = (t, n) => G.cnW(t) + 5 + G.cnW('剩餘點數') + 4 + bdgW(n);
+    const lab = (t, n, x, y) => { const w0 = G.cn(c, t, x, y, 9), w1 = G.cn(c, '剩餘點數', x + w0 + 5, y, 6), bx = x + w0 + 5 + w1 + 4, bw = bdgW(n), by = y - 1;
+      if (n > 0) { const ph = (U.t * 0.9) % 1, bob = Math.round(Math.sin(U.t * 5) * 1);
+        c.globalAlpha = (1 - ph) * 0.6 * c.globalAlpha; c.fillStyle = P[13]; const e2 = Math.round(ph * 5); c.fillRect(bx - e2, by - e2 + bob, bw + e2 * 2, 1); c.fillRect(bx - e2, by + 13 + e2 + bob, bw + e2 * 2, 1); c.fillRect(bx - e2, by - e2 + bob, 1, 14 + e2 * 2); c.fillRect(bx + bw + e2 - 1, by - e2 + bob, 1, 14 + e2 * 2); c.globalAlpha = 1;
+        c.fillStyle = P[0]; c.fillRect(bx - 1, by - 1 + bob, bw + 2, 16); c.fillStyle = P[((U.t * 4) | 0) % 2 ? 13 : 14]; c.fillRect(bx, by + bob, bw, 14); c.fillStyle = P[9]; c.fillRect(bx + 1, by + 1 + bob, bw - 2, 1);
+        G.text(c, n, bx + bw / 2, by + 2 + bob, 0, 2, null, 0.5); }
+      else G.text(c, n, bx + bw / 2, by + 2, 4, 2, null, 0.5); };
+    lab('技能', h.sp || 0, x0 + Y.sx, y0 + 23);
     const sks = [...h.skills, ...h.pskills];
     sks.forEach((s, k) => {
       const col = k % Y.sc, row = (k / Y.sc) | 0, x = x0 + Y.sx + col * (Y.cw + Y.g), y = y0 + Y.sy + row * (Y.chS + Y.g), id = 'lvS' + k;
@@ -682,8 +702,8 @@ G.UI = (() => {
     c.fillStyle = P[4];
     if (Y.port) { c.fillRect(x0 + 6, y0 + Y.div, Y.pw - 12, 1); c.fillStyle = P[1]; c.fillRect(x0 + 6, y0 + Y.div + 1, Y.pw - 12, 1); }
     else { c.fillRect(x0 + Y.divX, y0 + Y.sy, 1, Y.bodyH); c.fillStyle = P[1]; c.fillRect(x0 + Y.divX + 1, y0 + Y.sy, 1, Y.bodyH); }
-    { const ex = '已升 ' + (h.ppGot || 0) + '/' + G.POT_CAP, pcw = Y.pc * Y.cw + (Y.pc - 1) * Y.g;   // 橫屏：靠右對齊，不會壓到左邊技能欄的標題
-      lab('藥水', h.pp || 0, Y.port ? x0 + Y.px : x0 + Y.px + pcw - labW('藥水', h.pp || 0, ex), y0 + Y.py - 13, ex); }
+    { const pcw = Y.pc * Y.cw + (Y.pc - 1) * Y.g;   // 橫屏：靠右對齊，不會壓到左邊技能欄的標題
+      lab('藥水', h.pp || 0, Y.port ? x0 + Y.px : x0 + Y.px + pcw - labW('藥水', h.pp || 0), y0 + Y.py - 17); }
     G.POT.forEach((it, k) => {
       const col = k % Y.pc, row = (k / Y.pc) | 0, x = x0 + Y.px + col * (Y.cw + Y.g), y = y0 + Y.py + row * (Y.chP + Y.g), id = 'lvP' + k;
       const lv = W.pot[it.id] || 0, mx = lv >= G.POT_MAX, can = W.canPot(it.id), pc = it.col === 9 ? 13 : it.col;
@@ -694,7 +714,6 @@ G.UI = (() => {
       const vt = it.k === 'rev' ? (W.rev > 0 ? 'X' + W.rev : '') : lv ? G.potVal(it, lv) : '';
       if (vt) G.text(c, vt, x + Y.cw / 2, y + 36 + o, lv ? 9 : 5, 1, null, 0.5);
     });
-    G.cn(c, '點選升級・長按看說明', x0 + Y.pw / 2, y0 + Y.ph - 25 - 16, 5, 0.5);
   }
   // 點選後的說明＋確認
   function lvDetail(c) {
@@ -717,7 +736,7 @@ G.UI = (() => {
   // 藥水資訊卡：大藥水瓶、名稱、說明、1～3 級的效果（目前等級亮黃、下一級標示）
   function potCard(c, it, ax, ay, opt) {
     const lv = W.pot[it.id] || 0, w = Math.min(it.k === 'rev' ? 184 : 168, R.uw - R.ins.l - R.ins.r - 8);
-    const head = it.k === 'rev' ? G.cnWrapRich('每升 1 級存 1 次復活。' + G.potTxt(it, 1), w - 12) : G.cnWrapRich('升級後{整場有效}，最多 3 級', w - 12);
+    const head = it.k === 'rev' ? G.cnWrapRich('每升 1 級存 1 次復活。' + G.potTxt(it, 1), w - 12) : [];
     const rows = it.k === 'rev' ? [] : [1, 2, 3].map(k => ['Lv' + k, G.cnWrapRich(G.potTxt(it, k), w - 64)]);
     const hh = 34 + head.length * 13 + rows.reduce((a2, r2) => a2 + r2[1].length * 13, 0) + 8 + (it.k === 'rev' ? 13 : 0), ex = opt && opt.foot || 0;
     const x = Math.round(opt && opt.center ? R.uw / 2 - w / 2 : G.clamp(ax - w / 2 + 18, R.ins.l + 2, R.uw - R.ins.r - w - 2)), y = Math.round(opt && opt.center ? G.clamp(R.uh / 2 - (hh + ex) / 2, R.ins.t + 2, R.uh - hh - ex - 2) : G.clamp(ay - hh - 6, R.ins.t + 2, R.uh - hh - 2));
@@ -756,10 +775,11 @@ G.UI = (() => {
     dim(c, 0.7);
     // 每個按鈕都有圖示＋名稱
     // v3.10 「這場不計入排行」改成按了重新開始／回首頁之後才跳確認（Pai：直接寫在暫停裡很冗）
-    const ranked = !G.Team.dev && W && !W.over && !W.attract, leave = (k, fn) => () => { if (ranked) { U.leaveAsk = k; G.Audio.play('open'); } else fn(); };
+    const ranked = !G.Team.dev && W && !W.over && !W.attract && !W.tut, leave = (k, fn) => () => { if (ranked) { U.leaveAsk = k; G.Audio.play('open'); } else fn(); };
     if (U.leaveAsk) return leaveAsk(c);
     if (U.ctlOpen) return setPanel(c);
-    const items = [['i_play', '繼續', () => { U.paused = false; }], ['i_guide', '教學', () => G.Menus.openGuide(true)], ['i_gear', '設定', () => { U.ctlOpen = true; }], ['i_retry', '重新開始', leave('retry', () => U.start(U.hero))],
+    const items = W && W.tut ? [['i_play', '繼續', () => { U.paused = false; }], ['i_gear', '設定', () => { U.ctlOpen = true; }], ['i_retry', '重新教學', () => G.Tut.start()], ['i_tree', '跳過教學', () => G.Tut.leave()]]   // v4.0.1 新手教學中
+      : [['i_play', '繼續', () => { U.paused = false; }], ['i_guide', '教學', () => G.Menus.openGuide(true)], ['i_gear', '設定', () => { U.ctlOpen = true; }], ['i_retry', '重新開始', leave('retry', () => U.start(U.hero))],
       ['i_tree', '回首頁', leave('home', () => U.goTitle())]];
     const bw = Math.max(Math.max(...items.map(q => G.cnW(q[1]))) + 34, Math.min(150, uw - R.ins.l - R.ins.r - 16)), bh = 20, gap = 4;
     const tot = 18 + items.length * (bh + gap) - gap;
@@ -939,13 +959,14 @@ G.UI = (() => {
     if ((U.paused || U.lvUp || U.screen !== 'battle') && G.Ctl) G.Ctl.joyEnd();
     const c = R.uctx; c.clearRect(0, 0, R.uw, R.uh); c.imageSmoothingEnabled = false; R.hi = [];
     if (G.Dom) G.Dom.begin();
-    if (G.Menus && G.Menus[U.screen]) G.Menus[U.screen](c);
+    if (G.Menus && G.Menus[U.screen]) { G.Menus[U.screen](c); if (G.Coach) G.Coach.draw(c, M_DT); }   // v4.0.1 第一次進頁面的聚光燈說明
     else {
       if (W.lvOpen && !U.paused && !U.lvUp && !W.over && U.screen === 'battle') { W.lvOpen = false; U.openLv(true); }   // v3.14 升級：暫停並打開升級頁
       if (!(W.over && W.over.t > 1.6)) hud(c);
       if (W.over && W.over.t > 1.6) { U.lvUp = null; end(c); }
       else if (U.paused) { U.btns = []; pause(c); }
       else if (U.lvUp) lvPage(c);
+      if (G.Tut && G.Tut.on) G.Tut.draw(c, M_DT);                                // v4.0.1 新手教學提示
     }
     if (G.Ach && G.Ach.drawBanner) G.Ach.drawBanner(c);
     if (G.Mail) G.Mail.drawCast(c, M_DT);                                         // v3.2 系統公告跑馬燈

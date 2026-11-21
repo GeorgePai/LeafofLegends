@@ -93,15 +93,46 @@ G.Ctl = (() => {
   };
   C.joyEnd = () => { J.on = false; J.dir = null; };
   C.joyDir = () => J.on && J.dir ? J.dir : null;
+  // v4.0.1 搖桿美術：半透明玻璃底座（金屬外環、內圈導引線、四方向箭頭）＋球形搖桿頭（左上受光、反光點）；畫好存成小圖
+  const joyC = new Map();
+  const joyBase = (R0, on) => {
+    const key = 'b' + R0 + on; let cv = joyC.get(key); if (cv) return cv;
+    const S = R0 * 2 + 3; cv = G.canvas(S, S); const q = cv.getContext('2d'), C0 = R0 + 1, put = (x, y, ci, a = 1) => { q.globalAlpha = a; q.fillStyle = P[ci]; q.fillRect(x, y, 1, 1); };
+    for (let py = 0; py < S; py++) for (let px = 0; px < S; px++) {
+      const dx = px - C0, dy = py - C0, d = Math.hypot(dx, dy), l = (-dx * 0.6 - dy * 0.8) / Math.max(d, 1);
+      if (d > R0 + 0.5) continue;
+      if (d > R0 - 0.5) { put(px, py, 0, 0.9); continue; }
+      if (d > R0 - 2.5) { put(px, py, l > 0.4 ? (on ? 9 : 8) : l < -0.35 ? 4 : (on ? 7 : 6), 0.9); continue; }
+      if (d > R0 - 3.5) { put(px, py, 0, 0.7); continue; }
+      if (Math.abs(d - R0 * 0.62) < 0.5 && G.bayer(px, py) < 0.5) { put(px, py, on ? 6 : 5, 0.6); continue; }
+      put(px, py, -dy / R0 > 0.3 ? 2 : 1, 0.42);
+    }
+    q.globalAlpha = 1; q.fillStyle = P[on ? 8 : 6];
+    for (const [ax, ay] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) for (let k = 0; k < 3; k++) { const x0 = C0 + ax * (R0 - 6), y0 = C0 + ay * (R0 - 6); q.fillRect(x0 - (ay ? k : 0) - (ax ? ax * k : 0), y0 - (ax ? k : 0) - (ay ? ay * k : 0), ay ? k * 2 + 1 : 1, ax ? k * 2 + 1 : 1); }
+    joyC.set(key, cv); return cv;
+  };
+  const joyKnob = (kr, on) => {
+    const key = 'k' + kr + on; let cv = joyC.get(key); if (cv) return cv;
+    const S = kr * 2 + 5; cv = G.canvas(S, S); const q = cv.getContext('2d'), C0 = kr + 1, ramp = on ? [4, 5, 6, 7, 8, 9] : [3, 4, 5, 6, 7, 8], put = (x, y, ci, a = 1) => { q.globalAlpha = a; q.fillStyle = P[ci]; q.fillRect(x, y, 1, 1); };
+    for (let py = 0; py < S; py++) for (let px = 0; px < S; px++) {
+      const dx = px - C0, dy = py - C0, d = Math.hypot(dx, dy);
+      if (d > kr + 0.5) { if (Math.hypot(dx - 1, dy - 2) <= kr + 0.5) put(px, py, 0, 0.45); continue; }
+      if (d > kr - 0.5) { put(px, py, 0); continue; }
+      const n = G.clamp(((-dx * 0.55 - dy * 0.75) / kr) * 0.6 + (1 - d / kr) * 0.55 + 0.15, 0, 0.999) + (G.bayer(px, py) - 0.5) * 0.12;
+      put(px, py, ramp[G.clamp(Math.floor(n * ramp.length), 0, ramp.length - 1)]);
+    }
+    put(C0 - Math.round(kr * 0.4), C0 - Math.round(kr * 0.45), 9); put(C0 - Math.round(kr * 0.4) + 1, C0 - Math.round(kr * 0.45), 9); put(C0 - Math.round(kr * 0.4), C0 - Math.round(kr * 0.45) + 1, 9);
+    q.globalAlpha = 1; joyC.set(key, cv); return cv;
+  };
+  C.drawJoyAt = (c, bx, by, kx, ky, R0, on) => {
+    const kr = Math.round(R0 * 0.42);
+    c.globalAlpha = on ? 1 : 0.7; c.drawImage(joyBase(R0, on), Math.round(bx) - R0 - 1, Math.round(by) - R0 - 1);
+    c.drawImage(joyKnob(kr, on), Math.round(kx) - kr - 1, Math.round(ky) - kr - 1); c.globalAlpha = 1;
+  };
   C.drawJoy = c => {
     if (!C.joyOn()) return;
-    const r = C.rect('joy'), R0 = r.w / 2, on = J.on, bx = on ? J.bx : r.cx, by = on ? J.by : r.cy, kx = on ? J.kx : r.cx, ky = on ? J.ky : r.cy;
-    c.globalAlpha = on ? 0.85 : 0.4;
-    G.pxDisc(c, bx, by, R0, R0, 0, 0.35); G.pxEllipse(c, bx, by, R0, R0, on ? 7 : 5); G.pxEllipse(c, bx, by, R0 - 1, R0 - 1, 0);
-    c.fillStyle = P[on ? 8 : 6];
-    for (const [ax, ay] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) for (let k = 0; k < 3; k++) { const px = Math.round(bx + ax * (R0 - 5)), py = Math.round(by + ay * (R0 - 5)); c.fillRect(px - (ay ? k : 0) + (ax ? -ax * k : 0), py - (ax ? k : 0) + (ay ? -ay * k : 0), ay ? k * 2 + 1 : 1, ax ? k * 2 + 1 : 1); }
-    const kr = Math.round(R0 * 0.42); G.pxDisc(c, kx, ky + 1, kr, kr, 0, 0.5); G.pxDisc(c, kx, ky, kr, kr, on ? 8 : 6, 1); G.pxDisc(c, kx - 1, ky - 1, kr - 2, kr - 2, on ? 9 : 7, 1); G.pxEllipse(c, kx, ky, kr, kr, 0);
-    c.globalAlpha = 1;
+    const r = C.rect('joy'), R0 = Math.round(r.w / 2), on = J.on;
+    C.drawJoyAt(c, on ? J.bx : r.cx, on ? J.by : r.cy, on ? J.kx : r.cx, on ? J.ky : r.cy, R0, on);
   };
 
   // ---------- 排版編輯器 ----------
@@ -112,7 +143,7 @@ G.Ctl = (() => {
   // 編輯畫面上的元件外觀（和戰鬥中一樣：主動圓形、被動方形）
   C.drawPart = (c, id, r, col) => {
     const h = G.W && G.W.hero, U0 = U();
-    if (id === 'joy') { const R0 = r.w / 2; G.pxDisc(c, r.cx, r.cy, R0, R0, 0, 0.35); G.pxEllipse(c, r.cx, r.cy, R0, R0, col); const kr = Math.round(R0 * 0.42); G.pxDisc(c, r.cx, r.cy, kr, kr, 7, 1); G.pxEllipse(c, r.cx, r.cy, kr, kr, 0); return; }
+    if (id === 'joy') { const R0 = Math.round(r.w / 2); C.drawJoyAt(c, r.cx, r.cy, r.cx, r.cy, R0, true); if (col !== 7) G.pxEllipse(c, r.cx, r.cy, R0 + 1, R0 + 1, col); return; }
     if (id === 'atk') { U0.circBtn(c, r.cx, r.cy, r.w / 2, 1, col); C.atkIcon(c, r.cx, r.cy, r.w / 2); return; }
     if (id === 'cam') { H().box(c, r.x, r.y, r.w, r.h, 1, col); H().icon(c, 'i_center', r.cx, r.cy); return; }
     if (id === 'zoom') { const w2 = Math.round((r.w - 3) / 2); H().box(c, r.x, r.y, w2, r.h, 0, col); H().icon(c, 'i_zout', r.x + w2 / 2, r.cy); H().box(c, r.x + r.w - w2, r.y, w2, r.h, 0, col); H().icon(c, 'i_zin', r.x + r.w - w2 / 2, r.cy); return; }
@@ -157,12 +188,23 @@ G.Ctl = (() => {
       };
     }
   };
-  // 普攻鈕圖示：交叉雙劍（依按鈕大小放大）
+  // v4.0.1 普攻鈕圖示：拳頭（依按鈕大小整數放大）
+  const FIST = [
+    '..0000000000..',
+    '.099099099990.',
+    '.097097097970.',
+    '0977077077770.',
+    '0999999999970.',
+    '0000000099970.',
+    '0999999909970.',
+    '0977777709970.',
+    '.000000099970.',
+    '..09999999770.',
+    '..07777777770.',
+    '...000000000..'];
   C.atkIcon = (c, cx, cy, R0, col = 9) => {
-    const k = Math.max(1, Math.round(R0 / 10)), L = 5;
-    for (let i = -L; i <= L; i++) { c.fillStyle = P[0]; c.fillRect(cx + i * k - k, cy + i * k - k, k * 3, k * 3); c.fillRect(cx + i * k - k, cy - i * k - k, k * 3, k * 3); }
-    for (let i = -L; i <= L; i++) { c.fillStyle = P[i > L - 2 ? 5 : col]; c.fillRect(cx + i * k, cy + i * k, k, k); c.fillRect(cx - i * k, cy + i * k, k, k); }
-    c.fillStyle = P[13]; c.fillRect(cx + (L - 2) * k - k, cy + (L - 2) * k + k, k * 3, k); c.fillRect(cx - (L - 2) * k - k, cy + (L - 2) * k + k, k * 3, k);
+    const k = Math.max(1, Math.floor(R0 / 8)), w = FIST[0].length, h = FIST.length, x0 = Math.round(cx - w * k / 2), y0 = Math.round(cy - h * k / 2);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const ch = FIST[y][x]; if (ch === '.') continue; c.fillStyle = P[ch === '0' ? 0 : ch === '9' ? col : col === 9 ? 7 : 4]; c.fillRect(x0 + x * k, y0 + y * k, k, k); }
   };
   // 移動方式切換列（首頁設定、戰鬥操作設定共用）：回傳高度
   C.moveRow = (c, x, y, w) => {

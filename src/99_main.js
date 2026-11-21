@@ -19,17 +19,15 @@ G.boot = function () {
   G.UI.goTitle(); G.UI.screen = 'tap'; G.Intro.reset(); G.Audio.init();   // 點一下開始（解鎖聲音）→ 開場動畫 → 標題
   const STEP = 1 / 60;
   let last = performance.now(), acc = 0, fpsT = 0, fpsN = 0;
-  // v4.0 省電：畫面最多每秒 60 張（高刷新率手機不再跑 120 張）；暫停、升級頁、按鈕排版時 30 張（畫面幾乎不動）
+  // v4.0.1 拿掉 v4.0 的幀數上限：90Hz 手機會被砍成 45 張、觸發 08b_hd 自動降解析度＋關 2 倍細緻（畫質變差、角色抖）
   function frame(now) {
-    const U0 = G.UI, still = U0.paused || U0.lvUp || (G.Ctl && G.Ctl.ed), minMs = still ? 1000 / 30 : 1000 / 60;
-    if (now - last < minMs - 2) { requestAnimationFrame(frame); return; }
     let dt = (now - last) / 1000; last = now;
     if (dt > 0.1) dt = 0.1; if (dt < 0) dt = 0;
     fpsT += dt; fpsN++;
     if (fpsT >= 0.5) { const U = G.UI, f = fpsN / fpsT; U.fps = f; fpsT = 0; fpsN = 0;
       if (U.screen === 'battle' && !U.paused && !document.hidden) { U.fpsA = U.fpsA ? U.fpsA * 0.9 + f * 0.1 : f; U.fpsLo = Math.min(f, (U.fpsLo || f) + 0.5); } }   // v3.4 戰鬥幀數（約 5 秒平均、最低值慢慢回升）→ 管理玩家監測
     const W = G.W, U = G.UI;
-    if (!U.paused && !U.lvUp && !(G.Menus && G.Menus.covers(U.screen)) && !(G.StageGo && G.StageGo.hold())) {
+    if (!U.paused && !U.lvUp && !(G.Tut && G.Tut.hold()) && !(G.Menus && G.Menus.covers(U.screen)) && !(G.StageGo && G.StageGo.hold())) {
       W.keyDir = U.screen === 'battle' ? U.keyDir() : null;
       if (W.keyDir && !G.Ctl.joyDir()) G.Render.cam.follow = true;   // 鍵盤移動：鏡頭跟著；v4.0 搖桿移動時可以另一指拖曳看地圖（按下搖桿那一刻才回到英雄）
       acc += dt;
